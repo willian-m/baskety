@@ -12,6 +12,21 @@ Two distinct subsystems with different philosophies:
 - **Inventory subsystem (item-centric):** source of truth is the item record. Transactions automate updates but do not define state. Consumption is never logged — quantities are edited directly.
 - **Price tracking subsystem (transaction-centric):** purchase records focused on price, store, brand, and date. Not used to compute inventory state.
 
+### Money & quantity representation (canonical)
+
+This decision is pinned here and propagated unchanged through the Go DTOs and the TS types.
+
+- **Money:** stored as integer **minor units** (`BIGINT`, e.g. cents) plus an ISO-4217 `currency CHAR(3)`. Never floating point. A `price_per_unit_minor` of `349` with `currency = 'USD'` means $3.49. Display formatting (decimal placement) is a client concern driven by the currency code.
+- **Quantity:** stored as `NUMERIC` for decimal precision (e.g. `1.5 kg`). Serialized as a **string** in JSON and typed as `string` in TS to avoid float rounding. In Go it is `decimal.Decimal` (or `pgtype.Numeric`), never `float64`.
+
+### Timestamp & timezone representation (canonical)
+
+This decision is pinned here and propagated unchanged through the Go DTOs and the TS types. It applies to **every** temporal column in this schema — `created_at`, `updated_at`, `expires_at`, `revoked_at`, `joined_at`, `added_at`, `emptied_at`, `purchased_at`, `completed_at`, `pinned_at`, and any future timestamp.
+
+- **Storage:** Postgres `timestamptz` (timestamp with time zone). Values are stored and computed in **UTC** — the server runs and inserts in UTC; clients never send a local-time naive timestamp.
+- **Wire format:** serialized as an **RFC 3339 / ISO-8601 string in UTC** (e.g. `2026-06-08T14:30:00Z`, always with the `Z` offset). In Go this is `time.Time` marshaled to RFC 3339; in TS it is typed as `string` (ISO-8601). Clients parse to a local-time display value at render only.
+- **Comparisons & expiry:** all expiry/retention logic (`expires_at < now()` for sessions, share links, archived lists; batch `emptied_at`; expiry badges) compares against `now()` in UTC. Display "expires in N days" / red-amber-green badges are computed client-side from the UTC value against the client clock.
+
 ---
 
 ## Section 1: Identity & Households
@@ -54,7 +69,7 @@ inventory_share_links
 - A session is invalid if `revoked_at IS NOT NULL` or `expires_at < now()`.
 - Logout stamps `revoked_at` on the current session — instant invalidation.
 - Expired sessions are purged by pg_cron. Session duration is configurable via `user_settings` (`session_duration_days`, default 30).
-- The public user (link-based access) does not get a `sessions` row — its context is scoped entirely within the request via the share link token.
+- The public user (link-based access) does not get a `sessions` row — its context is scoped entirely within the request via the share link token. The unauthenticated read-only endpoint that serves a share link is `GET /api/v1/share/:token/inventory` (see the Go backend spec); presenting the token resolves a request-scoped context for the public user without writing any `sessions` row.
 
 ### Rules
 
@@ -66,7 +81,7 @@ inventory_share_links
 
 Two distinct patterns:
 
-1. **Link-based access (public user):** A system-seeded singleton user (well-known UUID, seeded at deploy time) represents anonymous link access. When someone visits a valid `inventory_share_links` token, the server creates a session for the public user scoped to that inventory. No `household_members` row is created. Password on the link is optional.
+1. **Link-based access (public user):** A system-seeded singleton user (well-known UUID, seeded at deploy time) represents anonymous link access. When someone presents a valid `inventory_share_links` token to `GET /api/v1/share/:token/inventory`, the server resolves a request-scoped context for the public user locked to that inventory. No `sessions` row and no `household_members` row is created. Password on the link is optional.
 
 2. **Invited guest (existing user):** An existing user receives a `household_members` row with `role = guest` plus an explicit `inventory_permissions` row (see Section 2). They log in with their own account and switch household context in the UI.
 
@@ -83,11 +98,11 @@ inventory_permissions
     permission (full|read_only|deny)
 
 inventory_items
-  — id, inventory_id, name, unit, target_quantity, category,
+  — id, inventory_id, name, unit, target_quantity (NUMERIC; serialized as string), category,
     notes, deleted_at (nullable), created_at, updated_at
 
 inventory_batches
-  — id, inventory_item_id, quantity,
+  — id, inventory_item_id, quantity (NUMERIC; serialized as string),
     expires_at (nullable),
     added_at,
     emptied_at (nullable),
@@ -101,9 +116,10 @@ inventory_batches
 - **Guest (no row):** defaults to `deny`. An explicit `read_only` row must be created to grant access.
 - `deny` permission means the inventory does not appear in the user's view at all.
 - `deleted_at` on `inventory_items` is a soft delete, preserving transaction history integrity.
+- **FK integrity under soft delete & purge:** soft-deleting an `inventory_items` row (stamping `deleted_at`) and the cruncher purging empty `inventory_batches` must never orphan `purchase_transactions` (which reference `receipt_scan_item_id` / `grocery_list_item_id`) nor break `ProcessPurchaseTransactionJob`'s inventory resolution (`receipt_scan_item_id → receipt_scan_items.inventory_item_id`). Soft delete keeps the `inventory_items` row resolvable; the cruncher only deletes batches, never items or `receipt_scan_items`. This invariant is covered by an integration test (see the Go backend spec, Section 8).
 - **Batch lifecycle:** quantity is decremented as items are consumed. When it reaches 0, `emptied_at` is stamped. A background cruncher periodically purges zero-quantity batches.
 - A user who does not want batch tracking simply maintains one batch per item with `expires_at = NULL`.
-- Total quantity on hand = `SUM(quantity)` across batches where `emptied_at IS NULL`.
+- Total quantity on hand = `SUM(quantity)` across batches where `emptied_at IS NULL`. The sum is `NUMERIC` and is serialized as a string (never `float64`) all the way out to the API.
 
 ---
 
@@ -121,7 +137,7 @@ grocery_lists
 grocery_list_items
   — id, grocery_list_id,
     inventory_item_id (nullable),
-    name, quantity, unit, notes,
+    name, quantity (NUMERIC; serialized as string), unit, notes,
     status (pending|bought|skipped),
     sort_order,
     created_at, updated_at
@@ -158,19 +174,19 @@ receipt_scan_items
     raw_text,
     parsed_name (nullable),
     parsed_brand (nullable),
-    parsed_quantity (nullable),
+    parsed_quantity (nullable, NUMERIC; serialized as string),
     parsed_unit (nullable),
-    parsed_price_per_unit (nullable),
-    parsed_currency (nullable),
+    parsed_price_per_unit_minor (nullable, BIGINT minor units),
+    parsed_currency (nullable, ISO-4217 CHAR(3)),
     parsed_store_name (nullable),
     confidence_score (nullable),
     status (pending|accepted|rejected|corrected),
     inventory_item_id (nullable),
     corrected_name (nullable),
     corrected_brand (nullable),
-    corrected_quantity (nullable),
-    corrected_price_per_unit (nullable),
-    corrected_currency (nullable),
+    corrected_quantity (nullable, NUMERIC; serialized as string),
+    corrected_price_per_unit_minor (nullable, BIGINT minor units),
+    corrected_currency (nullable, ISO-4217 CHAR(3)),
     corrected_store_name (nullable),
     created_at, updated_at
 ```
@@ -207,8 +223,8 @@ purchase_transactions
     receipt_scan_item_id (nullable),
     catalog_entry_id (nullable),
     store_id (nullable),
-    price_per_unit, currency,
-    quantity (nullable),
+    price_per_unit_minor (BIGINT minor units), currency (ISO-4217 CHAR(3)),
+    quantity (nullable, NUMERIC; serialized as string),
     purchased_at, created_at
 ```
 
@@ -218,7 +234,7 @@ purchase_transactions
 - **Catalog deduplication:** `canonical_entry_id` points to the canonical entry when two are merged. The non-canonical entry becomes an alias. On merge, all `purchase_transactions` referencing the alias are re-pointed to the canonical entry. App-layer queries always follow the canonical chain.
 - `scope = public, household_id = NULL`: public catalog built from aggregated user transactions.
 - `scope = private`: household-only catalog for brand/product preferences.
-- `purchase_transactions.quantity` is nullable — useful context but not required for price tracking.
+- `purchase_transactions.quantity` (`NUMERIC`, serialized as a string) is nullable — useful context but not required for price tracking. `price_per_unit_minor` is integer minor units paired with the ISO-4217 `currency` code (see Money & quantity representation).
 - A transaction is created for every bought item: receipt scan commit, manual grocery list completion, or direct inventory update.
 
 ---

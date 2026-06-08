@@ -51,11 +51,11 @@ baskety/
 ├── sqlc.yaml
 ├── Makefile                      # generate, migrate, lint, test targets
 ├── config.yaml                   # operator config (see Section 7)
-├── Dockerfile
-├── docker-compose.yml
 ├── go.mod
 └── go.sum
 ```
+
+> The container build and Compose stack are **not** inside `baskety/`. The canonical multi-stage `Dockerfile` and `docker-compose.yml` live at the **monorepo root** and are owned by the Docker/CI spec (`2026-06-08-docker-cicd-design.md`, Section 1) — the build context must be the repo root so the Go binary and the web app are built together.
 
 **Notes:**
 - `gen/sqlc/` is committed so contributors can build without installing sqlc. `make generate` regenerates it when queries change.
@@ -80,7 +80,7 @@ RequestID → Logger → Recoverer → Auth → HouseholdScope → [route handle
 | `Logger` | Structured JSON log per request (method, path, status, latency, request ID) |
 | `Recoverer` | Catches panics, returns 500 without crashing the server |
 | `Auth` | Reads `Authorization: Bearer <token>`, validates session, attaches `userID` to context. Returns 401 if missing/invalid/expired/revoked. Public routes bypass this. |
-| `HouseholdScope` | Resolves the authenticated user's active household, attaches `householdID` to context. All downstream write operations use this value — never a user-supplied household ID. |
+| `HouseholdScope` | Resolves the request's active household from the `X-Household-ID` header, validates it against the caller's `household_members` rows (active, non-revoked, non-expired), and attaches the resolved `householdID` to context. If the header is absent it falls back to the caller's default membership; if present but the caller is not a member, it returns `403`. The header is a **selection** channel only — it never grants cross-household authorization, and all downstream writes use the validated context value, never the raw header. Public share-link routes bypass this middleware (see Section 5). |
 
 ### Route grouping
 
@@ -92,6 +92,7 @@ RequestID → Logger → Recoverer → Auth → HouseholdScope → [route handle
     DELETE /session
 
   /households
+    GET    /                        # lists the caller's household memberships (id, name, role)
     POST   /
     GET    /:householdID
     POST   /:householdID/members
@@ -130,9 +131,14 @@ RequestID → Logger → Recoverer → Auth → HouseholdScope → [route handle
     GET    /stores
     GET    /transactions
 
+  /share
+    GET    /:token/inventory        # unauthenticated; bypasses Auth + HouseholdScope (see Section 5)
+
   /settings
     GET    /
     PATCH  /
+
+  /openapi.json                     # OpenAPI 3.1 document for this API (drives @baskety/core type generation)
 ```
 
 This list is a starting skeleton — it will grow as features are implemented.
@@ -144,10 +150,22 @@ This list is a starting skeleton — it will grow as features are implemented.
 ### Response envelope
 
 ```json
-{ "data": { ... } }           // success
-{ "error": "message" }        // client error (4xx)
-{ "error": "internal error" } // server error (5xx) — detail logged, not exposed
+{ "data": { ... } }                                    // success (single resource)
+{ "data": [ ... ], "next_cursor": "<opaque>" }         // success (paginated collection)
+{ "error": "message" }                                 // client error (4xx)
+{ "error": "message", "fields": { "name": "..." } }    // validation error (422) — per-field messages
+{ "error": "internal error" }                          // server error (5xx) — detail logged, not exposed
 ```
+
+**Validation errors:** any request that fails field validation returns `422` with an optional `fields` object mapping a request field name to a human-readable message. Clients map `fields` entries onto form inputs; the top-level `error` is the summary. Non-field client errors omit `fields`.
+
+**Pagination (cursor-based):** collection endpoints (`GET /inventories/:inventoryID/items`, `GET /grocery-lists`, `GET /catalog/entries`, `GET /catalog/stores`, `GET /catalog/transactions`) accept `?limit=<n>&cursor=<opaque>`. The response is `{ "data": [...], "next_cursor": "<opaque>" }`. `next_cursor` is `null` when the final page has been returned. Cursors are opaque, server-encoded, and stable across inserts. Pagination helpers live in `internal/shared/` (see Section 3). `limit` has a server default and a server-enforced maximum.
+
+### OpenAPI document (source of truth for client types)
+
+The backend is the **producer** of the API contract: it emits an OpenAPI 3.1 document describing every route, the response envelope, the `{ error, fields }` 422 shape, cursor pagination (`{ data, next_cursor }`), and the canonical money/quantity/timestamp encodings (money as `int64` minor units + ISO-4217 `currency`; quantities as decimal strings; timestamps as RFC 3339 UTC strings — see the DB spec). The document is generated from the chi routes and the per-domain `dto.go` structs (e.g. via struct tags + a generator such as `swaggo`/`go-swagger`, committed under `gen/`) and is served read-only at `GET /api/v1/openapi.json`.
+
+`@baskety/core/api/types.ts` is generated from this document via `openapi-typescript` and consumed by both web and mobile (see the frontend spec, Section 3, and the Android spec, Section 3). CI regenerates the document and the TS types and fails on drift, eliminating the hand-written-DTO ↔ hand-written-TS-type divergence class. Hand-written TS types are the **interim** state; OpenAPI-generated types are the target.
 
 ---
 
@@ -163,7 +181,7 @@ internal/<domain>/
   service.go        ← business logic; depends on Repository interface
   handler.go        ← Handler struct + all HandleX methods
   routes.go         ← RegisterRoutes(r chi.Router) — full URL surface in one place
-  dto.go            ← request/response structs + decode/validate helpers
+  dto.go            ← request/response structs + decode/validate helpers (money as int64 minor units + ISO-4217 currency string; quantities as decimal serialized to JSON strings — never float64; timestamps as RFC 3339 UTC strings — see the DB spec). These structs are the source for the generated OpenAPI document (Section 2) that drives @baskety/core's TS types.
   worker.go         ← River job definitions for this domain (only in domains that own jobs)
 ```
 
@@ -190,7 +208,7 @@ The interface is defined in the domain package (consumer-defined, idiomatic Go) 
 type Repository interface {
     GetItem(ctx context.Context, id uuid.UUID) (*model.InventoryItem, error)
     ListItems(ctx context.Context, inventoryID uuid.UUID) ([]model.InventoryItem, error)
-    SumBatchQuantity(ctx context.Context, itemID uuid.UUID) (float64, error)
+    SumBatchQuantity(ctx context.Context, itemID uuid.UUID) (decimal.Decimal, error)
     WithTx(tx *pgx.Tx) Repository
 }
 ```
@@ -314,7 +332,7 @@ Configurable via `user_settings` (`session_duration_days`, default 30). Expired 
 
 ### Share link access (public user)
 
-A system-seeded singleton user (well-known UUID) represents anonymous link access. When a valid `inventory_share_links` token is presented via query param, the `Auth` middleware creates a request context scoped to `userID = public_user_uuid` and `inventoryID` locked to that share link. No `sessions` row is created.
+A system-seeded singleton user (well-known UUID) represents anonymous link access. Share links are served by a dedicated, unauthenticated endpoint `GET /api/v1/share/:token/inventory` that is mounted **outside** the `Auth` and `HouseholdScope` middleware. The token travels in the **URL path** (`:token`), matching the client `/share/:token` route. The handler resolves a request-scoped context with `userID = public_user_uuid` and `inventoryID` locked to that share link, validating any optional password on the link. **No `sessions` row is created** — the context lives only for the duration of the request. The response is a read-only inventory view; no write routes are exposed to the public user.
 
 ---
 
@@ -485,6 +503,10 @@ internal/inventory/repository_pg_test.go
 internal/receipt/repository_pg_test.go
 ...
 ```
+
+**Cruncher / soft-delete integrity test (required).** A dedicated integration test asserts that the "purge empty batches" pg_cron task and `inventory_items.deleted_at` soft delete never orphan `purchase_transactions` and never break inventory resolution. It seeds a receipt commit (creating `receipt_scan_items` with a resolved `inventory_item_id`, an `inventory_batches` row, and a `purchase_transactions` row referencing `receipt_scan_item_id`), then:
+- soft-deletes the `inventory_items` row (`deleted_at` set) and runs the empty-batch purge against an emptied batch, and
+- asserts the `purchase_transactions` row still resolves its line-item FKs and that `ProcessPurchaseTransactionJob` re-run still follows `receipt_scan_item_id → receipt_scan_items.inventory_item_id` to the (soft-deleted) item without error — confirming the purge deletes only batches, never items or `receipt_scan_items`.
 
 ### Handler tests — HTTP layer
 

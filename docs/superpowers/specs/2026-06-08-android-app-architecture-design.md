@@ -95,18 +95,43 @@ packages/core/src/
   tsconfig.json
 ```
 
-### API client — base URL
+### API client — base URL and headers (canonical)
 
-`client.ts` reads `uiStore.getState().activeServerUrl` on every request. Zustand stores expose `getState()` outside React — no hook required.
+`client.ts` is the single shared client for both apps. It reads `uiStore.getState()` on every request — Zustand stores expose `getState()` outside React, no hook required — and derives the base URL plus auth and household headers from it.
 
-- **On web:** `activeServerUrl` is always `null`. The client uses a relative `/api/v1` path, which the Vite proxy rewrites to the Go backend.
-- **On mobile:** `useServerUrl` runs in the root `_layout.tsx`, computes the active URL from the current WiFi SSID, and writes it to `uiStore.activeServerUrl` via `setActiveServerUrl`. The client prepends it on every request.
+- **Base URL.** Reads `activeServerUrl`.
+  - **On web:** `activeServerUrl` is always `null`. The client uses a relative `/api/v1` path, which the Vite proxy rewrites to the Go backend.
+  - **On mobile:** `useServerUrl` runs in the root `_layout.tsx`, computes the active URL from the current WiFi SSID, and writes it to `uiStore.activeServerUrl` via `setActiveServerUrl`. The client prepends it on every request.
+- **Auth header.** If `token` is set, sends `Authorization: Bearer <token>`.
+- **Household header.** If `activeHouseholdId` is set, sends `X-Household-ID: <activeHouseholdId>` (the backend `HouseholdScope` middleware validates it against the caller's memberships — selection only).
+- **Content-Type.** Set to `application/json` **only** for non-`FormData` bodies. For the receipt multipart upload the body is `FormData`, so the client must **not** set `Content-Type` — `fetch` sets the multipart boundary itself.
+
+```ts
+// @baskety/core/api/client.ts  (canonical; the web spec defers to this)
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { activeServerUrl, token, activeHouseholdId } = uiStore.getState();
+  const base = activeServerUrl ?? "";                 // null on web → relative for Vite proxy
+  const headers = new Headers(init?.headers);
+  if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");  // never forced for FormData (receipt upload)
+  }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (activeHouseholdId) headers.set("X-Household-ID", activeHouseholdId);
+
+  const res = await fetch(`${base}/api/v1${path}`, { ...init, headers });
+  const body = await res.json();
+  if (!res.ok) throw new ApiError(res.status, body.error, body.fields);
+  return (body as { data: T }).data;
+}
+```
 
 This keeps `@baskety/core/api/client.ts` free of platform imports while still reacting to network changes.
 
 ### Queries
 
-All TanStack Query hooks migrated from `apps/web/src/features/*/queries.ts` into this package. Both apps import the same hooks (`useInventoryItems`, `useGroceryLists`, etc.) and the same query key hierarchy.
+All TanStack Query hooks are defined in this package (`@baskety/core/queries/`) — there are no per-feature `queries.ts` files in either app. Both apps import the same hooks (`useInventoryItems`, `useGroceryLists`, etc.) and the same household-scoped query key hierarchy (`["<domain>", householdId, ...]`; scan line items keyed by `scanId`). A `useHouseholds()` hook (`GET /households`, key `["households"]`) lists the caller's memberships to drive the household selector.
+
+**Type contract (`api/types.ts`):** money is `pricePerUnitMinor: number` (integer minor units) paired with `currency: string` (ISO-4217); quantities are `string` (decimal, never a JS `number`, to avoid float rounding); timestamps are `string` (ISO-8601 / RFC 3339 UTC). These mirror the DB schema and Go DTOs exactly — see the DB spec's "Money & quantity representation" and "Timestamp & timezone representation". These types are **hand-written for now (interim)**; the target is generating `types.ts` from the backend's OpenAPI document (`GET /api/v1/openapi.json`) via `openapi-typescript`, consumed identically by web and mobile, with CI checking for drift (owned by the Go backend spec, Section 2; see the frontend spec, Section 3).
 
 ### Stores
 
@@ -280,7 +305,7 @@ First-run sequence: onboarding → login → app. No per-screen auth checks.
 
 ### Deep links
 
-Expo Router handles deep links via the `scheme` in `app.json`. The share link route (`baskety://share/:token`) resolves outside `(app)` — no auth required.
+Expo Router handles deep links via the `scheme` in `app.json`. The share link route (`baskety://share/:token`) resolves outside `(app)` — no auth required. The token is read from the URL **path** and the read-only view is fetched from the dedicated unauthenticated backend endpoint `GET /api/v1/share/:token/inventory` (see the Go backend spec, Section 5); no session is created.
 
 ---
 
@@ -342,6 +367,8 @@ persistQueryClient({
 
 Only grocery list queries are persisted to AsyncStorage. Receipt, report, and settings data is not — stale data there causes confusion, not convenience.
 
+Collection queries (grocery lists, catalog entries/stores/transactions, inventory items) use the backend's cursor pagination (`?limit=&cursor=` → `{ "data": [...], "next_cursor": "..." }`, see the Go backend spec) via TanStack Query's `useInfiniteQuery`; `next_cursor === null` marks the final page.
+
 ### Offline mutation queuing
 
 Grocery list item mutations use `networkMode: 'offlineFirst'`. When offline, TanStack Query queues mutations in memory. `useOfflineSync` listens to NetInfo and calls `queryClient.resumePausedMutations()` when connectivity returns.
@@ -385,10 +412,11 @@ form.append('image', {
   type: 'image/jpeg',
 })
 await request('/receipts/scans', { method: 'POST', body: form })
-// Content-Type omitted — fetch sets multipart boundary automatically
+// Body is FormData, so the shared client (Section 3) skips setting Content-Type —
+// fetch sets the multipart boundary automatically. Auth + X-Household-ID are still attached.
 ```
 
-`POST /receipts/scans` already accepts `multipart/form-data`. No backend changes required.
+`POST /receipts/scans` already accepts `multipart/form-data`. The shared `request()` in `@baskety/core/api/client.ts` only sets `Content-Type: application/json` for non-`FormData` bodies, so this upload works unchanged. No backend changes required.
 
 ### Polling during processing
 

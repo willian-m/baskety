@@ -134,22 +134,25 @@ apps/web/
 
 ### Fetch wrapper
 
-The API client lives in `@baskety/core/api/client.ts` (shared with the mobile app) and is re-exported from `shared/lib/api-client.ts` for convenience within the web app. It handles the Go API response envelope (`{ "data": {...} }` / `{ "error": "..." }`), attaches the auth token, and throws `ApiError` on non-2xx responses so TanStack Query's error handling activates automatically.
+The API client lives in `@baskety/core/api/client.ts` (shared with the mobile app) and is re-exported from `shared/lib/api-client.ts` for convenience within the web app. It handles the Go API response envelope (`{ "data": {...} }` / `{ "error": "..." }`), attaches the auth token, attaches the active-household header, and throws `ApiError` on non-2xx responses so TanStack Query's error handling activates automatically. The canonical shape of this client is owned by the Android spec (`uiStore` exposes `activeServerUrl`); the web app uses the same code — `activeServerUrl` is `null` on web so requests stay relative for the Vite proxy.
 
 ```ts
 // @baskety/core/api/client.ts
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/v1${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader(),   // reads token from uiStore
-      ...init?.headers,
-    },
-  });
+  const base = useUiStore.getState().activeServerUrl ?? "";  // null on web → relative path for Vite proxy
+  const headers = new Headers(init?.headers);
+  // Do NOT force Content-Type: a FormData body (receipt upload) must set its own multipart boundary.
+  if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const { token, activeHouseholdId } = useUiStore.getState();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (activeHouseholdId) headers.set("X-Household-ID", activeHouseholdId);
+
+  const res = await fetch(`${base}/api/v1${path}`, { ...init, headers });
 
   const body = await res.json();
-  if (!res.ok) throw new ApiError(res.status, body.error);
+  if (!res.ok) throw new ApiError(res.status, body.error, body.fields);
   return body.data as T;
 }
 ```
@@ -160,14 +163,16 @@ All TanStack Query hooks are defined in `@baskety/core/queries/` and consumed by
 
 ```ts
 // @baskety/core/queries/inventory.ts
-export function useInventoryItems(inventoryId: string) {
+// Query keys are scoped by householdId (the active household, sent as the X-Household-ID
+// header by the client). Switching household invalidates every household-scoped key.
+export function useInventoryItems(householdId: string, inventoryId: string) {
   return useQuery({
-    queryKey: ["inventory", inventoryId, "items"],
+    queryKey: ["inventory", householdId, "items", inventoryId],
     queryFn: () => request<InventoryItem[]>(`/inventories/${inventoryId}/items`),
   });
 }
 
-export function useUpdateBatch(inventoryId: string) {
+export function useUpdateBatch(householdId: string, inventoryId: string) {
   return useMutation({
     mutationFn: ({ itemId, ...body }: { itemId: string; [k: string]: unknown }) =>
       request(`/inventories/${inventoryId}/items/${itemId}/batches`, {
@@ -175,27 +180,30 @@ export function useUpdateBatch(inventoryId: string) {
         body: JSON.stringify(body),
       }),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["inventory", inventoryId] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory", householdId] }),
   });
 }
 ```
 
 ### TypeScript types
 
-Types are hand-written in `@baskety/core/api/types.ts` to match Go API response shapes. No code generation at this stage — the API surface is small enough. `openapi-typescript` can be introduced later if the API grows significantly.
+`@baskety/core/api/types.ts` holds the domain TypeScript types matching the Go API response shapes. **Interim state:** these are hand-written to match the Go DTOs (money as `number` minor units + `currency` string, quantities and timestamps as `string` — see the DB spec). **Target state:** the Go backend emits an OpenAPI 3.1 document (served at `GET /api/v1/openapi.json`, generated from the chi routes + `dto.go` structs — owned by the Go backend spec, Section 2), and `types.ts` is **generated from it via `openapi-typescript`**. Both `apps/web` and `apps/mobile` consume the generated types unchanged. CI regenerates the types from the document and fails on drift, so the hand-written-DTO ↔ hand-written-TS-type divergence class (which underlies the money/quantity and pagination contracts) is eliminated. The hand-written types are removed once generation is wired into CI.
 
 ### Query key hierarchy
 
+One scheme: every household-scoped key is `["<domain>", householdId, ...]`. Scan line items are keyed by `scanId` because a scan is already bound to one household server-side.
+
 ```
-["inventory", householdId, "items"]           // all items
-["inventory", householdId, "items", itemId]   // one item
-["grocery", householdId, "lists"]             // all lists
-["grocery", householdId, "lists", listId]     // one list
-["receipt", scanId, "items"]                  // scan line items
-["catalog", householdId, "transactions"]      // price history
+["households"]                                 // caller's memberships (GET /households)
+["inventory", householdId, "items"]            // all items
+["inventory", householdId, "items", itemId]    // one item
+["grocery", householdId, "lists"]              // all lists
+["grocery", householdId, "lists", listId]      // one list
+["receipt", scanId, "items"]                   // scan line items
+["catalog", householdId, "transactions"]       // price history
 ```
 
-Invalidating at a higher key level cascades to all children.
+Invalidating at a higher key level cascades to all children. Switching the active household changes `householdId`, so every household-scoped query refetches automatically.
 
 **Rule:** Components never call `request()` directly. All API access goes through hooks in `@baskety/core/queries/`.
 
@@ -238,7 +246,7 @@ validateSearch: z.object({
 
 // _app.reports.tsx
 validateSearch: z.object({
-  from: z.string().optional(),   // ISO date
+  from: z.string().optional(),   // ISO-8601 / RFC 3339 UTC string — see the DB spec's "Timestamp & timezone representation"
   to: z.string().optional(),
   store_id: z.string().optional(),
 })
@@ -268,7 +276,7 @@ Three layers with distinct responsibilities. They do not overlap.
 
 ### Layer 1: TanStack Query — all server data
 
-Every piece of data from the Go API lives here. Components never fetch directly — they call hooks from their feature's `queries.ts`.
+Every piece of data from the Go API lives here. Components never fetch directly — they call hooks from `@baskety/core/queries/`. There are no per-feature `queries.ts` files in `apps/web/`; the centralized package is the single source of query hooks and keys (the Android spec consumes the same hooks).
 
 ### Layer 2: React Context — session and household
 
@@ -312,14 +320,15 @@ shoppingTripStore {
 ```
 
 **`uiStore`**
-Sidebar collapsed state, active household id (source of truth fed into `HouseholdContext`), session token, and server URL. All persisted. `authHeader()` in the API client reads the token via `uiStore.getState().token` — Zustand stores are readable outside React without hooks. `serverUrl` is set during onboarding on mobile and unused on web (which uses the Vite proxy).
+Sidebar collapsed state, active household id (source of truth fed into `HouseholdContext`), session token, and server-URL configuration. The API client reads `token` and `activeHouseholdId` via `uiStore.getState()` — Zustand stores are readable outside React without hooks. The canonical `uiStore` shape (including `externalUrl` / `networkProfiles` / `activeServerUrl`, which **supersede** the old single `serverUrl` field) is defined in the Android spec, Section 3; the web app uses that same store. On web, `activeServerUrl` is always `null` so the client issues relative requests through the Vite proxy.
 
 ```ts
+// Canonical shape lives in the Android spec (Section 3). Web-relevant fields:
 uiStore {
   sidebarCollapsed: boolean
   activeHouseholdId: string
   token: string | null
-  serverUrl: string | null        // mobile only; null on web
+  activeServerUrl: string | null   // null on web (Vite proxy); set on mobile by useServerUrl
   toggleSidebar()
   setActiveHousehold(id)
   setSession(token, firstHouseholdId)  // called on login
@@ -365,8 +374,9 @@ Page components own data fetching and mutations. Sub-components are pure — the
 ```tsx
 // InventoryPage.tsx — container
 export function InventoryPage() {
-  const { data } = useInventoryItems(householdId);
-  const updateBatch = useUpdateBatch();
+  const householdId = useHousehold();            // from HouseholdContext
+  const { data } = useInventoryItems(householdId, inventoryId);
+  const updateBatch = useUpdateBatch(householdId, inventoryId);
   return <ItemGrid items={data} onUpdateBatch={updateBatch.mutate} />;
 }
 
@@ -424,18 +434,24 @@ r.Handle("/*", shared.SPAHandler())  // SPA catch-all
 
 ### Docker build (multi-stage)
 
+> **Illustrative only.** The canonical, buildable Dockerfile is owned by the Docker/CI spec — see `2026-06-08-docker-cicd-design.md`, Section 1. The snippet below shows the *shape* of the multi-stage build, but note the web stage **must run from the monorepo root**: `apps/web` depends on the workspace packages `@baskety/core` / `@baskety/ui` and the root `pnpm-lock.yaml`, so copying only `apps/web/` makes `pnpm install --frozen-lockfile` fail. Build context = repo root; build the web app with `pnpm --filter web... build`.
+
 ```dockerfile
-# Stage 1: build the web app
+# Stage 1: build the web app — context is the MONOREPO ROOT, not apps/web
 FROM node:22-alpine AS web
-WORKDIR /app
-COPY apps/web/ ./
-RUN pnpm install --frozen-lockfile && pnpm build
+RUN corepack enable
+WORKDIR /repo
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY packages/ ./packages/
+COPY apps/web/ ./apps/web/
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter web... build        # builds @baskety/core, @baskety/ui, then web
 
 # Stage 2: build the Go binary (embeds the dist)
 FROM golang:1.23-alpine AS go
 WORKDIR /app
 COPY baskety/ ./
-COPY --from=web /app/dist ./internal/shared/dist
+COPY --from=web /repo/apps/web/dist ./internal/shared/dist
 RUN go build -o baskety ./cmd/baskety
 
 # Stage 3: minimal runtime image
@@ -496,10 +512,10 @@ End-to-end tests (Playwright, full browser + real backend) belong to a separate 
 ### CI pipeline
 
 ```
-pnpm typecheck    # tsc --noEmit
-pnpm lint         # ESLint
-pnpm test         # Vitest (unit + component)
-pnpm build        # Vite build (catches import errors)
+pnpm typecheck       # tsc --noEmit
+pnpm lint            # ESLint
+pnpm test            # Vitest (unit + component)
+pnpm --filter web... build   # builds @baskety/core + @baskety/ui + web — catches workspace/import errors
 ```
 
-All four must pass before the Go build stage runs in Docker.
+All four must pass before the Go build stage runs in Docker. The workspace-aware build (`--filter web...`) is what catches the monorepo Dockerfile failure mode pre-merge. The authoritative CI job that runs this is the `test-frontend` job in `2026-06-08-docker-cicd-design.md`, Section 2.
