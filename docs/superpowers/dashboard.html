@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baskety — Implementation Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --green: #10b981;
+    --green-bg: #ecfdf5;
+    --green-text: #065f46;
+    --amber-bg: #fffbeb;
+    --amber-text: #92400e;
+    --blue-bg: #eff6ff;
+    --blue-text: #1e40af;
+    --red: #ef4444;
+    --red-bg: #fef2f2;
+    --red-text: #991b1b;
+    --gray-bg: #f1f5f9;
+    --gray-text: #374151;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Access Banner ── */
+  #access-banner {
+    background: #1e293b;
+    color: #cbd5e1;
+    font-size: 12.5px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #access-banner code {
+    background: #334155;
+    color: #e2e8f0;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  #access-banner.hidden { display: none; }
+  #banner-dismiss {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    border-radius: 5px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #banner-dismiss:hover { background: #334155; }
+
+  /* ── Sticky Header ── */
+  #main-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 14px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+  #main-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.2px;
+    margin-bottom: 10px;
+  }
+  .header-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .overall-bar-wrap {
+    flex: 1;
+    min-width: 200px;
+    max-width: 480px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bar-track {
+    flex: 1;
+    height: 10px;
+    background: #334155;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 99px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+  .bar-pct {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green);
+    min-width: 40px;
+    text-align: right;
+  }
+  .header-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 13px;
+    color: #94a3b8;
+    flex-wrap: wrap;
+  }
+  .header-stats strong { color: #e2e8f0; }
+  #forecast-date { color: #e2e8f0; }
+  #forecast-date.behind { color: #fca5a5; }
+  #forecast-date.ahead  { color: #6ee7b7; }
+
+  /* ── Chart Card ── */
+  .chart-card {
+    max-width: 880px;
+    margin: 24px auto 0;
+    padding: 0 16px;
+  }
+  .chart-inner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 20px 12px;
+  }
+  .chart-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 10px;
+  }
+
+  /* ── Main content ── */
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 12px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ── Sprint Card ── */
+  .sprint-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .sprint-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select: none;
+    flex-wrap: wrap;
+  }
+  .sprint-header:hover { background: #fafafa; }
+  .sprint-num {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 60px;
+  }
+  .sprint-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    min-width: 160px;
+  }
+  .sprint-dates { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sprint-counter { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 99px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-not-started { background: var(--gray-bg);  color: var(--gray-text); }
+  .badge-in-progress { background: var(--blue-bg);  color: var(--blue-text); }
+  .badge-complete    { background: var(--green-bg); color: var(--green-text); }
+  .badge-at-risk     { background: var(--red-bg);   color: var(--red-text); }
+  .sprint-toggle {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+    transition: transform .2s;
+  }
+  .sprint-card.open .sprint-toggle { transform: rotate(90deg); }
+  .sprint-mini-bar { height: 3px; background: var(--border); }
+  .sprint-mini-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width .4s ease;
+    width: 0%;
+  }
+  .sprint-card.at-risk .sprint-mini-fill { background: var(--red); }
+  .sprint-note {
+    font-size: 11.5px;
+    color: var(--amber-text);
+    background: var(--amber-bg);
+    border-top: 1px solid #fde68a;
+    padding: 5px 18px;
+  }
+
+  /* ── Task List ── */
+  .sprint-tasks {
+    display: none;
+    padding: 6px 18px 14px;
+    flex-direction: column;
+    gap: 2px;
+    border-top: 1px solid var(--border);
+  }
+  .sprint-card.open .sprint-tasks { display: flex; }
+
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .task-row:hover { background: #f8fafc; }
+  .task-row.done  { background: var(--green-bg); }
+  .task-row.done:hover { background: #d1fae5; }
+
+  .task-check {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    transition: all .15s;
+  }
+  .task-row.done .task-check { background: var(--green); border-color: var(--green); }
+  .task-check::after {
+    content: '';
+    display: none;
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+  .task-row.done .task-check::after { display: block; }
+
+  .task-id {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 30px;
+    flex-shrink: 0;
+  }
+  .task-label { font-size: 13.5px; color: var(--text); flex: 1; line-height: 1.4; }
+  .task-row.done .task-label { text-decoration: line-through; color: #9ca3af; }
+  .task-days {
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 28px;
+    text-align: right;
+  }
+  .task-row.done .task-days { color: #9ca3af; }
+
+  /* ── Task Date Fields ── */
+  .task-date-fields {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    margin-left: 6px;
+  }
+  .task-date-input {
+    font-size: 11px;
+    font-family: inherit;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 4px;
+    color: #94a3b8;
+    background: transparent;
+    cursor: pointer;
+    width: 106px;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .task-date-input:hover  { border-color: var(--border); background: white; color: #374151; }
+  .task-date-input:focus  { border-color: #93c5fd; background: white; color: #374151; outline: none; }
+  .task-row.done .task-date-input { color: #6b7280; }
+  .date-sep { font-size: 11px; color: #cbd5e1; user-select: none; }
+
+  /* ── Footer ── */
+  footer {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 16px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #reset-btn {
+    background: white;
+    border: 1px solid #fca5a5;
+    color: var(--red);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  #reset-btn:hover { background: var(--red-bg); }
+  .footer-btn {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .footer-btn:hover { background: var(--bg); }
+  .footer-note { font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    .task-date-fields { display: none; }
+    .sprint-header { gap: 8px; }
+    .header-stats  { font-size: 12px; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Access Banner ── -->
+<div id="access-banner">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <strong style="color:#e2e8f0">Remote VM?</strong>
+    SSH tunnel: <code>ssh -L 9000:localhost:9000 user@vm</code>
+    &nbsp;·&nbsp; On VM: <code>make dashboard</code>
+    &nbsp;·&nbsp; Open: <code>http://localhost:9000/dashboard.html</code>
+  </div>
+  <button id="banner-dismiss">✕ Dismiss</button>
+</div>
+
+<!-- ── Sticky Header ── -->
+<header id="main-header">
+  <h1>🧺 Baskety — Implementation Dashboard</h1>
+  <div class="header-progress-row">
+    <div class="overall-bar-wrap">
+      <div class="bar-track"><div class="bar-fill" id="overall-fill"></div></div>
+      <div class="bar-pct" id="overall-pct">0%</div>
+    </div>
+    <div class="header-stats">
+      <span><strong id="days-done">0d</strong> / <strong id="days-total">—</strong> done</span>
+      <span>Planned: <strong>Oct 9, 2026</strong></span>
+      <span>Forecast: <strong id="forecast-date">Oct 9, 2026</strong></span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Chart ── -->
+<div id="chart-wrap-outer"></div>
+
+<main id="sprint-container"></main>
+
+<footer>
+  <button id="reset-btn">Reset all progress</button>
+  <button class="footer-btn" id="save-btn">Save progress</button>
+  <button class="footer-btn" id="load-btn">Load progress</button>
+  <input type="file" id="load-input" accept=".json" style="display:none">
+  <span class="footer-note">Saved in localStorage. Last updated: <span id="last-updated">never</span></span>
+</footer>
+
+<script>
+// ── Sprint + Task Data ─────────────────────────────────────────────────────
+const SPRINTS = [
+  {
+    id: 1, title: "Monorepo Scaffold + Shared Packages Bootstrap",
+    start: "2026-06-08", end: "2026-06-12",
+    tasks: [
+      { id: "1.1", label: "Initialize git repo + .gitignore (Go, Node, Expo, Docker, secrets)", days: 0.5 },
+      { id: "1.2", label: "Scaffold pnpm workspace root: pnpm-workspace.yaml, root package.json, shared ESLint + Prettier", days: 0.5 },
+      { id: "1.3", label: "Configure Turborepo turbo.json: build/test/lint/typecheck pipelines with correct dependency order", days: 0.5 },
+      { id: "1.4", label: "Scaffold packages/core: package.json, TypeScript config, Zod dep, empty barrel exports (api/, queries/, stores/, validation/)", days: 1 },
+      { id: "1.5", label: "Scaffold packages/ui: package.json, TS + React Native peer deps, empty component stubs with .web.tsx/.native.tsx pattern", days: 1 },
+      { id: "1.6", label: "Scaffold apps/web: Vite + React + TypeScript + Tailwind + shadcn/ui init; confirm pnpm dev starts on :5173", days: 0.5 },
+      { id: "1.7", label: "Scaffold apps/mobile: create-expo-app TypeScript template + Expo Router; confirm Expo Go boots", days: 0.5 },
+      { id: "1.8", label: "Scaffold baskety/ Go module: go.mod, cmd/baskety/main.go stub, internal/ domain package skeleton", days: 0.5 },
+    ]
+  },
+  {
+    id: 2, title: "Database: Migrations, sqlc, Test Harness",
+    start: "2026-06-15", end: "2026-06-19",
+    tasks: [
+      { id: "2.1", label: "Add goose; migration 001: users, sessions tables", days: 0.5 },
+      { id: "2.2", label: "Migration 002: households, household_members, inventory_share_links", days: 0.5 },
+      { id: "2.3", label: "Migration 003: inventories, inventory_permissions, inventory_items, inventory_batches", days: 0.5 },
+      { id: "2.4", label: "Migration 004: grocery_lists, grocery_list_items", days: 0.5 },
+      { id: "2.5", label: "Migration 005: receipt_scans, receipt_scan_items", days: 0.5 },
+      { id: "2.6", label: "Migration 006: stores, catalog_entries, purchase_transactions", days: 0.5 },
+      { id: "2.7", label: "Migration 007: system_settings, household_settings, user_settings, llm_provider_configs, ocr_provider_configs", days: 0.5 },
+      { id: "2.8", label: "Configure sqlc.yaml; write all .sql query files in db/queries/ per domain; run sqlc generate; fix all type errors", days: 1 },
+      { id: "2.9", label: "docker/postgres/Dockerfile (postgres:16 + postgresql-16-cron); local dev compose file with postgres only", days: 0.5 },
+      { id: "2.10", label: "Configure testcontainers-go integration test harness in internal/testutil/: container startup, migration runner, schema reset", days: 0.5 },
+    ]
+  },
+  {
+    id: 3, title: "Go Backend: Auth + Household Domains",
+    start: "2026-06-22", end: "2026-06-26",
+    note: "6d sprint — runs slightly over 1 week. Consider combining with Sprint 4 start.",
+    tasks: [
+      { id: "3.1", label: "internal/auth: model.go, dto.go, repository.go interface", days: 0.5 },
+      { id: "3.2", label: "auth/repository_pg.go: create user, find by email, create session, find by token hash, revoke session", days: 0.5 },
+      { id: "3.3", label: "auth/service.go: register (bcrypt cost 12), login (compare + mint token + sha256 hash), logout (stamp revoked_at)", days: 0.5 },
+      { id: "3.4", label: "auth/handler.go + routes.go: POST /register, POST /login, DELETE /session", days: 0.5 },
+      { id: "3.5", label: "Auth middleware: extract Bearer token, sha256 hash, look up session, attach userID to context; 401 on miss/expiry/revocation", days: 0.5 },
+      { id: "3.6", label: "Unit tests for auth/service.go with mockery-generated repository mocks", days: 0.5 },
+      { id: "3.7", label: "Handler tests for all three auth endpoints (httptest + mock service)", days: 0.5 },
+      { id: "3.8", label: "internal/household: model.go, dto.go, repository.go interface", days: 0.5 },
+      { id: "3.9", label: "household/repository_pg.go: create household, find by ID, list for user, add member, remove member, create share link", days: 0.5 },
+      { id: "3.10", label: "household/service.go + handler.go + routes.go: all household + members + share-link endpoints", days: 0.5 },
+      { id: "3.11", label: "HouseholdScope middleware: read X-Household-ID header, validate membership, attach householdID to context", days: 0.5 },
+      { id: "3.12", label: "Unit tests for household/service.go; handler tests for all household endpoints", days: 0.5 },
+    ]
+  },
+  {
+    id: 4, title: "Go Backend: Inventory Domain",
+    start: "2026-06-29", end: "2026-07-03",
+    tasks: [
+      { id: "4.1", label: "internal/inventory: model.go, dto.go, repository.go interface (inventory + item + batch)", days: 0.5 },
+      { id: "4.2", label: "inventory/repository_pg.go: CRUD for inventories, items (soft-delete via deleted_at), batches", days: 1 },
+      { id: "4.3", label: "inventory/service.go: create/get/list inventories; create/update/soft-delete items; add batch, list batches, compute effective quantity (SUM where emptied_at IS NULL)", days: 1 },
+      { id: "4.4", label: "inventory/handler.go + routes.go: all inventory/items/batches endpoints with householdID scope", days: 0.5 },
+      { id: "4.5", label: "Unit tests for inventory/service.go", days: 0.5 },
+      { id: "4.6", label: "Handler tests for all inventory endpoints", days: 0.5 },
+      { id: "4.7", label: "Repository integration test: soft-delete integrity (soft-deleted item does not orphan purchase_transactions)", days: 0.5 },
+      { id: "4.8", label: "Repository integration test: batch quantity aggregation (SUM across non-emptied batches matches service output)", days: 0.5 },
+    ]
+  },
+  {
+    id: 5, title: "Go Backend: Grocery Lists Domain",
+    start: "2026-07-06", end: "2026-07-10",
+    tasks: [
+      { id: "5.1", label: "internal/grocery: model.go, dto.go, repository.go interface", days: 0.5 },
+      { id: "5.2", label: "grocery/repository_pg.go: CRUD for lists and items, complete transition (active → completed), archive query", days: 0.5 },
+      { id: "5.3", label: "grocery/service.go — list management: create, get, list, update, complete, archive", days: 0.5 },
+      { id: "5.4", label: "grocery/service.go — item management: add item, update status (pending/bought/skipped), reorder", days: 0.5 },
+      { id: "5.5", label: "Auto-generation logic: query items where effective_quantity < target_quantity or batches expiring within threshold; populate grocery_list_items for shortfalls", days: 1 },
+      { id: "5.6", label: "grocery/handler.go + routes.go: all grocery list + items + complete endpoints", days: 0.5 },
+      { id: "5.7", label: "Unit tests for grocery/service.go including auto-generation logic", days: 0.5 },
+      { id: "5.8", label: "Handler tests for all grocery endpoints", days: 0.5 },
+    ]
+  },
+  {
+    id: 6, title: "Go Backend: Receipt Scanning Domain",
+    start: "2026-07-13", end: "2026-07-17",
+    note: "6.5d sprint — consider running 1.5 weeks. Anthropic adapter (6.6) may defer to Sprint 7.",
+    tasks: [
+      { id: "6.1", label: "internal/receipt: model.go, dto.go, repository.go interface", days: 0.5 },
+      { id: "6.2", label: "receipt/repository_pg.go: create scan, update status/fields, create scan items, list/update scan items", days: 0.5 },
+      { id: "6.3", label: "OCRProvider interface + Tesseract adapter (shell out to tesseract CLI)", days: 0.5 },
+      { id: "6.4", label: "LLMProvider interface + Ollama adapter (HTTP call to local endpoint, structured JSON prompt)", days: 0.5 },
+      { id: "6.5", label: "OpenAI LLMProvider adapter", days: 0.5 },
+      { id: "6.6", label: "Anthropic LLMProvider adapter", days: 0.5 },
+      { id: "6.7", label: "Add River job queue to main.go; implement ProcessReceiptScanJob: OCR → LLM → persist receipt_scan_items → set status=pending_review; handle failures", days: 1 },
+      { id: "6.8", label: "receipt/service.go: upload image (FileStore), enqueue job, get scan, get/update scan items, commit (create purchase_transactions, stamp committed, enqueue ProcessPurchaseTransactionJob)", days: 1 },
+      { id: "6.9", label: "receipt/handler.go + routes.go + worker.go", days: 0.5 },
+      { id: "6.10", label: "Unit tests for receipt/service.go (mock OCR/LLM providers, mock repository)", days: 0.5 },
+      { id: "6.11", label: "Cruncher/soft-delete integrity integration test (Go backend spec Section 8: purge + soft-delete never orphan purchase_transactions)", days: 0.5 },
+    ]
+  },
+  {
+    id: 7, title: "Go Backend: Catalog, Settings, pg_cron, Wire-up",
+    start: "2026-07-20", end: "2026-07-24",
+    tasks: [
+      { id: "7.1", label: "internal/catalog: model, dto, repository interface + repository_pg.go (upsert store, upsert catalog_entry, list entries/stores/transactions)", days: 1 },
+      { id: "7.2", label: "ProcessPurchaseTransactionJob (River): upsert store, upsert catalog_entry, update inventory batch quantity", days: 0.5 },
+      { id: "7.3", label: "catalog/service.go + handler.go + routes.go: GET /catalog/entries, /stores, /transactions", days: 0.5 },
+      { id: "7.4", label: "internal/settings: model, dto, repository + pg implementation; CRUD for settings key-value tables and provider configs", days: 0.5 },
+      { id: "7.5", label: "settings/service.go + handler.go + routes.go: GET/PATCH /api/v1/settings, LLM + OCR config management", days: 0.5 },
+      { id: "7.6", label: "Register pg_cron jobs in goose migration: purge expired sessions (daily), purge emptied batches (weekly), archive/purge completed grocery lists (daily)", days: 0.5 },
+      { id: "7.7", label: "Wire all domain routers, middleware, River workers, FileStore, config loading into cmd/baskety/main.go; confirm binary boots cleanly", days: 1 },
+    ]
+  },
+  {
+    id: 8, title: "Go Backend: Integration Tests + OpenAPI",
+    start: "2026-07-27", end: "2026-07-31",
+    tasks: [
+      { id: "8.1", label: "Repository integration tests — auth domain: register, login, session lifecycle (testcontainers)", days: 0.5 },
+      { id: "8.2", label: "Repository integration tests — household domain: create, members, permissions, share link", days: 0.5 },
+      { id: "8.3", label: "Repository integration tests — inventory domain: soft-delete integrity, batch aggregation", days: 0.5 },
+      { id: "8.4", label: "Repository integration tests — grocery domain: auto-generation query correctness", days: 0.5 },
+      { id: "8.5", label: "Repository integration tests — receipt domain: state machine transitions, commit flow", days: 0.5 },
+      { id: "8.6", label: "Repository integration tests — catalog domain: upsert idempotency, price history ordering", days: 0.5 },
+      { id: "8.7", label: "Implement GET /api/v1/share/:token/inventory: unauthenticated endpoint validates token, checks expiry/revocation, returns read-only inventory view", days: 0.5 },
+      { id: "8.8", label: "Generate and serve OpenAPI 3.1 spec at GET /api/v1/openapi.json (drives @baskety/core type generation)", days: 0.5 },
+    ]
+  },
+  {
+    id: 9, title: "Web Frontend: Foundation + Auth Pages",
+    start: "2026-08-03", end: "2026-08-07",
+    tasks: [
+      { id: "9.1", label: "packages/core/api/types.ts: all domain TS types (money as number minor units + currency string; quantities + timestamps as strings per DB spec)", days: 1 },
+      { id: "9.2", label: "packages/core/api/client.ts: typed fetch wrapper, reads uiStore for token/activeHouseholdId/activeServerUrl, unwraps { data } envelope, throws ApiError", days: 0.5 },
+      { id: "9.3", label: "packages/core/stores/uiStore.ts: token, activeHouseholdId, activeServerUrl, sidebarCollapsed; setSession, clearSession", days: 0.5 },
+      { id: "9.4", label: "packages/core/queries/auth.ts: useLogin, useRegister, useLogout, useHouseholds", days: 0.5 },
+      { id: "9.5", label: "AuthContext + HouseholdContext in apps/web; wire both into root layout", days: 0.5 },
+      { id: "9.6", label: "Configure TanStack Router route tree: all routes declared with auth guard on _app.tsx parent, redirects for _auth.tsx", days: 0.5 },
+      { id: "9.7", label: "Build /login page: email/password form with Zod validation, error display, redirect on success", days: 0.5 },
+      { id: "9.8", label: "Build /register page: email/name/password fields, validation, auto-login after registration", days: 0.5 },
+    ]
+  },
+  {
+    id: 10, title: "Web Frontend: Inventory + Grocery Pages",
+    start: "2026-08-10", end: "2026-08-14",
+    tasks: [
+      { id: "10.1", label: "packages/core/queries/inventory.ts: useInventories, useInventoryItems, useInventoryItem, useCreateItem, useUpdateItem, useDeleteItem, useBatches, useAddBatch", days: 1 },
+      { id: "10.2", label: "Build /inventory page: item list with search/filter by category; ExpiryBadge for expiring items; quantity vs. target indicator", days: 1 },
+      { id: "10.3", label: "Build /inventory/:itemId page: item detail — batch list, edit item form, add batch drawer", days: 1 },
+      { id: "10.4", label: "packages/core/queries/grocery.ts: useGroceryLists, useGroceryList, useCreateList, useAddListItem, useUpdateListItem, useCompleteList", days: 0.5 },
+      { id: "10.5", label: "Build /grocery page: list of grocery lists (pinned first, then by date); create new list button; status badges", days: 0.5 },
+      { id: "10.6", label: "Build /grocery/:listId page: items grouped by status; check-off inline; add item form; complete list action", days: 1 },
+    ]
+  },
+  {
+    id: 11, title: "Web Frontend: Receipt Review + Reports + Settings",
+    start: "2026-08-17", end: "2026-08-21",
+    note: "5.5d sprint — /reports (11.5) is most deferrable if running behind",
+    tasks: [
+      { id: "11.1", label: "packages/core/queries/receipt.ts: useStartScan, useScanStatus, useScanItems, useUpdateScanItem, useCommitScan", days: 0.5 },
+      { id: "11.2", label: "Build /receipt page: file picker upload, scan history list with status badges, poll scan status", days: 0.5 },
+      { id: "11.3", label: "Build /receipt/:scanId/review page: table of parsed line items; accept/reject/correct each item; confidence indicators; commit button gated on all items reviewed", days: 2 },
+      { id: "11.4", label: "packages/core/queries/catalog.ts: useCatalogEntries, useStores, usePriceHistory", days: 0.5 },
+      { id: "11.5", label: "Build /reports page: price history per item across stores (Recharts line chart)", days: 1 },
+      { id: "11.6", label: "Build /settings page: household settings, LLM provider config form, OCR provider config form", days: 1 },
+    ]
+  },
+  {
+    id: 12, title: "Web Frontend: Share Page + Test Coverage",
+    start: "2026-08-24", end: "2026-08-28",
+    tasks: [
+      { id: "12.1", label: "Build /share/:token page: unauthenticated inventory view, read-only item list, expiry indicators, optional password prompt", days: 0.5 },
+      { id: "12.2", label: "Implement packages/ui web variants fully: Button, Badge, TextInput, Card, Avatar, Spinner, ExpiryBadge (.web.tsx)", days: 1 },
+      { id: "12.3", label: "Set up MSW for web: handlers for all API routes using Zod schemas as fixture factories", days: 0.5 },
+      { id: "12.4", label: "Vitest + RTL tests — auth pages: form validation, error states, success redirect", days: 0.5 },
+      { id: "12.5", label: "Vitest + RTL tests — inventory pages: item list rendering, add item flow, expiry badge logic", days: 0.5 },
+      { id: "12.6", label: "Vitest + RTL tests — receipt review page: accept/reject/correct flow, commit button state", days: 0.5 },
+      { id: "12.7", label: "Vitest + RTL tests — grocery list page: check-off item, complete list action", days: 0.5 },
+    ]
+  },
+  {
+    id: 13, title: "Mobile: Foundation + Auth + Navigation",
+    start: "2026-08-31", end: "2026-09-04",
+    tasks: [
+      { id: "13.1", label: "Configure Expo Router file-based routes: (auth)/_layout, (auth)/login, register, onboarding, (app)/_layout, all app screens", days: 0.5 },
+      { id: "13.2", label: "Implement useServerUrl hook: reads WiFi SSID via @react-native-community/netinfo; maps known SSIDs to local URL; falls back to externalUrl", days: 1 },
+      { id: "13.3", label: "Wire @baskety/core AuthContext, HouseholdContext, API client, TanStack QueryClient (with AsyncStorage persister) in mobile root _layout.tsx", days: 0.5 },
+      { id: "13.4", label: "Build Onboarding screen: external URL input with connectivity check; optional local SSID + URL for home network", days: 0.5 },
+      { id: "13.5", label: "Build Login screen: email/password form, error feedback, redirect on success", days: 0.5 },
+      { id: "13.6", label: "Build Register screen: email/name/password, validation, auto-login", days: 0.5 },
+      { id: "13.7", label: "Implement packages/ui native variants: Button, Badge, TextInput, Card, Avatar, Spinner, ExpiryBadge (.native.tsx)", days: 1 },
+    ]
+  },
+  {
+    id: 14, title: "Mobile: Inventory + Grocery Screens",
+    start: "2026-09-07", end: "2026-09-11",
+    tasks: [
+      { id: "14.1", label: "Build Inventory list screen: FlatList of items, search bar, category filter chips, ExpiryBadge, quantity vs. target bar", days: 1 },
+      { id: "14.2", label: "Build Inventory item detail screen: batch list, edit item bottom sheet, add batch form", days: 1 },
+      { id: "14.3", label: "Implement grocery list offline persistence: persistQueryClient + AsyncStorage persister for grocery queries only; optimistic updates for check-off", days: 1 },
+      { id: "14.4", label: "Build Grocery lists screen: list of active/pinned lists, create new list FAB", days: 0.5 },
+      { id: "14.5", label: "Build Grocery list detail screen: item rows with swipe-to-check, status filter tabs", days: 0.5 },
+      { id: "14.6", label: "Build Shopping trip screen (/grocery/:listId/trip): full-screen focus mode, large check-off UI, progress indicator, complete trip action", days: 1 },
+    ]
+  },
+  {
+    id: 15, title: "Mobile: Receipt Scanning + Offline + Network Switching",
+    start: "2026-09-14", end: "2026-09-18",
+    tasks: [
+      { id: "15.1", label: "Implement useCamera hook: wraps expo-camera (viewfinder) + expo-image-picker (gallery); returns URI + requestPermission", days: 0.5 },
+      { id: "15.2", label: "Build Scan tab home screen: camera capture button, gallery picker fallback, recent scans list with status badges", days: 0.5 },
+      { id: "15.3", label: "Implement upload flow: compress image, POST as FormData (no Content-Type override — fetch sets multipart boundary), navigate to status screen", days: 0.5 },
+      { id: "15.4", label: "Build scan status polling screen: animated progress states (uploading/OCR/LLM/pending_review); auto-navigates on pending_review", days: 0.5 },
+      { id: "15.5", label: "Build receipt review screen (full-screen, tab bar hidden): scrollable parsed items; accept/reject/correct inline; confirm and commit", days: 2 },
+      { id: "15.6", label: "Implement useOfflineSync: listens to NetInfo connectivity; calls queryClient.resumePausedMutations() on reconnect", days: 0.5 },
+      { id: "15.7", label: "Verify offline grocery list round-trip: go offline → check items → reconnect → mutations replay; fix any AsyncStorage edge cases", days: 0.5 },
+    ]
+  },
+  {
+    id: 16, title: "Mobile: Testing + EAS Build Pipeline",
+    start: "2026-09-21", end: "2026-09-25",
+    tasks: [
+      { id: "16.1", label: "Set up Jest + RNTL + MSW for mobile: configure jest preset, MSW server with handlers, mock @react-native-community/netinfo", days: 0.5 },
+      { id: "16.2", label: "RNTL tests — auth screens: login/register form validation and error states", days: 0.5 },
+      { id: "16.3", label: "RNTL tests — inventory screens: list rendering, item detail, add batch", days: 0.5 },
+      { id: "16.4", label: "RNTL tests — grocery screens: item check-off, offline persistence mock", days: 0.5 },
+      { id: "16.5", label: "RNTL tests — receipt review screen: accept/reject/correct/commit flow", days: 0.5 },
+      { id: "16.6", label: "Configure eas.json: development, preview, production profiles; configure signing keystore", days: 0.5 },
+      { id: "16.7", label: "Run EAS Build --platform android --profile production; install and smoke test APK on real Android device", days: 0.5 },
+    ]
+  },
+  {
+    id: 17, title: "Docker, CI/CD, Release Pipeline",
+    start: "2026-09-28", end: "2026-10-02",
+    tasks: [
+      { id: "17.1", label: "Write docker/postgres/Dockerfile: FROM postgres:16; install postgresql-16-cron; configure shared_preload_libraries", days: 0.5 },
+      { id: "17.2", label: "Write root Dockerfile (canonical multi-stage): Stage 1 node+pnpm web build; Stage 2 golang embeds dist + builds binary (CGO_ENABLED=0); Stage 3 alpine runtime", days: 1 },
+      { id: "17.3", label: "Write docker-compose.yml: postgres (custom image, volume, healthcheck), baskety (depends_on health, config bind-mount, upload volume, Docker secret), minio (optional profile)", days: 0.5 },
+      { id: "17.4", label: "Write .env.example, config.yaml.example, secrets/baskety_key.example with generation instructions", days: 0.5 },
+      { id: "17.5", label: "Write .github/workflows/ci.yml: test-go + test-frontend parallel jobs on PR + main push", days: 0.5 },
+      { id: "17.6", label: "Write .github/workflows/docker.yml: triggered after CI on main; push :latest + :<sha> to GHCR", days: 0.5 },
+      { id: "17.7", label: "Write .github/workflows/release.yml: triggered on v*.*.* tag; push versioned image; create draft GitHub Release with auto-generated notes", days: 0.5 },
+    ]
+  },
+  {
+    id: 18, title: "End-to-End Hardening + Launch Readiness",
+    start: "2026-10-05", end: "2026-10-09",
+    tasks: [
+      { id: "18.1", label: "Full end-to-end smoke test: register → household → inventory → grocery list → complete shopping trip → scan receipt → commit to inventory", days: 1 },
+      { id: "18.2", label: "Security audit: verify all endpoints enforce householdID scope; session revocation works; no PII in structured logs", days: 0.5 },
+      { id: "18.3", label: "DB index pass: add indexes on all FK columns and high-frequency query predicates; run EXPLAIN ANALYZE on auto-generation query", days: 0.5 },
+      { id: "18.4", label: "Write README.md: project description, screenshots, Docker Compose quick-start, configuration reference, self-hosting guide, backup instructions", days: 1 },
+      { id: "18.5", label: "Update CLAUDE.md build/run commands section with all final commands (go run, pnpm dev, docker compose up, eas build)", days: 0.5 },
+      { id: "18.6", label: "Tag v1.0.0; verify release.yml fires, GHCR image pushed, GitHub Release draft created; build APK and attach to release", days: 1 },
+    ]
+  },
+];
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const PROJECT_START = new Date("2026-06-08");
+const PLANNED_END   = new Date("2026-10-09");
+const STORAGE_KEY   = "baskety_progress";
+const EXPANDED_KEY  = "baskety_expanded";
+const DATES_KEY     = "baskety_dates";
+const BANNER_KEY    = "baskety_banner_dismissed";
+const TOTAL_DAYS    = SPRINTS.reduce((s, sp) => s + sp.tasks.reduce((a, t) => a + t.days, 0), 0);
+
+// ── State ──────────────────────────────────────────────────────────────────
+let checked    = JSON.parse(localStorage.getItem(STORAGE_KEY)   || "{}");
+let expanded   = JSON.parse(localStorage.getItem(EXPANDED_KEY)  || "{}");
+let taskDates  = JSON.parse(localStorage.getItem(DATES_KEY)     || "{}");
+// taskDates["1.1"] = { start: "2026-06-08", end: "2026-06-09" }
+
+function save() {
+  localStorage.setItem(STORAGE_KEY,  JSON.stringify(checked));
+  localStorage.setItem(EXPANDED_KEY, JSON.stringify(expanded));
+  localStorage.setItem(DATES_KEY,    JSON.stringify(taskDates));
+  const el = document.getElementById("last-updated");
+  if (el) el.textContent = new Date().toLocaleString();
+}
+
+// ── Date helpers ───────────────────────────────────────────────────────────
+function daysBetween(a, b) { return (b.getTime() - a.getTime()) / 86400000; }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + Math.ceil(n)); return r; }
+function fmtDate(d) { return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
+function fmtShort(iso) {
+  const d = new Date(iso + "T12:00:00Z");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function todayIso() { return new Date().toISOString().slice(0, 10); }
+
+// ── Sprint state helpers ───────────────────────────────────────────────────
+function defaultExpanded(sprint) {
+  if (sprint.id in expanded) return expanded[sprint.id];
+  const today = new Date();
+  return today >= new Date(sprint.start + "T00:00:00") && today <= new Date(sprint.end + "T23:59:59");
+}
+
+function sprintStatus(sprint) {
+  const today   = new Date();
+  const endDate = new Date(sprint.end + "T23:59:59");
+  const done    = sprint.tasks.filter(t => checked[t.id]).length;
+  if (done === sprint.tasks.length) return "complete";
+  if (today > endDate) return "at-risk";
+  if (done > 0) return "in-progress";
+  return "not-started";
+}
+
+const STATUS_LABEL = { "not-started": "Not Started", "in-progress": "In Progress", "complete": "Complete", "at-risk": "⚠ At Risk" };
+function badgeClass(s) { return "badge badge-" + s; }
+
+// ── Header ─────────────────────────────────────────────────────────────────
+function computeHeader() {
+  const doneDays  = SPRINTS.reduce((s, sp) => s + sp.tasks.filter(t => checked[t.id]).reduce((a, t) => a + t.days, 0), 0);
+  const today     = new Date();
+  const elapsed   = Math.max(1, daysBetween(PROJECT_START, today));
+  const velocity  = doneDays > 0 ? doneDays / elapsed : 0;
+  const remaining = TOTAL_DAYS - doneDays;
+  const forecast  = velocity > 0 ? addDays(today, remaining / velocity) : PLANNED_END;
+  const pct       = Math.round((doneDays / TOTAL_DAYS) * 100);
+
+  document.getElementById("overall-fill").style.width = pct + "%";
+  document.getElementById("overall-pct").textContent  = pct + "%";
+  document.getElementById("days-done").textContent    = doneDays % 1 === 0 ? doneDays + "d" : doneDays.toFixed(1) + "d";
+  document.getElementById("days-total").textContent   = TOTAL_DAYS + "d";
+
+  const fEl = document.getElementById("forecast-date");
+  fEl.textContent = doneDays > 0 ? fmtDate(forecast) : fmtDate(PLANNED_END);
+  fEl.className = "";
+  if (doneDays > 0) {
+    const diff = daysBetween(PLANNED_END, forecast);
+    if (diff > 3)  fEl.classList.add("behind");
+    if (diff < -3) fEl.classList.add("ahead");
+  }
+}
+
+// ── Chart ──────────────────────────────────────────────────────────────────
+function buildChartSVG() {
+  const W = 700, H = 180;
+  const ML = 38, MR = 20, MT = 22, MB = 32;
+  const PW = W - ML - MR, PH = H - MT - MB;
+
+  const t0   = PROJECT_START.getTime();
+  const span = PLANNED_END.getTime() - t0;
+  const today = new Date();
+
+  const xOf = date => ML + PW * Math.max(0, Math.min(1, (new Date(date).getTime() - t0) / span));
+  const yOf = d    => MT + PH * (1 - Math.min(d, TOTAL_DAYS) / TOTAL_DAYS);
+
+  // Planned line: linear from (start, 0) → (end, TOTAL)
+  const plannedD = `M${ML},${yOf(0)} L${ML + PW},${yOf(TOTAL_DAYS)}`;
+
+  // Actual line: step function from completed tasks sorted by end date
+  const events = [];
+  SPRINTS.forEach(sp => sp.tasks.forEach(t => {
+    if (!checked[t.id]) return;
+    const end = taskDates[t.id]?.end || todayIso();
+    events.push({ end, days: t.days });
+  }));
+  events.sort((a, b) => a.end.localeCompare(b.end));
+
+  let cumul = 0;
+  const actualParts = events.length > 0 ? [`M${ML},${yOf(0)}`] : [];
+  events.forEach(ev => {
+    const x = xOf(ev.end + "T23:59:59");
+    actualParts.push(`L${x},${yOf(cumul)}`, `L${x},${yOf(cumul + ev.days)}`);
+    cumul += ev.days;
+  });
+  if (events.length > 0) {
+    const todayX = xOf(today);
+    actualParts.push(`L${Math.min(ML + PW, todayX)},${yOf(cumul)}`);
+  }
+
+  // Today marker
+  const todayX = xOf(today);
+  const todayInRange = today >= PROJECT_START && today <= PLANNED_END;
+
+  // X axis month ticks
+  const monthTicks = [];
+  ["2026-07-01","2026-08-01","2026-09-01","2026-10-01"].forEach(iso => {
+    const d = new Date(iso + "T12:00:00");
+    if (d > PROJECT_START && d < PLANNED_END)
+      monthTicks.push({ x: xOf(iso + "T12:00:00"), label: d.toLocaleDateString("en-US", { month: "short" }) });
+  });
+
+  // Y axis ticks
+  const yTicks = [0, 20, 40, 60, 80, TOTAL_DAYS];
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${H}px;display:block">`;
+
+  // Subtle grid
+  yTicks.forEach(v => {
+    s += `<line x1="${ML}" y1="${yOf(v)}" x2="${ML+PW}" y2="${yOf(v)}" stroke="#f1f5f9" stroke-width="1"/>`;
+  });
+
+  // Sprint boundaries (very subtle)
+  SPRINTS.forEach(sp => {
+    const x = xOf(sp.start + "T00:00:00");
+    s += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+PH}" stroke="#f8fafc" stroke-width="1"/>`;
+  });
+
+  // Today line
+  if (todayInRange) {
+    s += `<line x1="${todayX}" y1="${MT}" x2="${todayX}" y2="${MT+PH}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>`;
+    s += `<text x="${todayX + 3}" y="${MT + 11}" fill="#94a3b8" font-size="9.5" font-family="system-ui,sans-serif">Today</text>`;
+  }
+
+  // Planned line (dashed)
+  s += `<path d="${plannedD}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+
+  // Actual line (solid green)
+  if (actualParts.length > 0) {
+    s += `<path d="${actualParts.join(" ")}" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // Dot at the tip
+    const tipX = Math.min(ML + PW, xOf(today));
+    s += `<circle cx="${tipX}" cy="${yOf(cumul)}" r="4" fill="#10b981"/>`;
+  }
+
+  // Axes
+  s += `<line x1="${ML}" y1="${MT}" x2="${ML}" y2="${MT+PH+2}" stroke="#e2e8f0" stroke-width="1"/>`;
+  s += `<line x1="${ML-2}" y1="${MT+PH}" x2="${ML+PW}" y2="${MT+PH}" stroke="#e2e8f0" stroke-width="1"/>`;
+
+  // Y labels + ticks
+  yTicks.forEach(v => {
+    const y = yOf(v);
+    s += `<line x1="${ML-3}" y1="${y}" x2="${ML}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    s += `<text x="${ML-5}" y="${y+4}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">${v}d</text>`;
+  });
+
+  // X labels + ticks
+  s += `<text x="${ML}" y="${MT+PH+16}" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">Jun 8</text>`;
+  monthTicks.forEach(m => {
+    s += `<line x1="${m.x}" y1="${MT+PH}" x2="${m.x}" y2="${MT+PH+4}" stroke="#e2e8f0" stroke-width="1"/>`;
+    s += `<text x="${m.x}" y="${MT+PH+16}" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">${m.label}</text>`;
+  });
+  s += `<text x="${ML+PW}" y="${MT+PH+16}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">Oct 9</text>`;
+
+  // Legend
+  const LX = W - 110, LY = MT + 6;
+  s += `<line x1="${LX}" y1="${LY}" x2="${LX+16}" y2="${LY}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3"/>`;
+  s += `<text x="${LX+20}" y="${LY+4}" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">Planned</text>`;
+  s += `<line x1="${LX}" y1="${LY+14}" x2="${LX+16}" y2="${LY+14}" stroke="#10b981" stroke-width="2"/>`;
+  s += `<circle cx="${LX+8}" cy="${LY+14}" r="3" fill="#10b981"/>`;
+  s += `<text x="${LX+20}" y="${LY+18}" fill="#94a3b8" font-size="10" font-family="system-ui,sans-serif">Actual</text>`;
+
+  s += `</svg>`;
+  return s;
+}
+
+function renderChart() {
+  const wrap = document.getElementById("chart-wrap-outer");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="chart-card">
+      <div class="chart-inner">
+        <div class="chart-title">Actual vs. Planned Progress (cumulative dev-days)</div>
+        ${buildChartSVG()}
+      </div>
+    </div>`;
+}
+
+// ── Render Sprints ─────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderSprints() {
+  const container = document.getElementById("sprint-container");
+  container.innerHTML = "";
+
+  SPRINTS.forEach(sprint => {
+    const status   = sprintStatus(sprint);
+    const isOpen   = defaultExpanded(sprint);
+    const taskDone = sprint.tasks.filter(t => checked[t.id]).length;
+    const daysDone = sprint.tasks.filter(t => checked[t.id]).reduce((a, t) => a + t.days, 0);
+    const totalT   = sprint.tasks.length;
+    const totalD   = sprint.tasks.reduce((a, t) => a + t.days, 0);
+    const pct      = totalD > 0 ? (daysDone / totalD) * 100 : 0;
+
+    const card = document.createElement("div");
+    card.className = ["sprint-card", isOpen ? "open" : "", status === "complete" ? "complete" : "", status === "at-risk" ? "at-risk" : ""].filter(Boolean).join(" ");
+    card.dataset.sprintId = sprint.id;
+
+    const taskRows = sprint.tasks.map(task => {
+      const startVal = taskDates[task.id]?.start || "";
+      const endVal   = taskDates[task.id]?.end   || "";
+      return `
+        <div class="task-row ${checked[task.id] ? "done" : ""}" data-task-id="${task.id}" role="checkbox" aria-checked="${!!checked[task.id]}" tabindex="0">
+          <div class="task-check"></div>
+          <span class="task-id">${task.id}</span>
+          <span class="task-label">${escapeHtml(task.label)}</span>
+          <span class="task-days">${task.days}d</span>
+          <span class="task-date-fields" onclick="event.stopPropagation()">
+            <input type="date" class="task-date-input" data-task-id="${task.id}" data-field="start" value="${startVal}" title="Start date">
+            <span class="date-sep">→</span>
+            <input type="date" class="task-date-input" data-task-id="${task.id}" data-field="end" value="${endVal}" title="End date">
+          </span>
+        </div>`;
+    }).join("");
+
+    card.innerHTML = `
+      <div class="sprint-header" role="button" aria-expanded="${isOpen}">
+        <span class="sprint-num">Sprint ${sprint.id}</span>
+        <span class="sprint-title">${sprint.title}</span>
+        <span class="sprint-dates">${fmtShort(sprint.start)} – ${fmtShort(sprint.end)}, 2026</span>
+        <span class="sprint-counter">${taskDone}/${totalT} tasks &nbsp;(${daysDone % 1 === 0 ? daysDone : daysDone.toFixed(1)}d / ${totalD}d)</span>
+        <span class="badge ${badgeClass(status)}">${STATUS_LABEL[status]}</span>
+        <span class="sprint-toggle">▶</span>
+      </div>
+      <div class="sprint-mini-bar"><div class="sprint-mini-fill" style="width:${pct}%"></div></div>
+      ${sprint.note ? `<div class="sprint-note">⚠ ${sprint.note}</div>` : ""}
+      <div class="sprint-tasks">${taskRows}</div>`;
+
+    // Sprint header toggle
+    card.querySelector(".sprint-header").addEventListener("click", () => {
+      const nowOpen = card.classList.toggle("open");
+      expanded[sprint.id] = nowOpen;
+      card.querySelector(".sprint-header").setAttribute("aria-expanded", nowOpen);
+      save();
+    });
+
+    // Task checkbox toggle
+    card.querySelectorAll(".task-row").forEach(row => {
+      const toggle = () => {
+        const id = row.dataset.taskId;
+        checked[id] = !checked[id];
+
+        // Auto-fill end date on check; clear on uncheck if it was auto-filled today
+        if (checked[id]) {
+          if (!taskDates[id]) taskDates[id] = {};
+          if (!taskDates[id].end) {
+            taskDates[id].end = todayIso();
+            const endInput = row.querySelector('.task-date-input[data-field="end"]');
+            if (endInput) endInput.value = todayIso();
+          }
+        }
+
+        row.classList.toggle("done", checked[id]);
+        row.setAttribute("aria-checked", checked[id]);
+        save();
+        refreshSprintCard(card, sprint);
+        computeHeader();
+        renderChart();
+      };
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); } });
+    });
+
+    // Date input changes
+    card.querySelectorAll(".task-date-input").forEach(input => {
+      input.addEventListener("click",   e => e.stopPropagation());
+      input.addEventListener("keydown", e => e.stopPropagation());
+      input.addEventListener("change",  e => {
+        const id    = e.target.dataset.taskId;
+        const field = e.target.dataset.field;
+        if (!taskDates[id]) taskDates[id] = {};
+        if (e.target.value) taskDates[id][field] = e.target.value;
+        else delete taskDates[id][field];
+        save();
+        renderChart();
+      });
+    });
+
+    container.appendChild(card);
+  });
+}
+
+function refreshSprintCard(card, sprint) {
+  const status   = sprintStatus(sprint);
+  const taskDone = sprint.tasks.filter(t => checked[t.id]).length;
+  const daysDone = sprint.tasks.filter(t => checked[t.id]).reduce((a, t) => a + t.days, 0);
+  const totalT   = sprint.tasks.length;
+  const totalD   = sprint.tasks.reduce((a, t) => a + t.days, 0);
+  const pct      = totalD > 0 ? (daysDone / totalD) * 100 : 0;
+
+  card.querySelector(".sprint-counter").textContent =
+    `${taskDone}/${totalT} tasks  (${daysDone % 1 === 0 ? daysDone : daysDone.toFixed(1)}d / ${totalD}d)`;
+  const badge = card.querySelector(".badge");
+  badge.className  = badgeClass(status);
+  badge.textContent = STATUS_LABEL[status];
+  card.querySelector(".sprint-mini-fill").style.width = pct + "%";
+  card.classList.toggle("complete", status === "complete");
+  card.classList.toggle("at-risk",  status === "at-risk");
+}
+
+// ── Access Banner ──────────────────────────────────────────────────────────
+function initBanner() {
+  const banner = document.getElementById("access-banner");
+  if (localStorage.getItem(BANNER_KEY) === "1") banner.classList.add("hidden");
+  document.getElementById("banner-dismiss").addEventListener("click", () => {
+    banner.classList.add("hidden");
+    localStorage.setItem(BANNER_KEY, "1");
+  });
+}
+
+// ── Reset ──────────────────────────────────────────────────────────────────
+document.getElementById("reset-btn").addEventListener("click", () => {
+  if (confirm("Reset all progress and dates? This cannot be undone.")) {
+    checked = {}; expanded = {}; taskDates = {};
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(EXPANDED_KEY);
+    localStorage.removeItem(DATES_KEY);
+    renderSprints();
+    renderChart();
+    computeHeader();
+    document.getElementById("last-updated").textContent = "never";
+  }
+});
+
+// ── Save / Load ────────────────────────────────────────────────────────────
+document.getElementById("save-btn").addEventListener("click", () => {
+  const data = {
+    version: 1,
+    [STORAGE_KEY]:  JSON.parse(localStorage.getItem(STORAGE_KEY)  || "{}"),
+    [EXPANDED_KEY]: JSON.parse(localStorage.getItem(EXPANDED_KEY) || "{}"),
+    [DATES_KEY]:    JSON.parse(localStorage.getItem(DATES_KEY)    || "{}"),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "baskety-progress.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("load-btn").addEventListener("click", () => {
+  document.getElementById("load-input").click();
+});
+
+document.getElementById("load-input").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.version) throw new Error("Unrecognised file format.");
+      localStorage.setItem(STORAGE_KEY,  JSON.stringify(data[STORAGE_KEY]  || {}));
+      localStorage.setItem(EXPANDED_KEY, JSON.stringify(data[EXPANDED_KEY] || {}));
+      localStorage.setItem(DATES_KEY,    JSON.stringify(data[DATES_KEY]    || {}));
+      checked   = data[STORAGE_KEY]  || {};
+      expanded  = data[EXPANDED_KEY] || {};
+      taskDates = data[DATES_KEY]    || {};
+      renderSprints();
+      renderChart();
+      computeHeader();
+      document.getElementById("last-updated").textContent = new Date().toLocaleString();
+    } catch (err) {
+      alert("Failed to load file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+initBanner();
+renderChart();
+renderSprints();
+computeHeader();
+if (localStorage.getItem(STORAGE_KEY)) {
+  document.getElementById("last-updated").textContent = "on page load";
+}
+</script>
+</body>
+</html>
