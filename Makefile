@@ -5,6 +5,7 @@ PNPM = pnpm
         go-build go-test go-vet go-generate go-migrate \
         web-dev web-build \
         up down logs \
+        db-up db-down \
         hooks
 
 ## Backend
@@ -52,6 +53,12 @@ down:
 
 logs:
 	docker compose logs -f
+
+db-up:
+	docker compose -f compose.dev.yml up -d
+
+db-down:
+	docker compose -f compose.dev.yml down
 
 ## Setup
 hooks:
