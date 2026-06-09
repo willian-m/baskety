@@ -8,6 +8,9 @@ import (
 )
 
 func TestNewTestDB(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires docker")
+	}
 	pool := testutil.NewTestDB(t)
 	if pool == nil {
 		t.Fatal("expected non-nil pool")
@@ -23,6 +26,9 @@ func TestNewTestDB(t *testing.T) {
 }
 
 func TestResetSchema(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires docker")
+	}
 	pool := testutil.NewTestDB(t)
 	testutil.ResetSchema(context.Background(), t, pool)
 }
