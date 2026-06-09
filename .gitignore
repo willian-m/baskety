@@ -1,6 +1,9 @@
 # Superpowers
 .superpowers/*
 
+# Claude Code (agents, settings, local tooling — never commit)
+.claude/
+
 # Go
 /bin/
 /dist/

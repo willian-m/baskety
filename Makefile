@@ -4,7 +4,8 @@ PNPM = pnpm
 .PHONY: dev build test lint typecheck generate migrate clean dashboard \
         go-build go-test go-vet go-generate go-migrate \
         web-dev web-build \
-        up down logs
+        up down logs \
+        hooks
 
 ## Backend
 go-build:
@@ -51,6 +52,12 @@ down:
 
 logs:
 	docker compose logs -f
+
+## Setup
+hooks:
+	cp scripts/hooks/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	@echo "Git hooks installed."
 
 ## Misc
 
