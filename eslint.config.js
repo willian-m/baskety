@@ -1,15 +1,22 @@
 // @ts-check
+const tseslint = require("@typescript-eslint/eslint-plugin");
 const tsParser = require("@typescript-eslint/parser");
-const tsPlugin = require("@typescript-eslint/eslint-plugin");
 const reactPlugin = require("eslint-plugin-react");
 const reactHooksPlugin = require("eslint-plugin-react-hooks");
 const importPlugin = require("eslint-plugin-import");
 const prettierConfig = require("eslint-config-prettier");
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 module.exports = [
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**", "**/android/**", "**/ios/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.next/**",
+      "**/android/**",
+      "**/ios/**",
+    ],
   },
   {
     files: ["**/*.{ts,tsx}"],
@@ -22,13 +29,13 @@ module.exports = [
       },
     },
     plugins: {
-      "@typescript-eslint": tsPlugin,
+      "@typescript-eslint": tseslint,
       react: reactPlugin,
       "react-hooks": reactHooksPlugin,
       import: importPlugin,
     },
     rules: {
-      ...tsPlugin.configs.recommended.rules,
+      ...tseslint.configs.recommended.rules,
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       "react/react-in-jsx-scope": "off",
