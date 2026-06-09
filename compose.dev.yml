@@ -1,0 +1,26 @@
+# compose.dev.yml — local development only.
+# Starts a single Postgres instance (no app, no minio) so you can run
+# the Go server and integration tests against a real database without
+# needing a full stack. All credentials are hardcoded — do NOT use in production.
+
+services:
+  postgres:
+    build:
+      context: ./docker/postgres
+    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=baskety
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: baskety
+      POSTGRES_USER: baskety
+      POSTGRES_PASSWORD: baskety
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baskety"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
