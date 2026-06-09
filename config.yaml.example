@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  public_url: https://baskety.example.com
+
+database:
+  url: postgres://baskety:changeme@postgres:5432/baskety
+
+storage:
+  backend: local        # local | s3 | azure
+  local_path: /data/uploads
+  s3:
+    endpoint: ""
+    bucket: baskety
+    access_key: ""
+    secret_key: ""
+  azure:
+    container: ""
+    connection_string: ""
+
+encryption:
+  key_file: /run/secrets/baskety_key
+
+log:
+  level: info
+  format: json

@@ -45,6 +45,10 @@ web-build/
 # Docker
 docker-compose.override.yml
 
+# Local config and secrets
+config.yaml
+secrets/baskety_key
+
 # Secrets & env
 .env
 .env.*
