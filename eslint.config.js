@@ -18,6 +18,7 @@ module.exports = [
       "**/ios/**",
     ],
   },
+  // TypeScript rules for all packages
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
@@ -30,24 +31,17 @@ module.exports = [
     },
     plugins: {
       "@typescript-eslint": tseslint,
-      react: reactPlugin,
-      "react-hooks": reactHooksPlugin,
       import: importPlugin,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
-      ...reactPlugin.configs.recommended.rules,
-      ...reactHooksPlugin.configs.recommended.rules,
-      "react/react-in-jsx-scope": "off",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "import/order": ["warn", { "newlines-between": "always", alphabetize: { order: "asc" } }],
     },
-    settings: {
-      react: { version: "detect" },
-    },
   },
+  // React rules scoped to app packages only
   {
-    files: ["**/*.{js,jsx}"],
+    files: ["apps/**/*.{ts,tsx,js,jsx}"],
     plugins: {
       react: reactPlugin,
       "react-hooks": reactHooksPlugin,
