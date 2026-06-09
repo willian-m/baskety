@@ -27,28 +27,29 @@ CREATE TABLE user_settings (
 CREATE INDEX idx_user_settings_user_id ON user_settings (user_id);
 
 CREATE TABLE llm_provider_configs (
-    id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    household_id uuid        REFERENCES households (id) ON DELETE CASCADE,
-    provider     text        NOT NULL,
-    model        text        NOT NULL,
-    endpoint     text,
-    api_key_ref  text,
-    is_default   boolean     NOT NULL DEFAULT false,
-    created_at   timestamptz NOT NULL DEFAULT NOW(),
-    updated_at   timestamptz NOT NULL DEFAULT NOW()
+    id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id      uuid        REFERENCES households (id) ON DELETE CASCADE,
+    provider          text        NOT NULL CHECK (provider IN ('anthropic', 'openai', 'ollama', 'litellm', 'custom')),
+    model             text        NOT NULL,
+    endpoint_url      text,
+    api_key_encrypted text,
+    is_default        boolean     NOT NULL DEFAULT false,
+    created_at        timestamptz NOT NULL DEFAULT NOW(),
+    updated_at        timestamptz NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_llm_provider_configs_household_id ON llm_provider_configs (household_id);
 
 CREATE TABLE ocr_provider_configs (
-    id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    household_id uuid        REFERENCES households (id) ON DELETE CASCADE,
-    provider     text        NOT NULL,
-    endpoint     text,
-    api_key_ref  text,
-    is_default   boolean     NOT NULL DEFAULT false,
-    created_at   timestamptz NOT NULL DEFAULT NOW(),
-    updated_at   timestamptz NOT NULL DEFAULT NOW()
+    id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id      uuid        REFERENCES households (id) ON DELETE CASCADE,
+    provider          text        NOT NULL CHECK (provider IN ('tesseract', 'google_vision', 'aws_textract', 'azure', 'custom')),
+    endpoint_url      text,
+    api_key_encrypted text,
+    extra_config      jsonb,
+    is_default        boolean     NOT NULL DEFAULT false,
+    created_at        timestamptz NOT NULL DEFAULT NOW(),
+    updated_at        timestamptz NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_ocr_provider_configs_household_id ON ocr_provider_configs (household_id);
