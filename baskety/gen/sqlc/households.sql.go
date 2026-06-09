@@ -86,7 +86,10 @@ func (q *Queries) GetHouseholdByID(ctx context.Context, id pgtype.UUID) (Househo
 }
 
 const getHouseholdMember = `-- name: GetHouseholdMember :one
-SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, revoked_at FROM household_members WHERE household_id = $1 AND user_id = $2
+SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, revoked_at FROM household_members
+WHERE household_id = $1 AND user_id = $2
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
 `
 
 type GetHouseholdMemberParams struct {
@@ -110,7 +113,11 @@ func (q *Queries) GetHouseholdMember(ctx context.Context, arg GetHouseholdMember
 }
 
 const listHouseholdMembers = `-- name: ListHouseholdMembers :many
-SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, revoked_at FROM household_members WHERE household_id = $1 ORDER BY joined_at ASC
+SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, revoked_at FROM household_members
+WHERE household_id = $1
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
+ORDER BY joined_at ASC
 `
 
 func (q *Queries) ListHouseholdMembers(ctx context.Context, householdID pgtype.UUID) ([]HouseholdMember, error) {
@@ -145,6 +152,8 @@ const listHouseholdsByUser = `-- name: ListHouseholdsByUser :many
 SELECT h.id, h.name, h.created_by, h.created_at, h.updated_at FROM households h
 JOIN household_members hm ON hm.household_id = h.id
 WHERE hm.user_id = $1
+  AND hm.revoked_at IS NULL
+  AND (hm.expires_at IS NULL OR hm.expires_at > NOW())
 ORDER BY h.created_at DESC
 `
 

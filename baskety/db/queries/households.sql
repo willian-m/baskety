@@ -10,6 +10,8 @@ SELECT * FROM households WHERE id = $1;
 SELECT h.* FROM households h
 JOIN household_members hm ON hm.household_id = h.id
 WHERE hm.user_id = $1
+  AND hm.revoked_at IS NULL
+  AND (hm.expires_at IS NULL OR hm.expires_at > NOW())
 ORDER BY h.created_at DESC;
 
 -- name: AddHouseholdMember :one
@@ -18,7 +20,10 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetHouseholdMember :one
-SELECT * FROM household_members WHERE household_id = $1 AND user_id = $2 AND revoked_at IS NULL;
+SELECT * FROM household_members
+WHERE household_id = $1 AND user_id = $2
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW());
 
 -- name: UpdateHouseholdMemberRole :one
 UPDATE household_members SET role = $3
@@ -29,7 +34,11 @@ RETURNING *;
 DELETE FROM household_members WHERE household_id = $1 AND user_id = $2;
 
 -- name: ListHouseholdMembers :many
-SELECT * FROM household_members WHERE household_id = $1 AND revoked_at IS NULL ORDER BY joined_at ASC;
+SELECT * FROM household_members
+WHERE household_id = $1
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
+ORDER BY joined_at ASC;
 
 -- name: UpdateHousehold :one
 UPDATE households SET name = $2, updated_at = NOW()
