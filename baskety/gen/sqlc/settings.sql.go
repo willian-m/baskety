@@ -8,7 +8,7 @@ package sqlc
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getHouseholdSetting = `-- name: GetHouseholdSetting :one
@@ -16,12 +16,12 @@ SELECT household_id, key, value, updated_at FROM household_settings WHERE househ
 `
 
 type GetHouseholdSettingParams struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	Key         string    `json:"key"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	Key         string      `json:"key"`
 }
 
 func (q *Queries) GetHouseholdSetting(ctx context.Context, arg GetHouseholdSettingParams) (HouseholdSetting, error) {
-	row := q.db.QueryRowContext(ctx, getHouseholdSetting, arg.HouseholdID, arg.Key)
+	row := q.db.QueryRow(ctx, getHouseholdSetting, arg.HouseholdID, arg.Key)
 	var i HouseholdSetting
 	err := row.Scan(
 		&i.HouseholdID,
@@ -37,7 +37,7 @@ SELECT key, value, updated_at FROM system_settings WHERE key = $1
 `
 
 func (q *Queries) GetSystemSetting(ctx context.Context, key string) (SystemSetting, error) {
-	row := q.db.QueryRowContext(ctx, getSystemSetting, key)
+	row := q.db.QueryRow(ctx, getSystemSetting, key)
 	var i SystemSetting
 	err := row.Scan(&i.Key, &i.Value, &i.UpdatedAt)
 	return i, err
@@ -48,12 +48,12 @@ SELECT user_id, key, value, updated_at FROM user_settings WHERE user_id = $1 AND
 `
 
 type GetUserSettingParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	Key    string    `json:"key"`
+	UserID pgtype.UUID `json:"user_id"`
+	Key    string      `json:"key"`
 }
 
 func (q *Queries) GetUserSetting(ctx context.Context, arg GetUserSettingParams) (UserSetting, error) {
-	row := q.db.QueryRowContext(ctx, getUserSetting, arg.UserID, arg.Key)
+	row := q.db.QueryRow(ctx, getUserSetting, arg.UserID, arg.Key)
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
@@ -71,13 +71,13 @@ ON CONFLICT (household_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at
 `
 
 type UpsertHouseholdSettingParams struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	Key         string    `json:"key"`
-	Value       string    `json:"value"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	Key         string      `json:"key"`
+	Value       string      `json:"value"`
 }
 
 func (q *Queries) UpsertHouseholdSetting(ctx context.Context, arg UpsertHouseholdSettingParams) error {
-	_, err := q.db.ExecContext(ctx, upsertHouseholdSetting, arg.HouseholdID, arg.Key, arg.Value)
+	_, err := q.db.Exec(ctx, upsertHouseholdSetting, arg.HouseholdID, arg.Key, arg.Value)
 	return err
 }
 
@@ -93,7 +93,7 @@ type UpsertSystemSettingParams struct {
 }
 
 func (q *Queries) UpsertSystemSetting(ctx context.Context, arg UpsertSystemSettingParams) error {
-	_, err := q.db.ExecContext(ctx, upsertSystemSetting, arg.Key, arg.Value)
+	_, err := q.db.Exec(ctx, upsertSystemSetting, arg.Key, arg.Value)
 	return err
 }
 
@@ -104,12 +104,12 @@ ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NO
 `
 
 type UpsertUserSettingParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	Key    string    `json:"key"`
-	Value  string    `json:"value"`
+	UserID pgtype.UUID `json:"user_id"`
+	Key    string      `json:"key"`
+	Value  string      `json:"value"`
 }
 
 func (q *Queries) UpsertUserSetting(ctx context.Context, arg UpsertUserSettingParams) error {
-	_, err := q.db.ExecContext(ctx, upsertUserSetting, arg.UserID, arg.Key, arg.Value)
+	_, err := q.db.Exec(ctx, upsertUserSetting, arg.UserID, arg.Key, arg.Value)
 	return err
 }

@@ -7,159 +7,27 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
-	"github.com/sqlc-dev/pqtype"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getDefaultLLMProvider = `-- name: GetDefaultLLMProvider :one
-SELECT id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at FROM llm_provider_configs
-WHERE is_default = true AND (household_id = $1 OR household_id IS NULL)
-ORDER BY household_id DESC NULLS LAST
-LIMIT 1
-`
-
-func (q *Queries) GetDefaultLLMProvider(ctx context.Context, householdID uuid.NullUUID) (LlmProviderConfig, error) {
-	row := q.db.QueryRowContext(ctx, getDefaultLLMProvider, householdID)
-	var i LlmProviderConfig
-	err := row.Scan(
-		&i.ID,
-		&i.HouseholdID,
-		&i.Provider,
-		&i.Model,
-		&i.EndpointUrl,
-		&i.ApiKeyEncrypted,
-		&i.IsDefault,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getDefaultOCRProvider = `-- name: GetDefaultOCRProvider :one
-SELECT id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at FROM ocr_provider_configs
-WHERE is_default = true AND (household_id = $1 OR household_id IS NULL)
-ORDER BY household_id DESC NULLS LAST
-LIMIT 1
-`
-
-func (q *Queries) GetDefaultOCRProvider(ctx context.Context, householdID uuid.NullUUID) (OcrProviderConfig, error) {
-	row := q.db.QueryRowContext(ctx, getDefaultOCRProvider, householdID)
-	var i OcrProviderConfig
-	err := row.Scan(
-		&i.ID,
-		&i.HouseholdID,
-		&i.Provider,
-		&i.EndpointUrl,
-		&i.ApiKeyEncrypted,
-		&i.ExtraConfig,
-		&i.IsDefault,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const listLLMProviders = `-- name: ListLLMProviders :many
-SELECT id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at FROM llm_provider_configs
-WHERE household_id = $1 OR household_id IS NULL
-ORDER BY is_default DESC, created_at ASC
-`
-
-func (q *Queries) ListLLMProviders(ctx context.Context, householdID uuid.NullUUID) ([]LlmProviderConfig, error) {
-	rows, err := q.db.QueryContext(ctx, listLLMProviders, householdID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []LlmProviderConfig
-	for rows.Next() {
-		var i LlmProviderConfig
-		if err := rows.Scan(
-			&i.ID,
-			&i.HouseholdID,
-			&i.Provider,
-			&i.Model,
-			&i.EndpointUrl,
-			&i.ApiKeyEncrypted,
-			&i.IsDefault,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOCRProviders = `-- name: ListOCRProviders :many
-SELECT id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at FROM ocr_provider_configs
-WHERE household_id = $1 OR household_id IS NULL
-ORDER BY is_default DESC, created_at ASC
-`
-
-func (q *Queries) ListOCRProviders(ctx context.Context, householdID uuid.NullUUID) ([]OcrProviderConfig, error) {
-	rows, err := q.db.QueryContext(ctx, listOCRProviders, householdID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []OcrProviderConfig
-	for rows.Next() {
-		var i OcrProviderConfig
-		if err := rows.Scan(
-			&i.ID,
-			&i.HouseholdID,
-			&i.Provider,
-			&i.EndpointUrl,
-			&i.ApiKeyEncrypted,
-			&i.ExtraConfig,
-			&i.IsDefault,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const upsertLLMProviderConfig = `-- name: UpsertLLMProviderConfig :one
+const createLLMProviderConfig = `-- name: CreateLLMProviderConfig :one
 INSERT INTO llm_provider_configs (household_id, provider, model, endpoint_url, api_key_encrypted, is_default)
 VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (id) DO UPDATE
-SET provider = EXCLUDED.provider, model = EXCLUDED.model,
-    endpoint_url = EXCLUDED.endpoint_url, api_key_encrypted = EXCLUDED.api_key_encrypted,
-    is_default = EXCLUDED.is_default, updated_at = NOW()
 RETURNING id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at
 `
 
-type UpsertLLMProviderConfigParams struct {
-	HouseholdID     uuid.NullUUID  `json:"household_id"`
-	Provider        string         `json:"provider"`
-	Model           string         `json:"model"`
-	EndpointUrl     sql.NullString `json:"endpoint_url"`
-	ApiKeyEncrypted sql.NullString `json:"api_key_encrypted"`
-	IsDefault       bool           `json:"is_default"`
+type CreateLLMProviderConfigParams struct {
+	HouseholdID     pgtype.UUID `json:"household_id"`
+	Provider        string      `json:"provider"`
+	Model           string      `json:"model"`
+	EndpointUrl     *string     `json:"endpoint_url"`
+	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
+	IsDefault       bool        `json:"is_default"`
 }
 
-func (q *Queries) UpsertLLMProviderConfig(ctx context.Context, arg UpsertLLMProviderConfigParams) (LlmProviderConfig, error) {
-	row := q.db.QueryRowContext(ctx, upsertLLMProviderConfig,
+func (q *Queries) CreateLLMProviderConfig(ctx context.Context, arg CreateLLMProviderConfigParams) (LlmProviderConfig, error) {
+	row := q.db.QueryRow(ctx, createLLMProviderConfig,
 		arg.HouseholdID,
 		arg.Provider,
 		arg.Model,
@@ -182,28 +50,224 @@ func (q *Queries) UpsertLLMProviderConfig(ctx context.Context, arg UpsertLLMProv
 	return i, err
 }
 
-const upsertOCRProviderConfig = `-- name: UpsertOCRProviderConfig :one
+const createOCRProviderConfig = `-- name: CreateOCRProviderConfig :one
 INSERT INTO ocr_provider_configs (household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default)
 VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (id) DO UPDATE
-SET provider = EXCLUDED.provider, endpoint_url = EXCLUDED.endpoint_url,
-    api_key_encrypted = EXCLUDED.api_key_encrypted, extra_config = EXCLUDED.extra_config,
-    is_default = EXCLUDED.is_default, updated_at = NOW()
 RETURNING id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at
 `
 
-type UpsertOCRProviderConfigParams struct {
-	HouseholdID     uuid.NullUUID         `json:"household_id"`
-	Provider        string                `json:"provider"`
-	EndpointUrl     sql.NullString        `json:"endpoint_url"`
-	ApiKeyEncrypted sql.NullString        `json:"api_key_encrypted"`
-	ExtraConfig     pqtype.NullRawMessage `json:"extra_config"`
-	IsDefault       bool                  `json:"is_default"`
+type CreateOCRProviderConfigParams struct {
+	HouseholdID     pgtype.UUID `json:"household_id"`
+	Provider        string      `json:"provider"`
+	EndpointUrl     *string     `json:"endpoint_url"`
+	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
+	ExtraConfig     []byte      `json:"extra_config"`
+	IsDefault       bool        `json:"is_default"`
 }
 
-func (q *Queries) UpsertOCRProviderConfig(ctx context.Context, arg UpsertOCRProviderConfigParams) (OcrProviderConfig, error) {
-	row := q.db.QueryRowContext(ctx, upsertOCRProviderConfig,
+func (q *Queries) CreateOCRProviderConfig(ctx context.Context, arg CreateOCRProviderConfigParams) (OcrProviderConfig, error) {
+	row := q.db.QueryRow(ctx, createOCRProviderConfig,
 		arg.HouseholdID,
+		arg.Provider,
+		arg.EndpointUrl,
+		arg.ApiKeyEncrypted,
+		arg.ExtraConfig,
+		arg.IsDefault,
+	)
+	var i OcrProviderConfig
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Provider,
+		&i.EndpointUrl,
+		&i.ApiKeyEncrypted,
+		&i.ExtraConfig,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getDefaultLLMProvider = `-- name: GetDefaultLLMProvider :one
+SELECT id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at FROM llm_provider_configs
+WHERE is_default = true AND (household_id = $1 OR household_id IS NULL)
+ORDER BY household_id DESC NULLS LAST
+LIMIT 1
+`
+
+func (q *Queries) GetDefaultLLMProvider(ctx context.Context, householdID pgtype.UUID) (LlmProviderConfig, error) {
+	row := q.db.QueryRow(ctx, getDefaultLLMProvider, householdID)
+	var i LlmProviderConfig
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Provider,
+		&i.Model,
+		&i.EndpointUrl,
+		&i.ApiKeyEncrypted,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getDefaultOCRProvider = `-- name: GetDefaultOCRProvider :one
+SELECT id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at FROM ocr_provider_configs
+WHERE is_default = true AND (household_id = $1 OR household_id IS NULL)
+ORDER BY household_id DESC NULLS LAST
+LIMIT 1
+`
+
+func (q *Queries) GetDefaultOCRProvider(ctx context.Context, householdID pgtype.UUID) (OcrProviderConfig, error) {
+	row := q.db.QueryRow(ctx, getDefaultOCRProvider, householdID)
+	var i OcrProviderConfig
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Provider,
+		&i.EndpointUrl,
+		&i.ApiKeyEncrypted,
+		&i.ExtraConfig,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listLLMProviders = `-- name: ListLLMProviders :many
+SELECT id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at FROM llm_provider_configs
+WHERE household_id = $1 OR household_id IS NULL
+ORDER BY is_default DESC, created_at ASC
+`
+
+func (q *Queries) ListLLMProviders(ctx context.Context, householdID pgtype.UUID) ([]LlmProviderConfig, error) {
+	rows, err := q.db.Query(ctx, listLLMProviders, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LlmProviderConfig
+	for rows.Next() {
+		var i LlmProviderConfig
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.Provider,
+			&i.Model,
+			&i.EndpointUrl,
+			&i.ApiKeyEncrypted,
+			&i.IsDefault,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOCRProviders = `-- name: ListOCRProviders :many
+SELECT id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at FROM ocr_provider_configs
+WHERE household_id = $1 OR household_id IS NULL
+ORDER BY is_default DESC, created_at ASC
+`
+
+func (q *Queries) ListOCRProviders(ctx context.Context, householdID pgtype.UUID) ([]OcrProviderConfig, error) {
+	rows, err := q.db.Query(ctx, listOCRProviders, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OcrProviderConfig
+	for rows.Next() {
+		var i OcrProviderConfig
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.Provider,
+			&i.EndpointUrl,
+			&i.ApiKeyEncrypted,
+			&i.ExtraConfig,
+			&i.IsDefault,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateLLMProviderConfig = `-- name: UpdateLLMProviderConfig :one
+UPDATE llm_provider_configs
+SET provider = $2, model = $3, endpoint_url = $4, api_key_encrypted = $5, is_default = $6, updated_at = NOW()
+WHERE id = $1
+RETURNING id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at
+`
+
+type UpdateLLMProviderConfigParams struct {
+	ID              pgtype.UUID `json:"id"`
+	Provider        string      `json:"provider"`
+	Model           string      `json:"model"`
+	EndpointUrl     *string     `json:"endpoint_url"`
+	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
+	IsDefault       bool        `json:"is_default"`
+}
+
+func (q *Queries) UpdateLLMProviderConfig(ctx context.Context, arg UpdateLLMProviderConfigParams) (LlmProviderConfig, error) {
+	row := q.db.QueryRow(ctx, updateLLMProviderConfig,
+		arg.ID,
+		arg.Provider,
+		arg.Model,
+		arg.EndpointUrl,
+		arg.ApiKeyEncrypted,
+		arg.IsDefault,
+	)
+	var i LlmProviderConfig
+	err := row.Scan(
+		&i.ID,
+		&i.HouseholdID,
+		&i.Provider,
+		&i.Model,
+		&i.EndpointUrl,
+		&i.ApiKeyEncrypted,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateOCRProviderConfig = `-- name: UpdateOCRProviderConfig :one
+UPDATE ocr_provider_configs
+SET provider = $2, endpoint_url = $3, api_key_encrypted = $4, extra_config = $5, is_default = $6, updated_at = NOW()
+WHERE id = $1
+RETURNING id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at
+`
+
+type UpdateOCRProviderConfigParams struct {
+	ID              pgtype.UUID `json:"id"`
+	Provider        string      `json:"provider"`
+	EndpointUrl     *string     `json:"endpoint_url"`
+	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
+	ExtraConfig     []byte      `json:"extra_config"`
+	IsDefault       bool        `json:"is_default"`
+}
+
+func (q *Queries) UpdateOCRProviderConfig(ctx context.Context, arg UpdateOCRProviderConfigParams) (OcrProviderConfig, error) {
+	row := q.db.QueryRow(ctx, updateOCRProviderConfig,
+		arg.ID,
 		arg.Provider,
 		arg.EndpointUrl,
 		arg.ApiKeyEncrypted,

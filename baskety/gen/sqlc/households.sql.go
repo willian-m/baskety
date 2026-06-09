@@ -8,7 +8,7 @@ package sqlc
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addHouseholdMember = `-- name: AddHouseholdMember :one
@@ -18,14 +18,14 @@ RETURNING household_id, user_id, role, joined_at, invited_by_user_id, expires_at
 `
 
 type AddHouseholdMemberParams struct {
-	HouseholdID     uuid.UUID     `json:"household_id"`
-	UserID          uuid.UUID     `json:"user_id"`
-	Role            string        `json:"role"`
-	InvitedByUserID uuid.NullUUID `json:"invited_by_user_id"`
+	HouseholdID     pgtype.UUID `json:"household_id"`
+	UserID          pgtype.UUID `json:"user_id"`
+	Role            string      `json:"role"`
+	InvitedByUserID pgtype.UUID `json:"invited_by_user_id"`
 }
 
 func (q *Queries) AddHouseholdMember(ctx context.Context, arg AddHouseholdMemberParams) (HouseholdMember, error) {
-	row := q.db.QueryRowContext(ctx, addHouseholdMember,
+	row := q.db.QueryRow(ctx, addHouseholdMember,
 		arg.HouseholdID,
 		arg.UserID,
 		arg.Role,
@@ -51,12 +51,12 @@ RETURNING id, name, created_by, created_at, updated_at
 `
 
 type CreateHouseholdParams struct {
-	Name      string    `json:"name"`
-	CreatedBy uuid.UUID `json:"created_by"`
+	Name      string      `json:"name"`
+	CreatedBy pgtype.UUID `json:"created_by"`
 }
 
 func (q *Queries) CreateHousehold(ctx context.Context, arg CreateHouseholdParams) (Household, error) {
-	row := q.db.QueryRowContext(ctx, createHousehold, arg.Name, arg.CreatedBy)
+	row := q.db.QueryRow(ctx, createHousehold, arg.Name, arg.CreatedBy)
 	var i Household
 	err := row.Scan(
 		&i.ID,
@@ -72,8 +72,8 @@ const getHouseholdByID = `-- name: GetHouseholdByID :one
 SELECT id, name, created_by, created_at, updated_at FROM households WHERE id = $1
 `
 
-func (q *Queries) GetHouseholdByID(ctx context.Context, id uuid.UUID) (Household, error) {
-	row := q.db.QueryRowContext(ctx, getHouseholdByID, id)
+func (q *Queries) GetHouseholdByID(ctx context.Context, id pgtype.UUID) (Household, error) {
+	row := q.db.QueryRow(ctx, getHouseholdByID, id)
 	var i Household
 	err := row.Scan(
 		&i.ID,
@@ -90,12 +90,12 @@ SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, r
 `
 
 type GetHouseholdMemberParams struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	UserID      uuid.UUID `json:"user_id"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	UserID      pgtype.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetHouseholdMember(ctx context.Context, arg GetHouseholdMemberParams) (HouseholdMember, error) {
-	row := q.db.QueryRowContext(ctx, getHouseholdMember, arg.HouseholdID, arg.UserID)
+	row := q.db.QueryRow(ctx, getHouseholdMember, arg.HouseholdID, arg.UserID)
 	var i HouseholdMember
 	err := row.Scan(
 		&i.HouseholdID,
@@ -113,8 +113,8 @@ const listHouseholdMembers = `-- name: ListHouseholdMembers :many
 SELECT household_id, user_id, role, joined_at, invited_by_user_id, expires_at, revoked_at FROM household_members WHERE household_id = $1 ORDER BY joined_at ASC
 `
 
-func (q *Queries) ListHouseholdMembers(ctx context.Context, householdID uuid.UUID) ([]HouseholdMember, error) {
-	rows, err := q.db.QueryContext(ctx, listHouseholdMembers, householdID)
+func (q *Queries) ListHouseholdMembers(ctx context.Context, householdID pgtype.UUID) ([]HouseholdMember, error) {
+	rows, err := q.db.Query(ctx, listHouseholdMembers, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +135,6 @@ func (q *Queries) ListHouseholdMembers(ctx context.Context, householdID uuid.UUI
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -151,8 +148,8 @@ WHERE hm.user_id = $1
 ORDER BY h.created_at DESC
 `
 
-func (q *Queries) ListHouseholdsByUser(ctx context.Context, userID uuid.UUID) ([]Household, error) {
-	rows, err := q.db.QueryContext(ctx, listHouseholdsByUser, userID)
+func (q *Queries) ListHouseholdsByUser(ctx context.Context, userID pgtype.UUID) ([]Household, error) {
+	rows, err := q.db.Query(ctx, listHouseholdsByUser, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +168,6 @@ func (q *Queries) ListHouseholdsByUser(ctx context.Context, userID uuid.UUID) ([
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -185,13 +179,68 @@ DELETE FROM household_members WHERE household_id = $1 AND user_id = $2
 `
 
 type RemoveHouseholdMemberParams struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	UserID      uuid.UUID `json:"user_id"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	UserID      pgtype.UUID `json:"user_id"`
 }
 
 func (q *Queries) RemoveHouseholdMember(ctx context.Context, arg RemoveHouseholdMemberParams) error {
-	_, err := q.db.ExecContext(ctx, removeHouseholdMember, arg.HouseholdID, arg.UserID)
+	_, err := q.db.Exec(ctx, removeHouseholdMember, arg.HouseholdID, arg.UserID)
 	return err
+}
+
+const revokeHouseholdMember = `-- name: RevokeHouseholdMember :exec
+UPDATE household_members SET revoked_at = NOW()
+WHERE household_id = $1 AND user_id = $2
+`
+
+type RevokeHouseholdMemberParams struct {
+	HouseholdID pgtype.UUID `json:"household_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) RevokeHouseholdMember(ctx context.Context, arg RevokeHouseholdMemberParams) error {
+	_, err := q.db.Exec(ctx, revokeHouseholdMember, arg.HouseholdID, arg.UserID)
+	return err
+}
+
+const setHouseholdMemberExpiry = `-- name: SetHouseholdMemberExpiry :exec
+UPDATE household_members SET expires_at = $3
+WHERE household_id = $1 AND user_id = $2
+`
+
+type SetHouseholdMemberExpiryParams struct {
+	HouseholdID pgtype.UUID        `json:"household_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+}
+
+func (q *Queries) SetHouseholdMemberExpiry(ctx context.Context, arg SetHouseholdMemberExpiryParams) error {
+	_, err := q.db.Exec(ctx, setHouseholdMemberExpiry, arg.HouseholdID, arg.UserID, arg.ExpiresAt)
+	return err
+}
+
+const updateHousehold = `-- name: UpdateHousehold :one
+UPDATE households SET name = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, name, created_by, created_at, updated_at
+`
+
+type UpdateHouseholdParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Name string      `json:"name"`
+}
+
+func (q *Queries) UpdateHousehold(ctx context.Context, arg UpdateHouseholdParams) (Household, error) {
+	row := q.db.QueryRow(ctx, updateHousehold, arg.ID, arg.Name)
+	var i Household
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateHouseholdMemberRole = `-- name: UpdateHouseholdMemberRole :one
@@ -201,13 +250,13 @@ RETURNING household_id, user_id, role, joined_at, invited_by_user_id, expires_at
 `
 
 type UpdateHouseholdMemberRoleParams struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	UserID      uuid.UUID `json:"user_id"`
-	Role        string    `json:"role"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	Role        string      `json:"role"`
 }
 
 func (q *Queries) UpdateHouseholdMemberRole(ctx context.Context, arg UpdateHouseholdMemberRoleParams) (HouseholdMember, error) {
-	row := q.db.QueryRowContext(ctx, updateHouseholdMemberRole, arg.HouseholdID, arg.UserID, arg.Role)
+	row := q.db.QueryRow(ctx, updateHouseholdMemberRole, arg.HouseholdID, arg.UserID, arg.Role)
 	var i HouseholdMember
 	err := row.Scan(
 		&i.HouseholdID,

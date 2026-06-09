@@ -7,10 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPurchaseTransaction = `-- name: CreatePurchaseTransaction :one
@@ -22,19 +20,19 @@ RETURNING id, household_id, store_id, grocery_list_item_id, receipt_scan_item_id
 `
 
 type CreatePurchaseTransactionParams struct {
-	HouseholdID       uuid.UUID      `json:"household_id"`
-	StoreID           uuid.NullUUID  `json:"store_id"`
-	GroceryListItemID uuid.NullUUID  `json:"grocery_list_item_id"`
-	ReceiptScanItemID uuid.NullUUID  `json:"receipt_scan_item_id"`
-	CatalogEntryID    uuid.NullUUID  `json:"catalog_entry_id"`
-	PricePerUnitMinor sql.NullInt64  `json:"price_per_unit_minor"`
-	Currency          string         `json:"currency"`
-	Quantity          sql.NullString `json:"quantity"`
-	PurchasedAt       time.Time      `json:"purchased_at"`
+	HouseholdID       pgtype.UUID        `json:"household_id"`
+	StoreID           pgtype.UUID        `json:"store_id"`
+	GroceryListItemID pgtype.UUID        `json:"grocery_list_item_id"`
+	ReceiptScanItemID pgtype.UUID        `json:"receipt_scan_item_id"`
+	CatalogEntryID    pgtype.UUID        `json:"catalog_entry_id"`
+	PricePerUnitMinor *int64             `json:"price_per_unit_minor"`
+	Currency          string             `json:"currency"`
+	Quantity          pgtype.Numeric     `json:"quantity"`
+	PurchasedAt       pgtype.Timestamptz `json:"purchased_at"`
 }
 
 func (q *Queries) CreatePurchaseTransaction(ctx context.Context, arg CreatePurchaseTransactionParams) (PurchaseTransaction, error) {
-	row := q.db.QueryRowContext(ctx, createPurchaseTransaction,
+	row := q.db.QueryRow(ctx, createPurchaseTransaction,
 		arg.HouseholdID,
 		arg.StoreID,
 		arg.GroceryListItemID,
@@ -66,8 +64,8 @@ const getPurchaseTransactionByID = `-- name: GetPurchaseTransactionByID :one
 SELECT id, household_id, store_id, grocery_list_item_id, receipt_scan_item_id, catalog_entry_id, price_per_unit_minor, currency, quantity, purchased_at, created_at FROM purchase_transactions WHERE id = $1
 `
 
-func (q *Queries) GetPurchaseTransactionByID(ctx context.Context, id uuid.UUID) (PurchaseTransaction, error) {
-	row := q.db.QueryRowContext(ctx, getPurchaseTransactionByID, id)
+func (q *Queries) GetPurchaseTransactionByID(ctx context.Context, id pgtype.UUID) (PurchaseTransaction, error) {
+	row := q.db.QueryRow(ctx, getPurchaseTransactionByID, id)
 	var i PurchaseTransaction
 	err := row.Scan(
 		&i.ID,
@@ -91,8 +89,8 @@ WHERE catalog_entry_id = $1
 ORDER BY purchased_at DESC
 `
 
-func (q *Queries) ListPurchaseTransactionsByCatalogEntry(ctx context.Context, catalogEntryID uuid.NullUUID) ([]PurchaseTransaction, error) {
-	rows, err := q.db.QueryContext(ctx, listPurchaseTransactionsByCatalogEntry, catalogEntryID)
+func (q *Queries) ListPurchaseTransactionsByCatalogEntry(ctx context.Context, catalogEntryID pgtype.UUID) ([]PurchaseTransaction, error) {
+	rows, err := q.db.Query(ctx, listPurchaseTransactionsByCatalogEntry, catalogEntryID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +114,6 @@ func (q *Queries) ListPurchaseTransactionsByCatalogEntry(ctx context.Context, ca
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -132,8 +127,8 @@ WHERE household_id = $1
 ORDER BY purchased_at DESC
 `
 
-func (q *Queries) ListPurchaseTransactionsByHousehold(ctx context.Context, householdID uuid.UUID) ([]PurchaseTransaction, error) {
-	rows, err := q.db.QueryContext(ctx, listPurchaseTransactionsByHousehold, householdID)
+func (q *Queries) ListPurchaseTransactionsByHousehold(ctx context.Context, householdID pgtype.UUID) ([]PurchaseTransaction, error) {
+	rows, err := q.db.Query(ctx, listPurchaseTransactionsByHousehold, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -157,9 +152,6 @@ func (q *Queries) ListPurchaseTransactionsByHousehold(ctx context.Context, house
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

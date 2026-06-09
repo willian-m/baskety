@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createSession = `-- name: CreateSession :one
@@ -19,13 +18,13 @@ RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at
 `
 
 type CreateSessionParams struct {
-	UserID    uuid.UUID    `json:"user_id"`
-	TokenHash string       `json:"token_hash"`
-	ExpiresAt sql.NullTime `json:"expires_at"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
-	row := q.db.QueryRowContext(ctx, createSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, createSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	var i Session
 	err := row.Scan(
 		&i.ID,
@@ -43,7 +42,7 @@ DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at < NOW()
 `
 
 func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, deleteExpiredSessions)
+	_, err := q.db.Exec(ctx, deleteExpiredSessions)
 	return err
 }
 
@@ -52,7 +51,7 @@ SELECT id, user_id, token_hash, expires_at, revoked_at, created_at FROM sessions
 `
 
 func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error) {
-	row := q.db.QueryRowContext(ctx, getSessionByTokenHash, tokenHash)
+	row := q.db.QueryRow(ctx, getSessionByTokenHash, tokenHash)
 	var i Session
 	err := row.Scan(
 		&i.ID,
@@ -69,7 +68,7 @@ const revokeSession = `-- name: RevokeSession :exec
 UPDATE sessions SET revoked_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) RevokeSession(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, revokeSession, id)
+func (q *Queries) RevokeSession(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, revokeSession, id)
 	return err
 }

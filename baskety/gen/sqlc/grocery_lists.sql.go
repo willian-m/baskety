@@ -7,17 +7,16 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const archiveGroceryList = `-- name: ArchiveGroceryList :exec
 UPDATE grocery_lists SET status = 'archived', updated_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) ArchiveGroceryList(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, archiveGroceryList, id)
+func (q *Queries) ArchiveGroceryList(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, archiveGroceryList, id)
 	return err
 }
 
@@ -28,13 +27,13 @@ RETURNING id, inventory_id, name, status, created_by_user_id, completed_at, pinn
 `
 
 type CreateGroceryListParams struct {
-	InventoryID     uuid.UUID `json:"inventory_id"`
-	Name            string    `json:"name"`
-	CreatedByUserID uuid.UUID `json:"created_by_user_id"`
+	InventoryID     pgtype.UUID `json:"inventory_id"`
+	Name            string      `json:"name"`
+	CreatedByUserID pgtype.UUID `json:"created_by_user_id"`
 }
 
 func (q *Queries) CreateGroceryList(ctx context.Context, arg CreateGroceryListParams) (GroceryList, error) {
-	row := q.db.QueryRowContext(ctx, createGroceryList, arg.InventoryID, arg.Name, arg.CreatedByUserID)
+	row := q.db.QueryRow(ctx, createGroceryList, arg.InventoryID, arg.Name, arg.CreatedByUserID)
 	var i GroceryList
 	err := row.Scan(
 		&i.ID,
@@ -55,8 +54,8 @@ const getGroceryListByID = `-- name: GetGroceryListByID :one
 SELECT id, inventory_id, name, status, created_by_user_id, completed_at, pinned_at, expires_at, created_at, updated_at FROM grocery_lists WHERE id = $1
 `
 
-func (q *Queries) GetGroceryListByID(ctx context.Context, id uuid.UUID) (GroceryList, error) {
-	row := q.db.QueryRowContext(ctx, getGroceryListByID, id)
+func (q *Queries) GetGroceryListByID(ctx context.Context, id pgtype.UUID) (GroceryList, error) {
+	row := q.db.QueryRow(ctx, getGroceryListByID, id)
 	var i GroceryList
 	err := row.Scan(
 		&i.ID,
@@ -77,8 +76,8 @@ const listGroceryListsByInventory = `-- name: ListGroceryListsByInventory :many
 SELECT id, inventory_id, name, status, created_by_user_id, completed_at, pinned_at, expires_at, created_at, updated_at FROM grocery_lists WHERE inventory_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListGroceryListsByInventory(ctx context.Context, inventoryID uuid.UUID) ([]GroceryList, error) {
-	rows, err := q.db.QueryContext(ctx, listGroceryListsByInventory, inventoryID)
+func (q *Queries) ListGroceryListsByInventory(ctx context.Context, inventoryID pgtype.UUID) ([]GroceryList, error) {
+	rows, err := q.db.Query(ctx, listGroceryListsByInventory, inventoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +101,6 @@ func (q *Queries) ListGroceryListsByInventory(ctx context.Context, inventoryID u
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -115,8 +111,8 @@ const pinGroceryList = `-- name: PinGroceryList :exec
 UPDATE grocery_lists SET pinned_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) PinGroceryList(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, pinGroceryList, id)
+func (q *Queries) PinGroceryList(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, pinGroceryList, id)
 	return err
 }
 
@@ -128,13 +124,13 @@ RETURNING id, inventory_id, name, status, created_by_user_id, completed_at, pinn
 `
 
 type UpdateGroceryListStatusParams struct {
-	ID          uuid.UUID    `json:"id"`
-	Status      string       `json:"status"`
-	CompletedAt sql.NullTime `json:"completed_at"`
+	ID          pgtype.UUID        `json:"id"`
+	Status      string             `json:"status"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
 func (q *Queries) UpdateGroceryListStatus(ctx context.Context, arg UpdateGroceryListStatusParams) (GroceryList, error) {
-	row := q.db.QueryRowContext(ctx, updateGroceryListStatus, arg.ID, arg.Status, arg.CompletedAt)
+	row := q.db.QueryRow(ctx, updateGroceryListStatus, arg.ID, arg.Status, arg.CompletedAt)
 	var i GroceryList
 	err := row.Scan(
 		&i.ID,

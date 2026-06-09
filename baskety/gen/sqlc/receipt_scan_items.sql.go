@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createReceiptScanItem = `-- name: CreateReceiptScanItem :one
@@ -23,20 +22,20 @@ RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quant
 `
 
 type CreateReceiptScanItemParams struct {
-	ReceiptScanID           uuid.UUID      `json:"receipt_scan_id"`
+	ReceiptScanID           pgtype.UUID    `json:"receipt_scan_id"`
 	RawText                 string         `json:"raw_text"`
-	ParsedName              sql.NullString `json:"parsed_name"`
-	ParsedBrand             sql.NullString `json:"parsed_brand"`
-	ParsedQuantity          sql.NullString `json:"parsed_quantity"`
-	ParsedUnit              sql.NullString `json:"parsed_unit"`
-	ParsedPricePerUnitMinor sql.NullInt64  `json:"parsed_price_per_unit_minor"`
-	ParsedCurrency          sql.NullString `json:"parsed_currency"`
-	ParsedStoreName         sql.NullString `json:"parsed_store_name"`
-	ConfidenceScore         sql.NullString `json:"confidence_score"`
+	ParsedName              *string        `json:"parsed_name"`
+	ParsedBrand             *string        `json:"parsed_brand"`
+	ParsedQuantity          pgtype.Numeric `json:"parsed_quantity"`
+	ParsedUnit              *string        `json:"parsed_unit"`
+	ParsedPricePerUnitMinor *int64         `json:"parsed_price_per_unit_minor"`
+	ParsedCurrency          *string        `json:"parsed_currency"`
+	ParsedStoreName         *string        `json:"parsed_store_name"`
+	ConfidenceScore         pgtype.Numeric `json:"confidence_score"`
 }
 
 func (q *Queries) CreateReceiptScanItem(ctx context.Context, arg CreateReceiptScanItemParams) (ReceiptScanItem, error) {
-	row := q.db.QueryRowContext(ctx, createReceiptScanItem,
+	row := q.db.QueryRow(ctx, createReceiptScanItem,
 		arg.ReceiptScanID,
 		arg.RawText,
 		arg.ParsedName,
@@ -80,12 +79,12 @@ UPDATE receipt_scan_items SET inventory_item_id = $2 WHERE id = $1
 `
 
 type LinkReceiptScanItemToInventoryParams struct {
-	ID              uuid.UUID     `json:"id"`
-	InventoryItemID uuid.NullUUID `json:"inventory_item_id"`
+	ID              pgtype.UUID `json:"id"`
+	InventoryItemID pgtype.UUID `json:"inventory_item_id"`
 }
 
 func (q *Queries) LinkReceiptScanItemToInventory(ctx context.Context, arg LinkReceiptScanItemToInventoryParams) error {
-	_, err := q.db.ExecContext(ctx, linkReceiptScanItemToInventory, arg.ID, arg.InventoryItemID)
+	_, err := q.db.Exec(ctx, linkReceiptScanItemToInventory, arg.ID, arg.InventoryItemID)
 	return err
 }
 
@@ -93,8 +92,8 @@ const listReceiptScanItems = `-- name: ListReceiptScanItems :many
 SELECT id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at FROM receipt_scan_items WHERE receipt_scan_id = $1 ORDER BY created_at ASC
 `
 
-func (q *Queries) ListReceiptScanItems(ctx context.Context, receiptScanID uuid.UUID) ([]ReceiptScanItem, error) {
-	rows, err := q.db.QueryContext(ctx, listReceiptScanItems, receiptScanID)
+func (q *Queries) ListReceiptScanItems(ctx context.Context, receiptScanID pgtype.UUID) ([]ReceiptScanItem, error) {
+	rows, err := q.db.Query(ctx, listReceiptScanItems, receiptScanID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,9 +128,6 @@ func (q *Queries) ListReceiptScanItems(ctx context.Context, receiptScanID uuid.U
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -153,18 +149,18 @@ RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quant
 `
 
 type UpdateReceiptScanItemStatusParams struct {
-	ID                         uuid.UUID      `json:"id"`
+	ID                         pgtype.UUID    `json:"id"`
 	Status                     string         `json:"status"`
-	CorrectedName              sql.NullString `json:"corrected_name"`
-	CorrectedBrand             sql.NullString `json:"corrected_brand"`
-	CorrectedQuantity          sql.NullString `json:"corrected_quantity"`
-	CorrectedPricePerUnitMinor sql.NullInt64  `json:"corrected_price_per_unit_minor"`
-	CorrectedCurrency          sql.NullString `json:"corrected_currency"`
-	CorrectedStoreName         sql.NullString `json:"corrected_store_name"`
+	CorrectedName              *string        `json:"corrected_name"`
+	CorrectedBrand             *string        `json:"corrected_brand"`
+	CorrectedQuantity          pgtype.Numeric `json:"corrected_quantity"`
+	CorrectedPricePerUnitMinor *int64         `json:"corrected_price_per_unit_minor"`
+	CorrectedCurrency          *string        `json:"corrected_currency"`
+	CorrectedStoreName         *string        `json:"corrected_store_name"`
 }
 
 func (q *Queries) UpdateReceiptScanItemStatus(ctx context.Context, arg UpdateReceiptScanItemStatusParams) (ReceiptScanItem, error) {
-	row := q.db.QueryRowContext(ctx, updateReceiptScanItemStatus,
+	row := q.db.QueryRow(ctx, updateReceiptScanItemStatus,
 		arg.ID,
 		arg.Status,
 		arg.CorrectedName,

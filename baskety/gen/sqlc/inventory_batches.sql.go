@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createInventoryBatch = `-- name: CreateInventoryBatch :one
@@ -19,14 +18,14 @@ RETURNING id, item_id, quantity, expires_at, added_at, emptied_at, notes, create
 `
 
 type CreateInventoryBatchParams struct {
-	ItemID    uuid.UUID      `json:"item_id"`
-	Quantity  string         `json:"quantity"`
-	ExpiresAt sql.NullTime   `json:"expires_at"`
-	Notes     sql.NullString `json:"notes"`
+	ItemID    pgtype.UUID        `json:"item_id"`
+	Quantity  pgtype.Numeric     `json:"quantity"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Notes     *string            `json:"notes"`
 }
 
 func (q *Queries) CreateInventoryBatch(ctx context.Context, arg CreateInventoryBatchParams) (InventoryBatch, error) {
-	row := q.db.QueryRowContext(ctx, createInventoryBatch,
+	row := q.db.QueryRow(ctx, createInventoryBatch,
 		arg.ItemID,
 		arg.Quantity,
 		arg.ExpiresAt,
@@ -50,8 +49,8 @@ const getInventoryBatchByID = `-- name: GetInventoryBatchByID :one
 SELECT id, item_id, quantity, expires_at, added_at, emptied_at, notes, created_at FROM inventory_batches WHERE id = $1
 `
 
-func (q *Queries) GetInventoryBatchByID(ctx context.Context, id uuid.UUID) (InventoryBatch, error) {
-	row := q.db.QueryRowContext(ctx, getInventoryBatchByID, id)
+func (q *Queries) GetInventoryBatchByID(ctx context.Context, id pgtype.UUID) (InventoryBatch, error) {
+	row := q.db.QueryRow(ctx, getInventoryBatchByID, id)
 	var i InventoryBatch
 	err := row.Scan(
 		&i.ID,
@@ -72,8 +71,8 @@ WHERE item_id = $1 AND emptied_at IS NULL
 ORDER BY expires_at ASC NULLS LAST
 `
 
-func (q *Queries) ListActiveBatchesByItem(ctx context.Context, itemID uuid.UUID) ([]InventoryBatch, error) {
-	rows, err := q.db.QueryContext(ctx, listActiveBatchesByItem, itemID)
+func (q *Queries) ListActiveBatchesByItem(ctx context.Context, itemID pgtype.UUID) ([]InventoryBatch, error) {
+	rows, err := q.db.Query(ctx, listActiveBatchesByItem, itemID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +93,6 @@ func (q *Queries) ListActiveBatchesByItem(ctx context.Context, itemID uuid.UUID)
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -110,8 +106,8 @@ WHERE emptied_at IS NULL AND expires_at <= $1
 ORDER BY expires_at ASC
 `
 
-func (q *Queries) ListExpiringBatches(ctx context.Context, expiresAt sql.NullTime) ([]InventoryBatch, error) {
-	rows, err := q.db.QueryContext(ctx, listExpiringBatches, expiresAt)
+func (q *Queries) ListExpiringBatches(ctx context.Context, expiresAt pgtype.Timestamptz) ([]InventoryBatch, error) {
+	rows, err := q.db.Query(ctx, listExpiringBatches, expiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +129,6 @@ func (q *Queries) ListExpiringBatches(ctx context.Context, expiresAt sql.NullTim
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -146,7 +139,7 @@ const markBatchEmptied = `-- name: MarkBatchEmptied :exec
 UPDATE inventory_batches SET emptied_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, markBatchEmptied, id)
+func (q *Queries) MarkBatchEmptied(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markBatchEmptied, id)
 	return err
 }

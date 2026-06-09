@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createReceiptScan = `-- name: CreateReceiptScan :one
@@ -19,14 +18,14 @@ RETURNING id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_r
 `
 
 type CreateReceiptScanParams struct {
-	HouseholdID     uuid.UUID     `json:"household_id"`
-	GroceryListID   uuid.NullUUID `json:"grocery_list_id"`
-	RawImagePath    string        `json:"raw_image_path"`
-	CreatedByUserID uuid.UUID     `json:"created_by_user_id"`
+	HouseholdID     pgtype.UUID `json:"household_id"`
+	GroceryListID   pgtype.UUID `json:"grocery_list_id"`
+	RawImagePath    string      `json:"raw_image_path"`
+	CreatedByUserID pgtype.UUID `json:"created_by_user_id"`
 }
 
 func (q *Queries) CreateReceiptScan(ctx context.Context, arg CreateReceiptScanParams) (ReceiptScan, error) {
-	row := q.db.QueryRowContext(ctx, createReceiptScan,
+	row := q.db.QueryRow(ctx, createReceiptScan,
 		arg.HouseholdID,
 		arg.GroceryListID,
 		arg.RawImagePath,
@@ -53,8 +52,8 @@ const getReceiptScanByID = `-- name: GetReceiptScanByID :one
 SELECT id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_response, status, error_message, created_by_user_id, created_at, updated_at FROM receipt_scans WHERE id = $1
 `
 
-func (q *Queries) GetReceiptScanByID(ctx context.Context, id uuid.UUID) (ReceiptScan, error) {
-	row := q.db.QueryRowContext(ctx, getReceiptScanByID, id)
+func (q *Queries) GetReceiptScanByID(ctx context.Context, id pgtype.UUID) (ReceiptScan, error) {
+	row := q.db.QueryRow(ctx, getReceiptScanByID, id)
 	var i ReceiptScan
 	err := row.Scan(
 		&i.ID,
@@ -76,8 +75,8 @@ const listReceiptScansByHousehold = `-- name: ListReceiptScansByHousehold :many
 SELECT id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_response, status, error_message, created_by_user_id, created_at, updated_at FROM receipt_scans WHERE household_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListReceiptScansByHousehold(ctx context.Context, householdID uuid.UUID) ([]ReceiptScan, error) {
-	rows, err := q.db.QueryContext(ctx, listReceiptScansByHousehold, householdID)
+func (q *Queries) ListReceiptScansByHousehold(ctx context.Context, householdID pgtype.UUID) ([]ReceiptScan, error) {
+	rows, err := q.db.Query(ctx, listReceiptScansByHousehold, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +101,6 @@ func (q *Queries) ListReceiptScansByHousehold(ctx context.Context, householdID u
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -119,12 +115,12 @@ RETURNING id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_r
 `
 
 type SetReceiptScanLLMResultParams struct {
-	ID             uuid.UUID      `json:"id"`
-	LlmRawResponse sql.NullString `json:"llm_raw_response"`
+	ID             pgtype.UUID `json:"id"`
+	LlmRawResponse *string     `json:"llm_raw_response"`
 }
 
 func (q *Queries) SetReceiptScanLLMResult(ctx context.Context, arg SetReceiptScanLLMResultParams) (ReceiptScan, error) {
-	row := q.db.QueryRowContext(ctx, setReceiptScanLLMResult, arg.ID, arg.LlmRawResponse)
+	row := q.db.QueryRow(ctx, setReceiptScanLLMResult, arg.ID, arg.LlmRawResponse)
 	var i ReceiptScan
 	err := row.Scan(
 		&i.ID,
@@ -150,12 +146,12 @@ RETURNING id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_r
 `
 
 type SetReceiptScanOCRResultParams struct {
-	ID      uuid.UUID      `json:"id"`
-	OcrText sql.NullString `json:"ocr_text"`
+	ID      pgtype.UUID `json:"id"`
+	OcrText *string     `json:"ocr_text"`
 }
 
 func (q *Queries) SetReceiptScanOCRResult(ctx context.Context, arg SetReceiptScanOCRResultParams) (ReceiptScan, error) {
-	row := q.db.QueryRowContext(ctx, setReceiptScanOCRResult, arg.ID, arg.OcrText)
+	row := q.db.QueryRow(ctx, setReceiptScanOCRResult, arg.ID, arg.OcrText)
 	var i ReceiptScan
 	err := row.Scan(
 		&i.ID,
@@ -181,13 +177,13 @@ RETURNING id, household_id, grocery_list_id, raw_image_path, ocr_text, llm_raw_r
 `
 
 type UpdateReceiptScanStatusParams struct {
-	ID           uuid.UUID      `json:"id"`
-	Status       string         `json:"status"`
-	ErrorMessage sql.NullString `json:"error_message"`
+	ID           pgtype.UUID `json:"id"`
+	Status       string      `json:"status"`
+	ErrorMessage *string     `json:"error_message"`
 }
 
 func (q *Queries) UpdateReceiptScanStatus(ctx context.Context, arg UpdateReceiptScanStatusParams) (ReceiptScan, error) {
-	row := q.db.QueryRowContext(ctx, updateReceiptScanStatus, arg.ID, arg.Status, arg.ErrorMessage)
+	row := q.db.QueryRow(ctx, updateReceiptScanStatus, arg.ID, arg.Status, arg.ErrorMessage)
 	var i ReceiptScan
 	err := row.Scan(
 		&i.ID,

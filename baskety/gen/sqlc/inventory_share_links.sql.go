@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createShareLink = `-- name: CreateShareLink :one
@@ -19,15 +18,15 @@ RETURNING id, inventory_id, token, created_by_user_id, password_hash, expires_at
 `
 
 type CreateShareLinkParams struct {
-	InventoryID     uuid.UUID      `json:"inventory_id"`
-	Token           string         `json:"token"`
-	CreatedByUserID uuid.UUID      `json:"created_by_user_id"`
-	PasswordHash    sql.NullString `json:"password_hash"`
-	ExpiresAt       sql.NullTime   `json:"expires_at"`
+	InventoryID     pgtype.UUID        `json:"inventory_id"`
+	Token           string             `json:"token"`
+	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
+	PasswordHash    *string            `json:"password_hash"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateShareLink(ctx context.Context, arg CreateShareLinkParams) (InventoryShareLink, error) {
-	row := q.db.QueryRowContext(ctx, createShareLink,
+	row := q.db.QueryRow(ctx, createShareLink,
 		arg.InventoryID,
 		arg.Token,
 		arg.CreatedByUserID,
@@ -53,7 +52,7 @@ SELECT id, inventory_id, token, created_by_user_id, password_hash, expires_at, r
 `
 
 func (q *Queries) GetShareLinkByToken(ctx context.Context, token string) (InventoryShareLink, error) {
-	row := q.db.QueryRowContext(ctx, getShareLinkByToken, token)
+	row := q.db.QueryRow(ctx, getShareLinkByToken, token)
 	var i InventoryShareLink
 	err := row.Scan(
 		&i.ID,
@@ -72,8 +71,8 @@ const listShareLinksByInventory = `-- name: ListShareLinksByInventory :many
 SELECT id, inventory_id, token, created_by_user_id, password_hash, expires_at, revoked_at, created_at FROM inventory_share_links WHERE inventory_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListShareLinksByInventory(ctx context.Context, inventoryID uuid.UUID) ([]InventoryShareLink, error) {
-	rows, err := q.db.QueryContext(ctx, listShareLinksByInventory, inventoryID)
+func (q *Queries) ListShareLinksByInventory(ctx context.Context, inventoryID pgtype.UUID) ([]InventoryShareLink, error) {
+	rows, err := q.db.Query(ctx, listShareLinksByInventory, inventoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +94,6 @@ func (q *Queries) ListShareLinksByInventory(ctx context.Context, inventoryID uui
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -108,7 +104,7 @@ const revokeShareLink = `-- name: RevokeShareLink :exec
 UPDATE inventory_share_links SET revoked_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) RevokeShareLink(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, revokeShareLink, id)
+func (q *Queries) RevokeShareLink(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, revokeShareLink, id)
 	return err
 }

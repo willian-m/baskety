@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addGroceryListItem = `-- name: AddGroceryListItem :one
@@ -19,17 +18,17 @@ RETURNING id, grocery_list_id, inventory_item_id, name, quantity, unit, notes, s
 `
 
 type AddGroceryListItemParams struct {
-	GroceryListID   uuid.UUID      `json:"grocery_list_id"`
-	InventoryItemID uuid.NullUUID  `json:"inventory_item_id"`
+	GroceryListID   pgtype.UUID    `json:"grocery_list_id"`
+	InventoryItemID pgtype.UUID    `json:"inventory_item_id"`
 	Name            string         `json:"name"`
-	Quantity        string         `json:"quantity"`
-	Unit            sql.NullString `json:"unit"`
-	Notes           sql.NullString `json:"notes"`
+	Quantity        pgtype.Numeric `json:"quantity"`
+	Unit            *string        `json:"unit"`
+	Notes           *string        `json:"notes"`
 	SortOrder       int32          `json:"sort_order"`
 }
 
 func (q *Queries) AddGroceryListItem(ctx context.Context, arg AddGroceryListItemParams) (GroceryListItem, error) {
-	row := q.db.QueryRowContext(ctx, addGroceryListItem,
+	row := q.db.QueryRow(ctx, addGroceryListItem,
 		arg.GroceryListID,
 		arg.InventoryItemID,
 		arg.Name,
@@ -59,8 +58,8 @@ const deleteGroceryListItem = `-- name: DeleteGroceryListItem :exec
 DELETE FROM grocery_list_items WHERE id = $1
 `
 
-func (q *Queries) DeleteGroceryListItem(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteGroceryListItem, id)
+func (q *Queries) DeleteGroceryListItem(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteGroceryListItem, id)
 	return err
 }
 
@@ -68,8 +67,8 @@ const getGroceryListItemByID = `-- name: GetGroceryListItemByID :one
 SELECT id, grocery_list_id, inventory_item_id, name, quantity, unit, notes, status, sort_order, created_at, updated_at FROM grocery_list_items WHERE id = $1
 `
 
-func (q *Queries) GetGroceryListItemByID(ctx context.Context, id uuid.UUID) (GroceryListItem, error) {
-	row := q.db.QueryRowContext(ctx, getGroceryListItemByID, id)
+func (q *Queries) GetGroceryListItemByID(ctx context.Context, id pgtype.UUID) (GroceryListItem, error) {
+	row := q.db.QueryRow(ctx, getGroceryListItemByID, id)
 	var i GroceryListItem
 	err := row.Scan(
 		&i.ID,
@@ -93,8 +92,8 @@ WHERE grocery_list_id = $1
 ORDER BY sort_order ASC, created_at ASC
 `
 
-func (q *Queries) ListGroceryListItems(ctx context.Context, groceryListID uuid.UUID) ([]GroceryListItem, error) {
-	rows, err := q.db.QueryContext(ctx, listGroceryListItems, groceryListID)
+func (q *Queries) ListGroceryListItems(ctx context.Context, groceryListID pgtype.UUID) ([]GroceryListItem, error) {
+	rows, err := q.db.Query(ctx, listGroceryListItems, groceryListID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,9 +118,6 @@ func (q *Queries) ListGroceryListItems(ctx context.Context, groceryListID uuid.U
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -133,12 +129,12 @@ UPDATE grocery_list_items SET sort_order = $2 WHERE id = $1
 `
 
 type UpdateGroceryListItemSortOrderParams struct {
-	ID        uuid.UUID `json:"id"`
-	SortOrder int32     `json:"sort_order"`
+	ID        pgtype.UUID `json:"id"`
+	SortOrder int32       `json:"sort_order"`
 }
 
 func (q *Queries) UpdateGroceryListItemSortOrder(ctx context.Context, arg UpdateGroceryListItemSortOrderParams) error {
-	_, err := q.db.ExecContext(ctx, updateGroceryListItemSortOrder, arg.ID, arg.SortOrder)
+	_, err := q.db.Exec(ctx, updateGroceryListItemSortOrder, arg.ID, arg.SortOrder)
 	return err
 }
 
@@ -150,12 +146,12 @@ RETURNING id, grocery_list_id, inventory_item_id, name, quantity, unit, notes, s
 `
 
 type UpdateGroceryListItemStatusParams struct {
-	ID     uuid.UUID `json:"id"`
-	Status string    `json:"status"`
+	ID     pgtype.UUID `json:"id"`
+	Status string      `json:"status"`
 }
 
 func (q *Queries) UpdateGroceryListItemStatus(ctx context.Context, arg UpdateGroceryListItemStatusParams) (GroceryListItem, error) {
-	row := q.db.QueryRowContext(ctx, updateGroceryListItemStatus, arg.ID, arg.Status)
+	row := q.db.QueryRow(ctx, updateGroceryListItemStatus, arg.ID, arg.Status)
 	var i GroceryListItem
 	err := row.Scan(
 		&i.ID,

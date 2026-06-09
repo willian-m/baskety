@@ -30,3 +30,16 @@ DELETE FROM household_members WHERE household_id = $1 AND user_id = $2;
 
 -- name: ListHouseholdMembers :many
 SELECT * FROM household_members WHERE household_id = $1 ORDER BY joined_at ASC;
+
+-- name: UpdateHousehold :one
+UPDATE households SET name = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: RevokeHouseholdMember :exec
+UPDATE household_members SET revoked_at = NOW()
+WHERE household_id = $1 AND user_id = $2;
+
+-- name: SetHouseholdMemberExpiry :exec
+UPDATE household_members SET expires_at = $3
+WHERE household_id = $1 AND user_id = $2;

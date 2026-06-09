@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createInventory = `-- name: CreateInventory :one
@@ -19,13 +18,13 @@ RETURNING id, household_id, name, description, created_at, updated_at
 `
 
 type CreateInventoryParams struct {
-	HouseholdID uuid.UUID      `json:"household_id"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
+	HouseholdID pgtype.UUID `json:"household_id"`
+	Name        string      `json:"name"`
+	Description *string     `json:"description"`
 }
 
 func (q *Queries) CreateInventory(ctx context.Context, arg CreateInventoryParams) (Inventory, error) {
-	row := q.db.QueryRowContext(ctx, createInventory, arg.HouseholdID, arg.Name, arg.Description)
+	row := q.db.QueryRow(ctx, createInventory, arg.HouseholdID, arg.Name, arg.Description)
 	var i Inventory
 	err := row.Scan(
 		&i.ID,
@@ -42,8 +41,8 @@ const deleteInventory = `-- name: DeleteInventory :exec
 DELETE FROM inventories WHERE id = $1
 `
 
-func (q *Queries) DeleteInventory(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteInventory, id)
+func (q *Queries) DeleteInventory(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteInventory, id)
 	return err
 }
 
@@ -51,8 +50,8 @@ const getInventoryByID = `-- name: GetInventoryByID :one
 SELECT id, household_id, name, description, created_at, updated_at FROM inventories WHERE id = $1
 `
 
-func (q *Queries) GetInventoryByID(ctx context.Context, id uuid.UUID) (Inventory, error) {
-	row := q.db.QueryRowContext(ctx, getInventoryByID, id)
+func (q *Queries) GetInventoryByID(ctx context.Context, id pgtype.UUID) (Inventory, error) {
+	row := q.db.QueryRow(ctx, getInventoryByID, id)
 	var i Inventory
 	err := row.Scan(
 		&i.ID,
@@ -70,12 +69,12 @@ SELECT inventory_id, user_id, permission FROM inventory_permissions WHERE invent
 `
 
 type GetInventoryPermissionParams struct {
-	InventoryID uuid.UUID `json:"inventory_id"`
-	UserID      uuid.UUID `json:"user_id"`
+	InventoryID pgtype.UUID `json:"inventory_id"`
+	UserID      pgtype.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetInventoryPermission(ctx context.Context, arg GetInventoryPermissionParams) (InventoryPermission, error) {
-	row := q.db.QueryRowContext(ctx, getInventoryPermission, arg.InventoryID, arg.UserID)
+	row := q.db.QueryRow(ctx, getInventoryPermission, arg.InventoryID, arg.UserID)
 	var i InventoryPermission
 	err := row.Scan(&i.InventoryID, &i.UserID, &i.Permission)
 	return i, err
@@ -85,8 +84,8 @@ const listInventoriesByHousehold = `-- name: ListInventoriesByHousehold :many
 SELECT id, household_id, name, description, created_at, updated_at FROM inventories WHERE household_id = $1 ORDER BY created_at ASC
 `
 
-func (q *Queries) ListInventoriesByHousehold(ctx context.Context, householdID uuid.UUID) ([]Inventory, error) {
-	rows, err := q.db.QueryContext(ctx, listInventoriesByHousehold, householdID)
+func (q *Queries) ListInventoriesByHousehold(ctx context.Context, householdID pgtype.UUID) ([]Inventory, error) {
+	rows, err := q.db.Query(ctx, listInventoriesByHousehold, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +105,6 @@ func (q *Queries) ListInventoriesByHousehold(ctx context.Context, householdID uu
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -119,8 +115,8 @@ const listInventoryPermissions = `-- name: ListInventoryPermissions :many
 SELECT inventory_id, user_id, permission FROM inventory_permissions WHERE inventory_id = $1
 `
 
-func (q *Queries) ListInventoryPermissions(ctx context.Context, inventoryID uuid.UUID) ([]InventoryPermission, error) {
-	rows, err := q.db.QueryContext(ctx, listInventoryPermissions, inventoryID)
+func (q *Queries) ListInventoryPermissions(ctx context.Context, inventoryID pgtype.UUID) ([]InventoryPermission, error) {
+	rows, err := q.db.Query(ctx, listInventoryPermissions, inventoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +129,6 @@ func (q *Queries) ListInventoryPermissions(ctx context.Context, inventoryID uuid
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -143,18 +136,19 @@ func (q *Queries) ListInventoryPermissions(ctx context.Context, inventoryID uuid
 }
 
 const updateInventory = `-- name: UpdateInventory :one
-UPDATE inventories SET name = $2, updated_at = NOW()
+UPDATE inventories SET name = $2, description = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING id, household_id, name, description, created_at, updated_at
 `
 
 type UpdateInventoryParams struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID          pgtype.UUID `json:"id"`
+	Name        string      `json:"name"`
+	Description *string     `json:"description"`
 }
 
 func (q *Queries) UpdateInventory(ctx context.Context, arg UpdateInventoryParams) (Inventory, error) {
-	row := q.db.QueryRowContext(ctx, updateInventory, arg.ID, arg.Name)
+	row := q.db.QueryRow(ctx, updateInventory, arg.ID, arg.Name, arg.Description)
 	var i Inventory
 	err := row.Scan(
 		&i.ID,
@@ -175,13 +169,13 @@ RETURNING inventory_id, user_id, permission
 `
 
 type UpsertInventoryPermissionParams struct {
-	InventoryID uuid.UUID `json:"inventory_id"`
-	UserID      uuid.UUID `json:"user_id"`
-	Permission  string    `json:"permission"`
+	InventoryID pgtype.UUID `json:"inventory_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	Permission  string      `json:"permission"`
 }
 
 func (q *Queries) UpsertInventoryPermission(ctx context.Context, arg UpsertInventoryPermissionParams) (InventoryPermission, error) {
-	row := q.db.QueryRowContext(ctx, upsertInventoryPermission, arg.InventoryID, arg.UserID, arg.Permission)
+	row := q.db.QueryRow(ctx, upsertInventoryPermission, arg.InventoryID, arg.UserID, arg.Permission)
 	var i InventoryPermission
 	err := row.Scan(&i.InventoryID, &i.UserID, &i.Permission)
 	return i, err

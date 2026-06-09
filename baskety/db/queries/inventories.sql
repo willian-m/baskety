@@ -10,7 +10,7 @@ SELECT * FROM inventories WHERE id = $1;
 SELECT * FROM inventories WHERE household_id = $1 ORDER BY created_at ASC;
 
 -- name: UpdateInventory :one
-UPDATE inventories SET name = $2, updated_at = NOW()
+UPDATE inventories SET name = $2, description = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 

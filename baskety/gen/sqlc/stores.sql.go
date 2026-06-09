@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createStore = `-- name: CreateStore :one
@@ -19,13 +18,13 @@ RETURNING id, name, chain_name, address, canonical_store_id, created_at, updated
 `
 
 type CreateStoreParams struct {
-	Name      string         `json:"name"`
-	ChainName sql.NullString `json:"chain_name"`
-	Address   sql.NullString `json:"address"`
+	Name      string  `json:"name"`
+	ChainName *string `json:"chain_name"`
+	Address   *string `json:"address"`
 }
 
 func (q *Queries) CreateStore(ctx context.Context, arg CreateStoreParams) (Store, error) {
-	row := q.db.QueryRowContext(ctx, createStore, arg.Name, arg.ChainName, arg.Address)
+	row := q.db.QueryRow(ctx, createStore, arg.Name, arg.ChainName, arg.Address)
 	var i Store
 	err := row.Scan(
 		&i.ID,
@@ -43,8 +42,8 @@ const getStoreByID = `-- name: GetStoreByID :one
 SELECT id, name, chain_name, address, canonical_store_id, created_at, updated_at FROM stores WHERE id = $1
 `
 
-func (q *Queries) GetStoreByID(ctx context.Context, id uuid.UUID) (Store, error) {
-	row := q.db.QueryRowContext(ctx, getStoreByID, id)
+func (q *Queries) GetStoreByID(ctx context.Context, id pgtype.UUID) (Store, error) {
+	row := q.db.QueryRow(ctx, getStoreByID, id)
 	var i Store
 	err := row.Scan(
 		&i.ID,
@@ -63,7 +62,7 @@ SELECT id, name, chain_name, address, canonical_store_id, created_at, updated_at
 `
 
 func (q *Queries) ListStores(ctx context.Context) ([]Store, error) {
-	rows, err := q.db.QueryContext(ctx, listStores)
+	rows, err := q.db.Query(ctx, listStores)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +83,6 @@ func (q *Queries) ListStores(ctx context.Context) ([]Store, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -98,12 +94,12 @@ UPDATE stores SET canonical_store_id = $2 WHERE id = $1
 `
 
 type MergeStoreParams struct {
-	ID               uuid.UUID     `json:"id"`
-	CanonicalStoreID uuid.NullUUID `json:"canonical_store_id"`
+	ID               pgtype.UUID `json:"id"`
+	CanonicalStoreID pgtype.UUID `json:"canonical_store_id"`
 }
 
 func (q *Queries) MergeStore(ctx context.Context, arg MergeStoreParams) error {
-	_, err := q.db.ExecContext(ctx, mergeStore, arg.ID, arg.CanonicalStoreID)
+	_, err := q.db.Exec(ctx, mergeStore, arg.ID, arg.CanonicalStoreID)
 	return err
 }
 
@@ -114,14 +110,14 @@ RETURNING id, name, chain_name, address, canonical_store_id, created_at, updated
 `
 
 type UpdateStoreParams struct {
-	ID        uuid.UUID      `json:"id"`
-	Name      string         `json:"name"`
-	ChainName sql.NullString `json:"chain_name"`
-	Address   sql.NullString `json:"address"`
+	ID        pgtype.UUID `json:"id"`
+	Name      string      `json:"name"`
+	ChainName *string     `json:"chain_name"`
+	Address   *string     `json:"address"`
 }
 
 func (q *Queries) UpdateStore(ctx context.Context, arg UpdateStoreParams) (Store, error) {
-	row := q.db.QueryRowContext(ctx, updateStore,
+	row := q.db.QueryRow(ctx, updateStore,
 		arg.ID,
 		arg.Name,
 		arg.ChainName,

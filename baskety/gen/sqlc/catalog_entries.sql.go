@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCatalogEntry = `-- name: CreateCatalogEntry :one
@@ -19,16 +18,16 @@ RETURNING id, name, brand, unit, category, scope, household_id, canonical_entry_
 `
 
 type CreateCatalogEntryParams struct {
-	Name        string         `json:"name"`
-	Brand       sql.NullString `json:"brand"`
-	Unit        sql.NullString `json:"unit"`
-	Category    sql.NullString `json:"category"`
-	Scope       string         `json:"scope"`
-	HouseholdID uuid.NullUUID  `json:"household_id"`
+	Name        string      `json:"name"`
+	Brand       *string     `json:"brand"`
+	Unit        *string     `json:"unit"`
+	Category    *string     `json:"category"`
+	Scope       string      `json:"scope"`
+	HouseholdID pgtype.UUID `json:"household_id"`
 }
 
 func (q *Queries) CreateCatalogEntry(ctx context.Context, arg CreateCatalogEntryParams) (CatalogEntry, error) {
-	row := q.db.QueryRowContext(ctx, createCatalogEntry,
+	row := q.db.QueryRow(ctx, createCatalogEntry,
 		arg.Name,
 		arg.Brand,
 		arg.Unit,
@@ -56,8 +55,8 @@ const getCatalogEntryByID = `-- name: GetCatalogEntryByID :one
 SELECT id, name, brand, unit, category, scope, household_id, canonical_entry_id, created_at, updated_at FROM catalog_entries WHERE id = $1
 `
 
-func (q *Queries) GetCatalogEntryByID(ctx context.Context, id uuid.UUID) (CatalogEntry, error) {
-	row := q.db.QueryRowContext(ctx, getCatalogEntryByID, id)
+func (q *Queries) GetCatalogEntryByID(ctx context.Context, id pgtype.UUID) (CatalogEntry, error) {
+	row := q.db.QueryRow(ctx, getCatalogEntryByID, id)
 	var i CatalogEntry
 	err := row.Scan(
 		&i.ID,
@@ -80,8 +79,8 @@ WHERE household_id = $1 OR household_id IS NULL
 ORDER BY name ASC
 `
 
-func (q *Queries) ListCatalogEntriesByHousehold(ctx context.Context, householdID uuid.NullUUID) ([]CatalogEntry, error) {
-	rows, err := q.db.QueryContext(ctx, listCatalogEntriesByHousehold, householdID)
+func (q *Queries) ListCatalogEntriesByHousehold(ctx context.Context, householdID pgtype.UUID) ([]CatalogEntry, error) {
+	rows, err := q.db.Query(ctx, listCatalogEntriesByHousehold, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +104,6 @@ func (q *Queries) ListCatalogEntriesByHousehold(ctx context.Context, householdID
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -119,12 +115,12 @@ UPDATE catalog_entries SET canonical_entry_id = $2 WHERE id = $1
 `
 
 type MergeCatalogEntryParams struct {
-	ID               uuid.UUID     `json:"id"`
-	CanonicalEntryID uuid.NullUUID `json:"canonical_entry_id"`
+	ID               pgtype.UUID `json:"id"`
+	CanonicalEntryID pgtype.UUID `json:"canonical_entry_id"`
 }
 
 func (q *Queries) MergeCatalogEntry(ctx context.Context, arg MergeCatalogEntryParams) error {
-	_, err := q.db.ExecContext(ctx, mergeCatalogEntry, arg.ID, arg.CanonicalEntryID)
+	_, err := q.db.Exec(ctx, mergeCatalogEntry, arg.ID, arg.CanonicalEntryID)
 	return err
 }
 
@@ -136,16 +132,16 @@ RETURNING id, name, brand, unit, category, scope, household_id, canonical_entry_
 `
 
 type UpdateCatalogEntryParams struct {
-	ID       uuid.UUID      `json:"id"`
-	Name     string         `json:"name"`
-	Brand    sql.NullString `json:"brand"`
-	Unit     sql.NullString `json:"unit"`
-	Category sql.NullString `json:"category"`
-	Scope    string         `json:"scope"`
+	ID       pgtype.UUID `json:"id"`
+	Name     string      `json:"name"`
+	Brand    *string     `json:"brand"`
+	Unit     *string     `json:"unit"`
+	Category *string     `json:"category"`
+	Scope    string      `json:"scope"`
 }
 
 func (q *Queries) UpdateCatalogEntry(ctx context.Context, arg UpdateCatalogEntryParams) (CatalogEntry, error) {
-	row := q.db.QueryRowContext(ctx, updateCatalogEntry,
+	row := q.db.QueryRow(ctx, updateCatalogEntry,
 		arg.ID,
 		arg.Name,
 		arg.Brand,

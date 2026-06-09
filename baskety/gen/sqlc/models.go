@@ -5,241 +5,237 @@
 package sqlc
 
 import (
-	"database/sql"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/sqlc-dev/pqtype"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type CatalogEntry struct {
-	ID               uuid.UUID      `json:"id"`
-	Name             string         `json:"name"`
-	Brand            sql.NullString `json:"brand"`
-	Unit             sql.NullString `json:"unit"`
-	Category         sql.NullString `json:"category"`
-	Scope            string         `json:"scope"`
-	HouseholdID      uuid.NullUUID  `json:"household_id"`
-	CanonicalEntryID uuid.NullUUID  `json:"canonical_entry_id"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID               pgtype.UUID        `json:"id"`
+	Name             string             `json:"name"`
+	Brand            *string            `json:"brand"`
+	Unit             *string            `json:"unit"`
+	Category         *string            `json:"category"`
+	Scope            string             `json:"scope"`
+	HouseholdID      pgtype.UUID        `json:"household_id"`
+	CanonicalEntryID pgtype.UUID        `json:"canonical_entry_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type GroceryList struct {
-	ID              uuid.UUID    `json:"id"`
-	InventoryID     uuid.UUID    `json:"inventory_id"`
-	Name            string       `json:"name"`
-	Status          string       `json:"status"`
-	CreatedByUserID uuid.UUID    `json:"created_by_user_id"`
-	CompletedAt     sql.NullTime `json:"completed_at"`
-	PinnedAt        sql.NullTime `json:"pinned_at"`
-	ExpiresAt       sql.NullTime `json:"expires_at"`
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
+	ID              pgtype.UUID        `json:"id"`
+	InventoryID     pgtype.UUID        `json:"inventory_id"`
+	Name            string             `json:"name"`
+	Status          string             `json:"status"`
+	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	PinnedAt        pgtype.Timestamptz `json:"pinned_at"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type GroceryListItem struct {
-	ID              uuid.UUID      `json:"id"`
-	GroceryListID   uuid.UUID      `json:"grocery_list_id"`
-	InventoryItemID uuid.NullUUID  `json:"inventory_item_id"`
-	Name            string         `json:"name"`
-	Quantity        string         `json:"quantity"`
-	Unit            sql.NullString `json:"unit"`
-	Notes           sql.NullString `json:"notes"`
-	Status          string         `json:"status"`
-	SortOrder       int32          `json:"sort_order"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              pgtype.UUID        `json:"id"`
+	GroceryListID   pgtype.UUID        `json:"grocery_list_id"`
+	InventoryItemID pgtype.UUID        `json:"inventory_item_id"`
+	Name            string             `json:"name"`
+	Quantity        pgtype.Numeric     `json:"quantity"`
+	Unit            *string            `json:"unit"`
+	Notes           *string            `json:"notes"`
+	Status          string             `json:"status"`
+	SortOrder       int32              `json:"sort_order"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Household struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	CreatedBy uuid.UUID `json:"created_by"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	CreatedBy pgtype.UUID        `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type HouseholdMember struct {
-	HouseholdID     uuid.UUID     `json:"household_id"`
-	UserID          uuid.UUID     `json:"user_id"`
-	Role            string        `json:"role"`
-	JoinedAt        time.Time     `json:"joined_at"`
-	InvitedByUserID uuid.NullUUID `json:"invited_by_user_id"`
-	ExpiresAt       sql.NullTime  `json:"expires_at"`
-	RevokedAt       sql.NullTime  `json:"revoked_at"`
+	HouseholdID     pgtype.UUID        `json:"household_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Role            string             `json:"role"`
+	JoinedAt        pgtype.Timestamptz `json:"joined_at"`
+	InvitedByUserID pgtype.UUID        `json:"invited_by_user_id"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
 }
 
 type HouseholdSetting struct {
-	HouseholdID uuid.UUID `json:"household_id"`
-	Key         string    `json:"key"`
-	Value       string    `json:"value"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	HouseholdID pgtype.UUID        `json:"household_id"`
+	Key         string             `json:"key"`
+	Value       string             `json:"value"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Inventory struct {
-	ID          uuid.UUID      `json:"id"`
-	HouseholdID uuid.UUID      `json:"household_id"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID          pgtype.UUID        `json:"id"`
+	HouseholdID pgtype.UUID        `json:"household_id"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type InventoryBatch struct {
-	ID        uuid.UUID      `json:"id"`
-	ItemID    uuid.UUID      `json:"item_id"`
-	Quantity  string         `json:"quantity"`
-	ExpiresAt sql.NullTime   `json:"expires_at"`
-	AddedAt   time.Time      `json:"added_at"`
-	EmptiedAt sql.NullTime   `json:"emptied_at"`
-	Notes     sql.NullString `json:"notes"`
-	CreatedAt time.Time      `json:"created_at"`
+	ID        pgtype.UUID        `json:"id"`
+	ItemID    pgtype.UUID        `json:"item_id"`
+	Quantity  pgtype.Numeric     `json:"quantity"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	AddedAt   pgtype.Timestamptz `json:"added_at"`
+	EmptiedAt pgtype.Timestamptz `json:"emptied_at"`
+	Notes     *string            `json:"notes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type InventoryItem struct {
-	ID             uuid.UUID      `json:"id"`
-	InventoryID    uuid.UUID      `json:"inventory_id"`
-	Name           string         `json:"name"`
-	Category       sql.NullString `json:"category"`
-	Unit           sql.NullString `json:"unit"`
-	TargetQuantity string         `json:"target_quantity"`
-	Notes          sql.NullString `json:"notes"`
-	DeletedAt      sql.NullTime   `json:"deleted_at"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID             pgtype.UUID        `json:"id"`
+	InventoryID    pgtype.UUID        `json:"inventory_id"`
+	Name           string             `json:"name"`
+	Category       *string            `json:"category"`
+	Unit           *string            `json:"unit"`
+	TargetQuantity pgtype.Numeric     `json:"target_quantity"`
+	Notes          *string            `json:"notes"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type InventoryPermission struct {
-	InventoryID uuid.UUID `json:"inventory_id"`
-	UserID      uuid.UUID `json:"user_id"`
-	Permission  string    `json:"permission"`
+	InventoryID pgtype.UUID `json:"inventory_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	Permission  string      `json:"permission"`
 }
 
 type InventoryShareLink struct {
-	ID              uuid.UUID      `json:"id"`
-	InventoryID     uuid.UUID      `json:"inventory_id"`
-	Token           string         `json:"token"`
-	CreatedByUserID uuid.UUID      `json:"created_by_user_id"`
-	PasswordHash    sql.NullString `json:"password_hash"`
-	ExpiresAt       sql.NullTime   `json:"expires_at"`
-	RevokedAt       sql.NullTime   `json:"revoked_at"`
-	CreatedAt       time.Time      `json:"created_at"`
+	ID              pgtype.UUID        `json:"id"`
+	InventoryID     pgtype.UUID        `json:"inventory_id"`
+	Token           string             `json:"token"`
+	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
+	PasswordHash    *string            `json:"password_hash"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type LlmProviderConfig struct {
-	ID              uuid.UUID      `json:"id"`
-	HouseholdID     uuid.NullUUID  `json:"household_id"`
-	Provider        string         `json:"provider"`
-	Model           string         `json:"model"`
-	EndpointUrl     sql.NullString `json:"endpoint_url"`
-	ApiKeyEncrypted sql.NullString `json:"api_key_encrypted"`
-	IsDefault       bool           `json:"is_default"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              pgtype.UUID        `json:"id"`
+	HouseholdID     pgtype.UUID        `json:"household_id"`
+	Provider        string             `json:"provider"`
+	Model           string             `json:"model"`
+	EndpointUrl     *string            `json:"endpoint_url"`
+	ApiKeyEncrypted *string            `json:"api_key_encrypted"`
+	IsDefault       bool               `json:"is_default"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OcrProviderConfig struct {
-	ID              uuid.UUID             `json:"id"`
-	HouseholdID     uuid.NullUUID         `json:"household_id"`
-	Provider        string                `json:"provider"`
-	EndpointUrl     sql.NullString        `json:"endpoint_url"`
-	ApiKeyEncrypted sql.NullString        `json:"api_key_encrypted"`
-	ExtraConfig     pqtype.NullRawMessage `json:"extra_config"`
-	IsDefault       bool                  `json:"is_default"`
-	CreatedAt       time.Time             `json:"created_at"`
-	UpdatedAt       time.Time             `json:"updated_at"`
+	ID              pgtype.UUID        `json:"id"`
+	HouseholdID     pgtype.UUID        `json:"household_id"`
+	Provider        string             `json:"provider"`
+	EndpointUrl     *string            `json:"endpoint_url"`
+	ApiKeyEncrypted *string            `json:"api_key_encrypted"`
+	ExtraConfig     []byte             `json:"extra_config"`
+	IsDefault       bool               `json:"is_default"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type PurchaseTransaction struct {
-	ID                uuid.UUID      `json:"id"`
-	HouseholdID       uuid.UUID      `json:"household_id"`
-	StoreID           uuid.NullUUID  `json:"store_id"`
-	GroceryListItemID uuid.NullUUID  `json:"grocery_list_item_id"`
-	ReceiptScanItemID uuid.NullUUID  `json:"receipt_scan_item_id"`
-	CatalogEntryID    uuid.NullUUID  `json:"catalog_entry_id"`
-	PricePerUnitMinor sql.NullInt64  `json:"price_per_unit_minor"`
-	Currency          string         `json:"currency"`
-	Quantity          sql.NullString `json:"quantity"`
-	PurchasedAt       time.Time      `json:"purchased_at"`
-	CreatedAt         time.Time      `json:"created_at"`
+	ID                pgtype.UUID        `json:"id"`
+	HouseholdID       pgtype.UUID        `json:"household_id"`
+	StoreID           pgtype.UUID        `json:"store_id"`
+	GroceryListItemID pgtype.UUID        `json:"grocery_list_item_id"`
+	ReceiptScanItemID pgtype.UUID        `json:"receipt_scan_item_id"`
+	CatalogEntryID    pgtype.UUID        `json:"catalog_entry_id"`
+	PricePerUnitMinor *int64             `json:"price_per_unit_minor"`
+	Currency          string             `json:"currency"`
+	Quantity          pgtype.Numeric     `json:"quantity"`
+	PurchasedAt       pgtype.Timestamptz `json:"purchased_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
 type ReceiptScan struct {
-	ID              uuid.UUID      `json:"id"`
-	HouseholdID     uuid.UUID      `json:"household_id"`
-	GroceryListID   uuid.NullUUID  `json:"grocery_list_id"`
-	RawImagePath    string         `json:"raw_image_path"`
-	OcrText         sql.NullString `json:"ocr_text"`
-	LlmRawResponse  sql.NullString `json:"llm_raw_response"`
-	Status          string         `json:"status"`
-	ErrorMessage    sql.NullString `json:"error_message"`
-	CreatedByUserID uuid.UUID      `json:"created_by_user_id"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              pgtype.UUID        `json:"id"`
+	HouseholdID     pgtype.UUID        `json:"household_id"`
+	GroceryListID   pgtype.UUID        `json:"grocery_list_id"`
+	RawImagePath    string             `json:"raw_image_path"`
+	OcrText         *string            `json:"ocr_text"`
+	LlmRawResponse  *string            `json:"llm_raw_response"`
+	Status          string             `json:"status"`
+	ErrorMessage    *string            `json:"error_message"`
+	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ReceiptScanItem struct {
-	ID                         uuid.UUID      `json:"id"`
-	ReceiptScanID              uuid.UUID      `json:"receipt_scan_id"`
-	RawText                    string         `json:"raw_text"`
-	ParsedName                 sql.NullString `json:"parsed_name"`
-	ParsedBrand                sql.NullString `json:"parsed_brand"`
-	ParsedQuantity             sql.NullString `json:"parsed_quantity"`
-	ParsedUnit                 sql.NullString `json:"parsed_unit"`
-	ParsedPricePerUnitMinor    sql.NullInt64  `json:"parsed_price_per_unit_minor"`
-	ParsedCurrency             sql.NullString `json:"parsed_currency"`
-	ParsedStoreName            sql.NullString `json:"parsed_store_name"`
-	ConfidenceScore            sql.NullString `json:"confidence_score"`
-	Status                     string         `json:"status"`
-	InventoryItemID            uuid.NullUUID  `json:"inventory_item_id"`
-	CorrectedName              sql.NullString `json:"corrected_name"`
-	CorrectedBrand             sql.NullString `json:"corrected_brand"`
-	CorrectedQuantity          sql.NullString `json:"corrected_quantity"`
-	CorrectedPricePerUnitMinor sql.NullInt64  `json:"corrected_price_per_unit_minor"`
-	CorrectedCurrency          sql.NullString `json:"corrected_currency"`
-	CorrectedStoreName         sql.NullString `json:"corrected_store_name"`
-	CreatedAt                  time.Time      `json:"created_at"`
-	UpdatedAt                  time.Time      `json:"updated_at"`
+	ID                         pgtype.UUID        `json:"id"`
+	ReceiptScanID              pgtype.UUID        `json:"receipt_scan_id"`
+	RawText                    string             `json:"raw_text"`
+	ParsedName                 *string            `json:"parsed_name"`
+	ParsedBrand                *string            `json:"parsed_brand"`
+	ParsedQuantity             pgtype.Numeric     `json:"parsed_quantity"`
+	ParsedUnit                 *string            `json:"parsed_unit"`
+	ParsedPricePerUnitMinor    *int64             `json:"parsed_price_per_unit_minor"`
+	ParsedCurrency             *string            `json:"parsed_currency"`
+	ParsedStoreName            *string            `json:"parsed_store_name"`
+	ConfidenceScore            pgtype.Numeric     `json:"confidence_score"`
+	Status                     string             `json:"status"`
+	InventoryItemID            pgtype.UUID        `json:"inventory_item_id"`
+	CorrectedName              *string            `json:"corrected_name"`
+	CorrectedBrand             *string            `json:"corrected_brand"`
+	CorrectedQuantity          pgtype.Numeric     `json:"corrected_quantity"`
+	CorrectedPricePerUnitMinor *int64             `json:"corrected_price_per_unit_minor"`
+	CorrectedCurrency          *string            `json:"corrected_currency"`
+	CorrectedStoreName         *string            `json:"corrected_store_name"`
+	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Session struct {
-	ID        uuid.UUID    `json:"id"`
-	UserID    uuid.UUID    `json:"user_id"`
-	TokenHash string       `json:"token_hash"`
-	ExpiresAt sql.NullTime `json:"expires_at"`
-	RevokedAt sql.NullTime `json:"revoked_at"`
-	CreatedAt time.Time    `json:"created_at"`
+	ID        pgtype.UUID        `json:"id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Store struct {
-	ID               uuid.UUID      `json:"id"`
-	Name             string         `json:"name"`
-	ChainName        sql.NullString `json:"chain_name"`
-	Address          sql.NullString `json:"address"`
-	CanonicalStoreID uuid.NullUUID  `json:"canonical_store_id"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID               pgtype.UUID        `json:"id"`
+	Name             string             `json:"name"`
+	ChainName        *string            `json:"chain_name"`
+	Address          *string            `json:"address"`
+	CanonicalStoreID pgtype.UUID        `json:"canonical_store_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SystemSetting struct {
-	Key       string    `json:"key"`
-	Value     string    `json:"value"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Key       string             `json:"key"`
+	Value     string             `json:"value"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	Name         string    `json:"name"`
-	PasswordHash string    `json:"password_hash"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           pgtype.UUID        `json:"id"`
+	Email        string             `json:"email"`
+	Name         string             `json:"name"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type UserSetting struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Key       string    `json:"key"`
-	Value     string    `json:"value"`
-	UpdatedAt time.Time `json:"updated_at"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Key       string             `json:"key"`
+	Value     string             `json:"value"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }

@@ -24,3 +24,12 @@ UPDATE inventory_items SET deleted_at = NOW() WHERE id = $1;
 SELECT COALESCE(SUM(quantity), 0)::numeric AS total_quantity
 FROM inventory_batches
 WHERE item_id = $1 AND emptied_at IS NULL;
+
+-- name: ListItemsBelowTarget :many
+SELECT i.*, COALESCE(SUM(b.quantity) FILTER (WHERE b.emptied_at IS NULL), 0)::numeric AS on_hand
+FROM inventory_items i
+LEFT JOIN inventory_batches b ON b.item_id = i.id
+WHERE i.inventory_id = $1 AND i.deleted_at IS NULL
+GROUP BY i.id
+HAVING COALESCE(SUM(b.quantity) FILTER (WHERE b.emptied_at IS NULL), 0) < i.target_quantity
+ORDER BY i.name ASC;

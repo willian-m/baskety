@@ -7,9 +7,8 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createInventoryItem = `-- name: CreateInventoryItem :one
@@ -19,16 +18,16 @@ RETURNING id, inventory_id, name, category, unit, target_quantity, notes, delete
 `
 
 type CreateInventoryItemParams struct {
-	InventoryID    uuid.UUID      `json:"inventory_id"`
+	InventoryID    pgtype.UUID    `json:"inventory_id"`
 	Name           string         `json:"name"`
-	Category       sql.NullString `json:"category"`
-	Unit           sql.NullString `json:"unit"`
-	TargetQuantity string         `json:"target_quantity"`
-	Notes          sql.NullString `json:"notes"`
+	Category       *string        `json:"category"`
+	Unit           *string        `json:"unit"`
+	TargetQuantity pgtype.Numeric `json:"target_quantity"`
+	Notes          *string        `json:"notes"`
 }
 
 func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryItemParams) (InventoryItem, error) {
-	row := q.db.QueryRowContext(ctx, createInventoryItem,
+	row := q.db.QueryRow(ctx, createInventoryItem,
 		arg.InventoryID,
 		arg.Name,
 		arg.Category,
@@ -56,8 +55,8 @@ const getInventoryItemByID = `-- name: GetInventoryItemByID :one
 SELECT id, inventory_id, name, category, unit, target_quantity, notes, deleted_at, created_at, updated_at FROM inventory_items WHERE id = $1
 `
 
-func (q *Queries) GetInventoryItemByID(ctx context.Context, id uuid.UUID) (InventoryItem, error) {
-	row := q.db.QueryRowContext(ctx, getInventoryItemByID, id)
+func (q *Queries) GetInventoryItemByID(ctx context.Context, id pgtype.UUID) (InventoryItem, error) {
+	row := q.db.QueryRow(ctx, getInventoryItemByID, id)
 	var i InventoryItem
 	err := row.Scan(
 		&i.ID,
@@ -80,9 +79,9 @@ FROM inventory_batches
 WHERE item_id = $1 AND emptied_at IS NULL
 `
 
-func (q *Queries) GetInventoryItemQuantity(ctx context.Context, itemID uuid.UUID) (string, error) {
-	row := q.db.QueryRowContext(ctx, getInventoryItemQuantity, itemID)
-	var total_quantity string
+func (q *Queries) GetInventoryItemQuantity(ctx context.Context, itemID pgtype.UUID) (pgtype.Numeric, error) {
+	row := q.db.QueryRow(ctx, getInventoryItemQuantity, itemID)
+	var total_quantity pgtype.Numeric
 	err := row.Scan(&total_quantity)
 	return total_quantity, err
 }
@@ -93,8 +92,8 @@ WHERE inventory_id = $1 AND deleted_at IS NULL
 ORDER BY name ASC
 `
 
-func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID uuid.UUID) ([]InventoryItem, error) {
-	rows, err := q.db.QueryContext(ctx, listInventoryItems, inventoryID)
+func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID pgtype.UUID) ([]InventoryItem, error) {
+	rows, err := q.db.Query(ctx, listInventoryItems, inventoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +117,61 @@ func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID uuid.UUID)
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	return items, nil
+}
+
+const listItemsBelowTarget = `-- name: ListItemsBelowTarget :many
+SELECT i.id, i.inventory_id, i.name, i.category, i.unit, i.target_quantity, i.notes, i.deleted_at, i.created_at, i.updated_at, COALESCE(SUM(b.quantity) FILTER (WHERE b.emptied_at IS NULL), 0)::numeric AS on_hand
+FROM inventory_items i
+LEFT JOIN inventory_batches b ON b.item_id = i.id
+WHERE i.inventory_id = $1 AND i.deleted_at IS NULL
+GROUP BY i.id
+HAVING COALESCE(SUM(b.quantity) FILTER (WHERE b.emptied_at IS NULL), 0) < i.target_quantity
+ORDER BY i.name ASC
+`
+
+type ListItemsBelowTargetRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	InventoryID    pgtype.UUID        `json:"inventory_id"`
+	Name           string             `json:"name"`
+	Category       *string            `json:"category"`
+	Unit           *string            `json:"unit"`
+	TargetQuantity pgtype.Numeric     `json:"target_quantity"`
+	Notes          *string            `json:"notes"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	OnHand         pgtype.Numeric     `json:"on_hand"`
+}
+
+func (q *Queries) ListItemsBelowTarget(ctx context.Context, inventoryID pgtype.UUID) ([]ListItemsBelowTargetRow, error) {
+	rows, err := q.db.Query(ctx, listItemsBelowTarget, inventoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListItemsBelowTargetRow
+	for rows.Next() {
+		var i ListItemsBelowTargetRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.InventoryID,
+			&i.Name,
+			&i.Category,
+			&i.Unit,
+			&i.TargetQuantity,
+			&i.Notes,
+			&i.DeletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OnHand,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -131,8 +183,8 @@ const softDeleteInventoryItem = `-- name: SoftDeleteInventoryItem :exec
 UPDATE inventory_items SET deleted_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) SoftDeleteInventoryItem(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, softDeleteInventoryItem, id)
+func (q *Queries) SoftDeleteInventoryItem(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, softDeleteInventoryItem, id)
 	return err
 }
 
@@ -144,16 +196,16 @@ RETURNING id, inventory_id, name, category, unit, target_quantity, notes, delete
 `
 
 type UpdateInventoryItemParams struct {
-	ID             uuid.UUID      `json:"id"`
+	ID             pgtype.UUID    `json:"id"`
 	Name           string         `json:"name"`
-	Category       sql.NullString `json:"category"`
-	Unit           sql.NullString `json:"unit"`
-	TargetQuantity string         `json:"target_quantity"`
-	Notes          sql.NullString `json:"notes"`
+	Category       *string        `json:"category"`
+	Unit           *string        `json:"unit"`
+	TargetQuantity pgtype.Numeric `json:"target_quantity"`
+	Notes          *string        `json:"notes"`
 }
 
 func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryItemParams) (InventoryItem, error) {
-	row := q.db.QueryRowContext(ctx, updateInventoryItem,
+	row := q.db.QueryRow(ctx, updateInventoryItem,
 		arg.ID,
 		arg.Name,
 		arg.Category,
