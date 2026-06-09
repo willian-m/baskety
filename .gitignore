@@ -55,6 +55,9 @@ secrets/
 credentials.json
 service-account.json
 
+# Turborepo
+.turbo/
+
 # Editor / OS
 .idea/
 .vscode/
