@@ -14,7 +14,8 @@ GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || tru
 if [ -n "$GO_FILES" ]; then
   echo "Running go vet..."
   # Collect unique packages containing the staged files
-  GO_PKGS=$(echo "$GO_FILES" | xargs -I{} dirname {} | sort -u | xargs -I{} echo "./{}" | tr '\n' ' ')
+  # Strip the leading "baskety/" prefix — paths are repo-relative but we cd into baskety/ first.
+  GO_PKGS=$(echo "$GO_FILES" | xargs -I{} dirname {} | sort -u | sed 's|^baskety/|./|;s|^baskety$|./|' | tr '\n' ' ')
   (cd baskety && go vet $GO_PKGS)
 
   echo "Checking gofmt..."
