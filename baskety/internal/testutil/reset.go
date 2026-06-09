@@ -2,10 +2,10 @@ package testutil
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +20,7 @@ func ResetSchema(ctx context.Context, t testing.TB, pool *pgxpool.Pool) {
 		SELECT table_name
 		FROM information_schema.tables
 		WHERE table_schema = 'public'
+		  AND table_type = 'BASE TABLE'
 		  AND table_name <> 'goose_db_version'
 	`)
 	if err != nil {
@@ -43,7 +44,11 @@ func ResetSchema(ctx context.Context, t testing.TB, pool *pgxpool.Pool) {
 		return
 	}
 
-	truncateSQL := fmt.Sprintf("TRUNCATE %s RESTART IDENTITY CASCADE", strings.Join(tables, ", "))
+	quoted := make([]string, len(tables))
+	for i, t := range tables {
+		quoted[i] = pgx.Identifier{t}.Sanitize()
+	}
+	truncateSQL := "TRUNCATE " + strings.Join(quoted, ", ") + " RESTART IDENTITY CASCADE"
 	if _, err := pool.Exec(ctx, truncateSQL); err != nil {
 		t.Fatalf("testutil: reset schema: %v", err)
 	}
