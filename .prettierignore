@@ -4,3 +4,11 @@ build
 .next
 android
 ios
+.claude
+docs
+prompts
+pnpm-lock.yaml
+*.md
+*.yml
+*.yaml
+*.html
