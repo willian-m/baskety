@@ -1,6 +1,6 @@
 # Usage:
 #   docker compose -f compose.dev.yml up -d
-#   export BASKETY_DATABASE_URL=postgres://baskety:baskety@localhost:5432/baskety
+#   export BASKETY_DATABASE_URL=postgres://baskety:baskety@localhost:5432/baskety?sslmode=disable
 
 # compose.dev.yml — manual/local development only.
 # Starts a single Postgres instance so you can run the Go server against a
