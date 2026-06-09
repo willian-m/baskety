@@ -18,7 +18,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetHouseholdMember :one
-SELECT * FROM household_members WHERE household_id = $1 AND user_id = $2;
+SELECT * FROM household_members WHERE household_id = $1 AND user_id = $2 AND revoked_at IS NULL;
 
 -- name: UpdateHouseholdMemberRole :one
 UPDATE household_members SET role = $3
@@ -29,7 +29,7 @@ RETURNING *;
 DELETE FROM household_members WHERE household_id = $1 AND user_id = $2;
 
 -- name: ListHouseholdMembers :many
-SELECT * FROM household_members WHERE household_id = $1 ORDER BY joined_at ASC;
+SELECT * FROM household_members WHERE household_id = $1 AND revoked_at IS NULL ORDER BY joined_at ASC;
 
 -- name: UpdateHousehold :one
 UPDATE households SET name = $2, updated_at = NOW()
