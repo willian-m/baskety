@@ -1,2 +1,2 @@
-export { Card } from "./Card.web.js";
-export type { CardProps } from "./Card.web.js";
+export { Card } from "./Card.web";
+export type { CardProps } from "./Card.web";

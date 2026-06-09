@@ -1,2 +1,2 @@
-export { Button } from "./Button.web.js";
-export type { ButtonProps } from "./Button.web.js";
+export { Button } from "./Button.web";
+export type { ButtonProps } from "./Button.web";

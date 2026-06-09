@@ -1,3 +1,8 @@
+# Copy this file to config.yaml before running:
+#   cp config.yaml.example config.yaml
+# Then edit the values for your environment.
+# In Docker Compose this file is mounted at /etc/baskety/config.yaml.
+
 server:
   port: 8080
   public_url: https://baskety.example.com

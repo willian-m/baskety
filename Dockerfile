@@ -9,10 +9,10 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter web... build
+RUN pnpm --filter @baskety/web... build
 
 # Stage 2: build the Go binary (embeds the web dist)
-FROM golang:1.23-alpine AS go
+FROM golang:1.26-alpine AS go
 WORKDIR /app
 COPY baskety/ ./
 COPY --from=web /repo/apps/web/dist ./internal/shared/dist

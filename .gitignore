@@ -12,7 +12,6 @@
 *.test
 *.out
 vendor/
-go.sum
 
 # Node / npm / yarn / pnpm
 node_modules/
@@ -55,7 +54,7 @@ secrets/baskety_key
 !.env.example
 *.pem
 *.key
-secrets/
+secrets/baskety_key
 credentials.json
 service-account.json
 
