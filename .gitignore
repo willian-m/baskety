@@ -25,7 +25,8 @@ pnpm-debug.log*
 .pnpm-store/
 .npm/
 .yarn/
-dist/
+apps/web/dist/
+packages/*/dist/
 build/
 .next/
 .nuxt/

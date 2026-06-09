@@ -10,8 +10,15 @@ import (
 	"github.com/willian-m/baskety/internal/shared"
 )
 
-// NewTestDB starts a postgres:16-alpine container, runs all goose migrations,
+// NewTestDB starts a fresh postgres:16-alpine container, runs all goose migrations,
 // and returns a ready pool. The container is terminated via t.Cleanup.
+//
+// Each call starts an independent container, which is perfectly fine for small
+// test suites. For larger suites, callers should create a single pool in
+// TestMain (by calling NewTestDB(m) with a *testing.M adapter) and call
+// [ResetSchema] between subtests to avoid the per-test container startup cost.
+// Once the suite justifies it, a shared TestMain-based container can be
+// introduced without changing individual test signatures.
 func NewTestDB(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 
