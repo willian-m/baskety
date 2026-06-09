@@ -35,9 +35,9 @@ CREATE TABLE receipt_scan_items (
     corrected_name                text,
     corrected_brand               text,
     corrected_quantity            numeric(10,3),
-    corrected_unit                text,
     corrected_price_per_unit_minor bigint,
     corrected_currency            char(3),
+    corrected_store_name          text,
     created_at                    timestamptz   NOT NULL DEFAULT NOW(),
     updated_at                    timestamptz   NOT NULL DEFAULT NOW()
 );
