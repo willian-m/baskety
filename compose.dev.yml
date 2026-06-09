@@ -1,7 +1,11 @@
-# compose.dev.yml — local development only.
-# Starts a single Postgres instance (no app, no minio) so you can run
-# the Go server and integration tests against a real database without
-# needing a full stack. All credentials are hardcoded — do NOT use in production.
+# Usage:
+#   docker compose -f compose.dev.yml up -d
+#   export BASKETY_DATABASE_URL=postgres://baskety:baskety@localhost:5432/baskety?sslmode=disable
+
+# compose.dev.yml — manual/local development only.
+# Starts a single Postgres instance so you can run the Go server against a
+# real database without a full stack. CI integration tests use testcontainers-go
+# and do NOT rely on this file. All credentials are hardcoded — do NOT use in production.
 
 services:
   postgres:
