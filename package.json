@@ -7,11 +7,17 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "turbo": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
