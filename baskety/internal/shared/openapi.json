@@ -1,0 +1,2181 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Baskety API",
+    "version": "0.1.0",
+    "description": "Self-hosted grocery management API. Tracks inventory, generates grocery lists, and processes receipt scans."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password", "name"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8 },
+          "name": { "type": "string" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": { "type": "string" },
+              "user_id": { "type": "string", "format": "uuid" }
+            }
+          }
+        }
+      },
+      "Household": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "HouseholdRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" },
+          "role": { "type": "string" }
+        }
+      },
+      "AddMemberRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "ShareLink": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "url": { "type": "string" },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "InventoryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "InventoryItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "inventory_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "target_quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "InventoryItemRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "target_quantity": { "type": "number" },
+          "unit": { "type": "string" }
+        }
+      },
+      "Batch": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "item_id": { "type": "string", "format": "uuid" },
+          "quantity": { "type": "number" },
+          "expires_at": { "type": "string", "format": "date-time", "nullable": true },
+          "added_at": { "type": "string", "format": "date-time" },
+          "emptied_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "BatchRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "properties": {
+          "quantity": { "type": "number" },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "EffectiveQuantity": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "quantity": { "type": "number" },
+              "unit": { "type": "string" }
+            }
+          }
+        }
+      },
+      "GroceryList": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "inventory_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "completed", "archived"] },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GroceryListRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "GroceryListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "list_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "checked"] },
+          "sort_order": { "type": "integer" }
+        }
+      },
+      "AddGroceryItemRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" }
+        }
+      },
+      "UpdateItemStatusRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["pending", "checked"] }
+        }
+      },
+      "ReorderItemRequest": {
+        "type": "object",
+        "required": ["sort_order"],
+        "properties": {
+          "sort_order": { "type": "integer" }
+        }
+      },
+      "ReceiptScan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["pending", "processing", "review", "committed", "failed"] },
+          "store_name": { "type": "string", "nullable": true },
+          "scanned_at": { "type": "string", "format": "date-time" },
+          "committed_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "ReceiptScanItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "scan_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "price": { "type": "string", "description": "Decimal string, e.g. \"1.99\"" },
+          "brand": { "type": "string", "nullable": true }
+        }
+      },
+      "UpdateScanItemRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "price": { "type": "string" },
+          "brand": { "type": "string" }
+        }
+      },
+      "CommitScanRequest": {
+        "type": "object",
+        "required": ["inventory_id"],
+        "properties": {
+          "inventory_id": { "type": "string", "format": "uuid" }
+        }
+      },
+      "Store": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StoreRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "CatalogEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "brand": { "type": "string", "nullable": true },
+          "barcode": { "type": "string", "nullable": true },
+          "deleted_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "CatalogEntryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "brand": { "type": "string" },
+          "barcode": { "type": "string" }
+        }
+      },
+      "PurchaseTransaction": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "scan_id": { "type": "string", "format": "uuid" },
+          "store_id": { "type": "string", "format": "uuid", "nullable": true },
+          "catalog_entry_id": { "type": "string", "format": "uuid", "nullable": true },
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "price": { "type": "string" },
+          "purchased_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Setting": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "value": {}
+        }
+      },
+      "UpsertSettingRequest": {
+        "type": "object",
+        "required": ["value"],
+        "properties": {
+          "value": {}
+        }
+      },
+      "LLMProvider": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "base_url": { "type": "string" },
+          "model": { "type": "string" }
+        }
+      },
+      "LLMProviderRequest": {
+        "type": "object",
+        "required": ["name", "type", "model"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "base_url": { "type": "string" },
+          "model": { "type": "string" },
+          "api_key": { "type": "string" }
+        }
+      },
+      "OCRProvider": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "base_url": { "type": "string" }
+        }
+      },
+      "OCRProviderRequest": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "base_url": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid authentication token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request body or parameters",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "HouseholdID": {
+        "name": "householdID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "InventoryID": {
+        "name": "inventoryID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ItemID": {
+        "name": "itemID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "BatchID": {
+        "name": "batchID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ListID": {
+        "name": "listID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ScanID": {
+        "name": "scanID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "UserID": {
+        "name": "userID",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "XHouseholdID": {
+        "name": "X-Household-ID",
+        "in": "header",
+        "required": false,
+        "description": "Optional household scope override. Falls back to caller's first household.",
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "healthCheck",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "summary": "OpenAPI spec",
+        "operationId": "getOpenAPISpec",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 specification document",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "operationId": "register",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/LoginResponse/properties/data" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": {
+            "description": "Email already registered",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Log in and obtain a bearer token",
+        "operationId": "login",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/auth/session": {
+      "delete": {
+        "summary": "Log out (invalidate token)",
+        "operationId": "logout",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Session invalidated" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/households": {
+      "get": {
+        "summary": "List households the caller belongs to",
+        "operationId": "listHouseholds",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of households",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Household" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a new household",
+        "operationId": "createHousehold",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HouseholdRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Household created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Household" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}": {
+      "get": {
+        "summary": "Get a household by ID",
+        "operationId": "getHousehold",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/HouseholdID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Household",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Household" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/members": {
+      "post": {
+        "summary": "Add a member to a household",
+        "operationId": "addHouseholdMember",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/HouseholdID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AddMemberRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Member added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Member" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/members/{userID}": {
+      "delete": {
+        "summary": "Remove a member from a household",
+        "operationId": "removeHouseholdMember",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/HouseholdID" },
+          { "$ref": "#/components/parameters/UserID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "204": { "description": "Member removed" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/share-links": {
+      "post": {
+        "summary": "Create a share link for a household",
+        "operationId": "createShareLink",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/HouseholdID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "201": {
+            "description": "Share link created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/ShareLink" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/share/{token}/inventory": {
+      "get": {
+        "summary": "Access a shared inventory via share token",
+        "operationId": "getSharedInventory",
+        "tags": ["Households"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared inventory data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Inventory" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories": {
+      "get": {
+        "summary": "List inventories for the scoped household",
+        "operationId": "listInventories",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of inventories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Inventory" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a new inventory",
+        "operationId": "createInventory",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inventory created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Inventory" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}": {
+      "get": {
+        "summary": "Get an inventory by ID",
+        "operationId": "getInventory",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Inventory" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "summary": "Update an inventory",
+        "operationId": "updateInventory",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Inventory" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Delete an inventory",
+        "operationId": "deleteInventory",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "204": { "description": "Inventory deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items": {
+      "get": {
+        "summary": "List items in an inventory",
+        "operationId": "listInventoryItems",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of inventory items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/InventoryItem" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "summary": "Add an item to an inventory",
+        "operationId": "createInventoryItem",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/InventoryItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}": {
+      "get": {
+        "summary": "Get an inventory item",
+        "operationId": "getInventoryItem",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/InventoryItem" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "summary": "Update an inventory item",
+        "operationId": "updateInventoryItem",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/InventoryItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Delete an inventory item",
+        "operationId": "deleteInventoryItem",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "204": { "description": "Item deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/quantity": {
+      "get": {
+        "summary": "Get the effective (non-expired) quantity on hand for an item",
+        "operationId": "getEffectiveQuantity",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective quantity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EffectiveQuantity" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/batches": {
+      "get": {
+        "summary": "List active batches for an item",
+        "operationId": "listActiveBatches",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of active batches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Batch" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "summary": "Add a batch (purchase) to an inventory item",
+        "operationId": "addBatch",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BatchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Batch added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Batch" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/batches/{batchID}/empty": {
+      "post": {
+        "summary": "Mark a batch as emptied",
+        "operationId": "markBatchEmptied",
+        "tags": ["Inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/BatchID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch marked as emptied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Batch" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists": {
+      "get": {
+        "summary": "List grocery lists for an inventory",
+        "operationId": "listGroceryLists",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of grocery lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/GroceryList" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a grocery list",
+        "operationId": "createGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GroceryListRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Grocery list created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryList" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/auto-generate": {
+      "post": {
+        "summary": "Auto-generate a grocery list from inventory shortfalls",
+        "operationId": "autoGenerateGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "201": {
+            "description": "Auto-generated grocery list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryList" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}": {
+      "get": {
+        "summary": "Get a grocery list",
+        "operationId": "getGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grocery list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryList" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/complete": {
+      "post": {
+        "summary": "Mark a grocery list as completed",
+        "operationId": "completeGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryList" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/archive": {
+      "post": {
+        "summary": "Archive a grocery list",
+        "operationId": "archiveGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryList" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items": {
+      "get": {
+        "summary": "List items in a grocery list",
+        "operationId": "listGroceryListItems",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/GroceryListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "summary": "Add an item to a grocery list",
+        "operationId": "addGroceryListItem",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AddGroceryItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryListItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}/status": {
+      "put": {
+        "summary": "Update a grocery list item's status",
+        "operationId": "updateGroceryItemStatus",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateItemStatusRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryListItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}/order": {
+      "put": {
+        "summary": "Reorder a grocery list item",
+        "operationId": "reorderGroceryItem",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReorderItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item reordered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/GroceryListItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}": {
+      "delete": {
+        "summary": "Delete a grocery list item",
+        "operationId": "deleteGroceryListItem",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/InventoryID" },
+          { "$ref": "#/components/parameters/ListID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "204": { "description": "Item deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/receipts": {
+      "get": {
+        "summary": "List receipt scans for the scoped household",
+        "operationId": "listReceiptScans",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of receipt scans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ReceiptScan" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Upload a receipt image for OCR + LLM extraction",
+        "operationId": "uploadReceiptScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Receipt image (JPEG, PNG, PDF)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Scan accepted and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/ReceiptScan" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}": {
+      "get": {
+        "summary": "Get a receipt scan by ID",
+        "operationId": "getReceiptScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScanID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipt scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/ReceiptScan" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/items": {
+      "get": {
+        "summary": "Get parsed line items from a receipt scan",
+        "operationId": "getReceiptScanItems",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScanID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of scan items for user review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ReceiptScanItem" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/items/{itemID}": {
+      "put": {
+        "summary": "Update a scan item during user review",
+        "operationId": "updateReceiptScanItem",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScanID" },
+          { "$ref": "#/components/parameters/ItemID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateScanItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan item updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/ReceiptScanItem" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/commit": {
+      "post": {
+        "summary": "Commit a reviewed receipt scan to inventory",
+        "description": "Applies the reviewed line items to the specified inventory. User confirmation is required — never auto-committed.",
+        "operationId": "commitReceiptScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScanID" },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommitScanRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/ReceiptScan" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/catalog/stores": {
+      "get": {
+        "summary": "List catalog stores",
+        "operationId": "listStores",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of stores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Store" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a store",
+        "operationId": "createStore",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StoreRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Store created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Store" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/catalog/entries": {
+      "get": {
+        "summary": "List catalog entries",
+        "operationId": "listCatalogEntries",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search term to filter entries by name or brand",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of catalog entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/CatalogEntry" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a catalog entry",
+        "operationId": "createCatalogEntry",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CatalogEntryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catalog entry created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/CatalogEntry" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/catalog/transactions": {
+      "get": {
+        "summary": "List purchase transactions",
+        "operationId": "listTransactions",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/XHouseholdID" },
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "Filter by store ID",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of purchase transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/PurchaseTransaction" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/settings/household/{key}": {
+      "get": {
+        "summary": "Get a household setting",
+        "operationId": "getHouseholdSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setting value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Setting" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "summary": "Upsert a household setting",
+        "operationId": "upsertHouseholdSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/XHouseholdID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpsertSettingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setting upserted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Setting" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/settings/user/{key}": {
+      "get": {
+        "summary": "Get a user setting",
+        "operationId": "getUserSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setting value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Setting" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "summary": "Upsert a user setting",
+        "operationId": "upsertUserSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpsertSettingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setting upserted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Setting" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/settings/providers/llm": {
+      "get": {
+        "summary": "List configured LLM providers",
+        "operationId": "listLLMProviders",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of LLM providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/LLMProvider" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Add an LLM provider configuration",
+        "operationId": "createLLMProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LLMProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "LLM provider created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/LLMProvider" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/settings/providers/ocr": {
+      "get": {
+        "summary": "List configured OCR providers",
+        "operationId": "listOCRProviders",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of OCR providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/OCRProvider" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Add an OCR provider configuration",
+        "operationId": "createOCRProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/OCRProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OCR provider created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/OCRProvider" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  }
+}
