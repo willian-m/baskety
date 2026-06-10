@@ -150,6 +150,26 @@ func (r *pgRepository) FindMember(ctx context.Context, householdID, userID uuid.
 	}, nil
 }
 
+func (r *pgRepository) FindShareLinkByToken(ctx context.Context, token string) (*ShareLink, error) {
+	row, err := r.q.GetShareLinkByToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("find share link: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("find share link: %w", err)
+	}
+	return &ShareLink{
+		ID:              pgToUUID(row.ID),
+		InventoryID:     pgToUUID(row.InventoryID),
+		Token:           row.Token,
+		CreatedByUserID: pgToUUID(row.CreatedByUserID),
+		PasswordHash:    row.PasswordHash,
+		ExpiresAt:       pgToTimePtr(row.ExpiresAt),
+		RevokedAt:       pgToTimePtr(row.RevokedAt),
+		CreatedAt:       row.CreatedAt.Time,
+	}, nil
+}
+
 func (r *pgRepository) CreateShareLink(ctx context.Context, inventoryID, createdByUserID uuid.UUID, token string, passwordHash *string, expiresAt *time.Time) (*ShareLink, error) {
 	row, err := r.q.CreateShareLink(ctx, sqlc.CreateShareLinkParams{
 		InventoryID:     uuidToPg(inventoryID),

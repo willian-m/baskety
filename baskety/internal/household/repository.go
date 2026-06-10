@@ -15,4 +15,5 @@ type Repository interface {
 	RemoveMember(ctx context.Context, householdID, userID uuid.UUID) error
 	FindMember(ctx context.Context, householdID, userID uuid.UUID) (*Member, error)
 	CreateShareLink(ctx context.Context, inventoryID, createdByUserID uuid.UUID, token string, passwordHash *string, expiresAt *time.Time) (*ShareLink, error)
+	FindShareLinkByToken(ctx context.Context, token string) (*ShareLink, error)
 }
