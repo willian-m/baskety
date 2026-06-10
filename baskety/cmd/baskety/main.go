@@ -16,10 +16,12 @@ import (
 	"github.com/willian-m/baskety/internal/adapters/ocr"
 	"github.com/willian-m/baskety/internal/adapters/storage"
 	"github.com/willian-m/baskety/internal/auth"
+	"github.com/willian-m/baskety/internal/catalog"
 	"github.com/willian-m/baskety/internal/grocery"
 	"github.com/willian-m/baskety/internal/household"
 	"github.com/willian-m/baskety/internal/inventory"
 	"github.com/willian-m/baskety/internal/receipt"
+	"github.com/willian-m/baskety/internal/settings"
 	"github.com/willian-m/baskety/internal/shared"
 )
 
@@ -109,6 +111,20 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	receiptSvc := receipt.NewService(receiptRepo, fileStore, jobQueue)
 	receiptHandler := receipt.NewHandler(receiptSvc)
 
+	// Catalog domain: stores, catalog entries, purchase transactions. The
+	// catalog worker enriches committed purchase transactions (store/catalog
+	// linking + inventory batch updates) off the same in-process job queue.
+	catalogRepo := catalog.NewPgRepository(pool)
+	catalogSvc := catalog.NewService(catalogRepo)
+	catalogHandler := catalog.NewHandler(catalogSvc)
+	catalogWorker := catalog.NewProcessPurchaseTransactionWorker(catalogRepo, inventoryRepo, pool)
+	jobQueue.Register(catalog.JobProcessPurchaseTransaction, catalogWorker.HandleJob)
+
+	// Settings domain: system/household/user settings + LLM/OCR provider configs.
+	settingsRepo := settings.NewPgRepository(pool)
+	settingsSvc := settings.NewService(settingsRepo)
+	settingsHandler := settings.NewHandler(settingsSvc)
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
@@ -134,6 +150,12 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 			})
 			r.Route("/receipts", func(r chi.Router) {
 				receipt.RegisterRoutes(r, receiptHandler)
+			})
+			r.Route("/catalog", func(r chi.Router) {
+				catalog.RegisterRoutes(r, catalogHandler)
+			})
+			r.Route("/settings", func(r chi.Router) {
+				settings.RegisterRoutes(r, settingsHandler)
 			})
 		})
 	})
