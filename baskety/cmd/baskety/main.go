@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/willian-m/baskety/internal/auth"
+	"github.com/willian-m/baskety/internal/grocery"
 	"github.com/willian-m/baskety/internal/household"
 	"github.com/willian-m/baskety/internal/inventory"
 	"github.com/willian-m/baskety/internal/shared"
@@ -84,6 +85,10 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	inventorySvc := inventory.NewService(inventoryRepo)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
 
+	groceryRepo := grocery.NewPgRepository(pool)
+	grocerySvc := grocery.NewService(groceryRepo, inventorySvc)
+	groceryHandler := grocery.NewHandler(grocerySvc)
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
@@ -105,6 +110,7 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 			})
 			r.Route("/inventories", func(r chi.Router) {
 				inventory.RegisterRoutes(r, inventoryHandler)
+				grocery.RegisterRoutes(r, groceryHandler)
 			})
 		})
 	})
