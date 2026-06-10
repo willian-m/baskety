@@ -5,11 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/google/uuid"
+	"github.com/willian-m/baskety/internal/catalog"
 	"github.com/willian-m/baskety/internal/shared"
 )
+
+// Re-export the catalog job constants/payload so the receipt service can enqueue
+// post-commit enrichment without the wiring layer reaching across packages.
+const JobProcessPurchaseTransaction = catalog.JobProcessPurchaseTransaction
+
+type ProcessPurchaseTransactionArgs = catalog.ProcessPurchaseTransactionArgs
 
 var (
 	ErrForbidden    = errors.New("forbidden")
@@ -155,11 +163,14 @@ func (s *Service) CommitScan(ctx context.Context, scanID, householdID uuid.UUID,
 		return nil, fmt.Errorf("loading scan items: %w", err)
 	}
 
+	var txnIDs []uuid.UUID
 	for _, it := range items {
 		if it.Status == ItemStatusAccepted || it.Status == ItemStatusCorrected {
-			if _, err := s.repo.CreatePurchaseTransaction(ctx, householdID, it.ID, req.PurchasedAt); err != nil {
+			txn, err := s.repo.CreatePurchaseTransaction(ctx, householdID, it.ID, req.PurchasedAt)
+			if err != nil {
 				return nil, fmt.Errorf("creating purchase transaction: %w", err)
 			}
+			txnIDs = append(txnIDs, txn.ID)
 		}
 	}
 
@@ -167,5 +178,15 @@ func (s *Service) CommitScan(ctx context.Context, scanID, householdID uuid.UUID,
 	if err != nil {
 		return nil, fmt.Errorf("committing scan: %w", err)
 	}
+
+	// Enqueue post-commit enrichment (store/catalog linking + inventory update)
+	// for each created transaction. Enqueue failures are logged but do not fail
+	// the commit, since the transactions are already persisted.
+	for _, id := range txnIDs {
+		if err := s.queue.Enqueue(ctx, JobProcessPurchaseTransaction, ProcessPurchaseTransactionArgs{TransactionID: id.String()}); err != nil {
+			slog.Error("enqueue process_purchase_transaction failed", "transaction_id", id.String(), "error", err)
+		}
+	}
+
 	return toScanResponse(committed), nil
 }
