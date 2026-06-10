@@ -18,6 +18,7 @@ type JobHandler func(ctx context.Context, payload any) error
 
 // InProcessQueue dispatches jobs to a pool of goroutine workers.
 type InProcessQueue struct {
+	mu       sync.RWMutex
 	handlers map[string]JobHandler
 	jobs     chan queuedJob
 	wg       sync.WaitGroup
@@ -49,7 +50,17 @@ func NewInProcessQueue(workers, buffer int) *InProcessQueue {
 
 // Register associates a job type with its handler. Must be called before Enqueue.
 func (q *InProcessQueue) Register(jobType string, h JobHandler) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.handlers[jobType] = h
+}
+
+// handlerFor looks up the handler for a job type under a read lock.
+func (q *InProcessQueue) handlerFor(jobType string) (JobHandler, bool) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	h, ok := q.handlers[jobType]
+	return h, ok
 }
 
 func (q *InProcessQueue) Enqueue(ctx context.Context, jobType string, payload any) error {
@@ -64,7 +75,7 @@ func (q *InProcessQueue) Enqueue(ctx context.Context, jobType string, payload an
 func (q *InProcessQueue) worker() {
 	defer q.wg.Done()
 	for job := range q.jobs {
-		h, ok := q.handlers[job.jobType]
+		h, ok := q.handlerFor(job.jobType)
 		if !ok {
 			slog.Error("no handler for job type", "type", job.jobType)
 			continue

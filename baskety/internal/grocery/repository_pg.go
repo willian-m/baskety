@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
+	"github.com/willian-m/baskety/internal/shared"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -24,102 +23,18 @@ func NewPgRepository(pool *pgxpool.Pool) Repository {
 	return &pgRepository{q: sqlc.New(pool)}
 }
 
-func uuidToPg(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
-}
-
-func uuidPtrToPg(id *uuid.UUID) pgtype.UUID {
-	if id == nil {
-		return pgtype.UUID{Valid: false}
-	}
-	return pgtype.UUID{Bytes: *id, Valid: true}
-}
-
-func pgToUUID(id pgtype.UUID) uuid.UUID {
-	return uuid.UUID(id.Bytes)
-}
-
-func pgToUUIDPtr(id pgtype.UUID) *uuid.UUID {
-	if !id.Valid {
-		return nil
-	}
-	u := uuid.UUID(id.Bytes)
-	return &u
-}
-
-func timeToPg(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func pgToTimePtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
-func floatToPgNumeric(f float64) pgtype.Numeric {
-	var n pgtype.Numeric
-	_ = n.Scan(fmt.Sprintf("%v", f))
-	return n
-}
-
-func pgNumericToFloat(n pgtype.Numeric) float64 {
-	if !n.Valid || n.NaN {
-		return 0
-	}
-	f := new(big.Float).SetInt(n.Int)
-	if n.Exp != 0 {
-		exp := new(big.Float).SetFloat64(pow10(n.Exp))
-		f.Mul(f, exp)
-	}
-	res, _ := f.Float64()
-	return res
-}
-
-func pow10(exp int32) float64 {
-	r := 1.0
-	if exp >= 0 {
-		for i := int32(0); i < exp; i++ {
-			r *= 10
-		}
-	} else {
-		for i := int32(0); i < -exp; i++ {
-			r /= 10
-		}
-	}
-	return r
-}
-
-func strFromPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func ptrStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 // --- lists ---
 
 func (r *pgRepository) toList(row sqlc.GroceryList) *GroceryList {
 	return &GroceryList{
-		ID:              pgToUUID(row.ID),
-		InventoryID:     pgToUUID(row.InventoryID),
+		ID:              shared.PgToUUID(row.ID),
+		InventoryID:     shared.PgToUUID(row.InventoryID),
 		Name:            row.Name,
 		Status:          row.Status,
-		CreatedByUserID: pgToUUID(row.CreatedByUserID),
-		CompletedAt:     pgToTimePtr(row.CompletedAt),
-		PinnedAt:        pgToTimePtr(row.PinnedAt),
-		ExpiresAt:       pgToTimePtr(row.ExpiresAt),
+		CreatedByUserID: shared.PgToUUID(row.CreatedByUserID),
+		CompletedAt:     shared.PgToTimePtr(row.CompletedAt),
+		PinnedAt:        shared.PgToTimePtr(row.PinnedAt),
+		ExpiresAt:       shared.PgToTimePtr(row.ExpiresAt),
 		CreatedAt:       row.CreatedAt.Time,
 		UpdatedAt:       row.UpdatedAt.Time,
 	}
@@ -127,9 +42,9 @@ func (r *pgRepository) toList(row sqlc.GroceryList) *GroceryList {
 
 func (r *pgRepository) CreateList(ctx context.Context, inventoryID uuid.UUID, name string, createdBy uuid.UUID) (*GroceryList, error) {
 	row, err := r.q.CreateGroceryList(ctx, sqlc.CreateGroceryListParams{
-		InventoryID:     uuidToPg(inventoryID),
+		InventoryID:     shared.UUIDToPg(inventoryID),
 		Name:            name,
-		CreatedByUserID: uuidToPg(createdBy),
+		CreatedByUserID: shared.UUIDToPg(createdBy),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create list: %w", err)
@@ -138,7 +53,7 @@ func (r *pgRepository) CreateList(ctx context.Context, inventoryID uuid.UUID, na
 }
 
 func (r *pgRepository) GetList(ctx context.Context, id uuid.UUID) (*GroceryList, error) {
-	row, err := r.q.GetGroceryListByID(ctx, uuidToPg(id))
+	row, err := r.q.GetGroceryListByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get list: %w", ErrNotFound)
@@ -149,7 +64,7 @@ func (r *pgRepository) GetList(ctx context.Context, id uuid.UUID) (*GroceryList,
 }
 
 func (r *pgRepository) ListByInventory(ctx context.Context, inventoryID uuid.UUID) ([]*GroceryList, error) {
-	rows, err := r.q.ListGroceryListsByInventory(ctx, uuidToPg(inventoryID))
+	rows, err := r.q.ListGroceryListsByInventory(ctx, shared.UUIDToPg(inventoryID))
 	if err != nil {
 		return nil, fmt.Errorf("list by inventory: %w", err)
 	}
@@ -162,9 +77,9 @@ func (r *pgRepository) ListByInventory(ctx context.Context, inventoryID uuid.UUI
 
 func (r *pgRepository) UpdateListStatus(ctx context.Context, id uuid.UUID, status string, completedAt *time.Time) (*GroceryList, error) {
 	row, err := r.q.UpdateGroceryListStatus(ctx, sqlc.UpdateGroceryListStatusParams{
-		ID:          uuidToPg(id),
+		ID:          shared.UUIDToPg(id),
 		Status:      status,
-		CompletedAt: timeToPg(completedAt),
+		CompletedAt: shared.TimePtrToPg(completedAt),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -176,7 +91,7 @@ func (r *pgRepository) UpdateListStatus(ctx context.Context, id uuid.UUID, statu
 }
 
 func (r *pgRepository) ArchiveList(ctx context.Context, id uuid.UUID) error {
-	if err := r.q.ArchiveGroceryList(ctx, uuidToPg(id)); err != nil {
+	if err := r.q.ArchiveGroceryList(ctx, shared.UUIDToPg(id)); err != nil {
 		return fmt.Errorf("archive list: %w", err)
 	}
 	return nil
@@ -186,12 +101,12 @@ func (r *pgRepository) ArchiveList(ctx context.Context, id uuid.UUID) error {
 
 func (r *pgRepository) toItem(row sqlc.GroceryListItem) *GroceryListItem {
 	return &GroceryListItem{
-		ID:              pgToUUID(row.ID),
-		GroceryListID:   pgToUUID(row.GroceryListID),
-		InventoryItemID: pgToUUIDPtr(row.InventoryItemID),
+		ID:              shared.PgToUUID(row.ID),
+		GroceryListID:   shared.PgToUUID(row.GroceryListID),
+		InventoryItemID: shared.PgToUUIDPtr(row.InventoryItemID),
 		Name:            row.Name,
-		Quantity:        pgNumericToFloat(row.Quantity),
-		Unit:            strFromPtr(row.Unit),
+		Quantity:        shared.PgNumericToFloat(row.Quantity),
+		Unit:            shared.PtrStr(row.Unit),
 		Notes:           row.Notes,
 		Status:          row.Status,
 		SortOrder:       int(row.SortOrder),
@@ -202,11 +117,11 @@ func (r *pgRepository) toItem(row sqlc.GroceryListItem) *GroceryListItem {
 
 func (r *pgRepository) AddItem(ctx context.Context, listID uuid.UUID, inventoryItemID *uuid.UUID, name string, quantity float64, unit string, notes *string, sortOrder int) (*GroceryListItem, error) {
 	row, err := r.q.AddGroceryListItem(ctx, sqlc.AddGroceryListItemParams{
-		GroceryListID:   uuidToPg(listID),
-		InventoryItemID: uuidPtrToPg(inventoryItemID),
+		GroceryListID:   shared.UUIDToPg(listID),
+		InventoryItemID: shared.UUIDPtrToPg(inventoryItemID),
 		Name:            name,
-		Quantity:        floatToPgNumeric(quantity),
-		Unit:            ptrStr(unit),
+		Quantity:        shared.FloatToPgNumeric(quantity),
+		Unit:            shared.StrToPtr(unit),
 		Notes:           notes,
 		SortOrder:       int32(sortOrder),
 	})
@@ -217,7 +132,7 @@ func (r *pgRepository) AddItem(ctx context.Context, listID uuid.UUID, inventoryI
 }
 
 func (r *pgRepository) GetItem(ctx context.Context, id uuid.UUID) (*GroceryListItem, error) {
-	row, err := r.q.GetGroceryListItemByID(ctx, uuidToPg(id))
+	row, err := r.q.GetGroceryListItemByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get item: %w", ErrNotFound)
@@ -228,7 +143,7 @@ func (r *pgRepository) GetItem(ctx context.Context, id uuid.UUID) (*GroceryListI
 }
 
 func (r *pgRepository) ListItems(ctx context.Context, listID uuid.UUID) ([]*GroceryListItem, error) {
-	rows, err := r.q.ListGroceryListItems(ctx, uuidToPg(listID))
+	rows, err := r.q.ListGroceryListItems(ctx, shared.UUIDToPg(listID))
 	if err != nil {
 		return nil, fmt.Errorf("list items: %w", err)
 	}
@@ -241,7 +156,7 @@ func (r *pgRepository) ListItems(ctx context.Context, listID uuid.UUID) ([]*Groc
 
 func (r *pgRepository) UpdateItemStatus(ctx context.Context, id uuid.UUID, status string) (*GroceryListItem, error) {
 	row, err := r.q.UpdateGroceryListItemStatus(ctx, sqlc.UpdateGroceryListItemStatusParams{
-		ID:     uuidToPg(id),
+		ID:     shared.UUIDToPg(id),
 		Status: status,
 	})
 	if err != nil {
@@ -255,7 +170,7 @@ func (r *pgRepository) UpdateItemStatus(ctx context.Context, id uuid.UUID, statu
 
 func (r *pgRepository) ReorderItem(ctx context.Context, id uuid.UUID, sortOrder int) error {
 	if err := r.q.UpdateGroceryListItemSortOrder(ctx, sqlc.UpdateGroceryListItemSortOrderParams{
-		ID:        uuidToPg(id),
+		ID:        shared.UUIDToPg(id),
 		SortOrder: int32(sortOrder),
 	}); err != nil {
 		return fmt.Errorf("reorder item: %w", err)
@@ -264,7 +179,7 @@ func (r *pgRepository) ReorderItem(ctx context.Context, id uuid.UUID, sortOrder 
 }
 
 func (r *pgRepository) DeleteItem(ctx context.Context, id uuid.UUID) error {
-	if err := r.q.DeleteGroceryListItem(ctx, uuidToPg(id)); err != nil {
+	if err := r.q.DeleteGroceryListItem(ctx, shared.UUIDToPg(id)); err != nil {
 		return fmt.Errorf("delete item: %w", err)
 	}
 	return nil

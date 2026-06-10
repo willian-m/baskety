@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
+	"github.com/willian-m/baskety/internal/shared"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -24,85 +23,12 @@ func NewPgRepository(pool *pgxpool.Pool) Repository {
 	return &pgRepository{q: sqlc.New(pool)}
 }
 
-func uuidToPg(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
-}
-
-func pgToUUID(id pgtype.UUID) uuid.UUID {
-	return uuid.UUID(id.Bytes)
-}
-
-func timeToPg(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func pgToTimePtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
-func floatToPgNumeric(f float64) pgtype.Numeric {
-	var n pgtype.Numeric
-	// Scan from the decimal string representation to preserve precision.
-	_ = n.Scan(fmt.Sprintf("%v", f))
-	return n
-}
-
-func pgNumericToFloat(n pgtype.Numeric) float64 {
-	if !n.Valid {
-		return 0
-	}
-	if n.NaN {
-		return 0
-	}
-	f := new(big.Float).SetInt(n.Int)
-	if n.Exp != 0 {
-		exp := new(big.Float).SetFloat64(pow10(n.Exp))
-		f.Mul(f, exp)
-	}
-	res, _ := f.Float64()
-	return res
-}
-
-func pow10(exp int32) float64 {
-	r := 1.0
-	if exp >= 0 {
-		for i := int32(0); i < exp; i++ {
-			r *= 10
-		}
-	} else {
-		for i := int32(0); i < -exp; i++ {
-			r /= 10
-		}
-	}
-	return r
-}
-
-func ptrStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func strFromPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // --- inventories ---
 
 func (r *pgRepository) toInventory(row sqlc.Inventory) *Inventory {
 	return &Inventory{
-		ID:          pgToUUID(row.ID),
-		HouseholdID: pgToUUID(row.HouseholdID),
+		ID:          shared.PgToUUID(row.ID),
+		HouseholdID: shared.PgToUUID(row.HouseholdID),
 		Name:        row.Name,
 		Description: row.Description,
 		CreatedAt:   row.CreatedAt.Time,
@@ -112,7 +38,7 @@ func (r *pgRepository) toInventory(row sqlc.Inventory) *Inventory {
 
 func (r *pgRepository) CreateInventory(ctx context.Context, householdID uuid.UUID, name string, description *string) (*Inventory, error) {
 	row, err := r.q.CreateInventory(ctx, sqlc.CreateInventoryParams{
-		HouseholdID: uuidToPg(householdID),
+		HouseholdID: shared.UUIDToPg(householdID),
 		Name:        name,
 		Description: description,
 	})
@@ -123,7 +49,7 @@ func (r *pgRepository) CreateInventory(ctx context.Context, householdID uuid.UUI
 }
 
 func (r *pgRepository) GetInventory(ctx context.Context, id uuid.UUID) (*Inventory, error) {
-	row, err := r.q.GetInventoryByID(ctx, uuidToPg(id))
+	row, err := r.q.GetInventoryByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get inventory: %w", ErrNotFound)
@@ -134,7 +60,7 @@ func (r *pgRepository) GetInventory(ctx context.Context, id uuid.UUID) (*Invento
 }
 
 func (r *pgRepository) ListInventories(ctx context.Context, householdID uuid.UUID) ([]*Inventory, error) {
-	rows, err := r.q.ListInventoriesByHousehold(ctx, uuidToPg(householdID))
+	rows, err := r.q.ListInventoriesByHousehold(ctx, shared.UUIDToPg(householdID))
 	if err != nil {
 		return nil, fmt.Errorf("list inventories: %w", err)
 	}
@@ -147,7 +73,7 @@ func (r *pgRepository) ListInventories(ctx context.Context, householdID uuid.UUI
 
 func (r *pgRepository) UpdateInventory(ctx context.Context, id uuid.UUID, name string, description *string) (*Inventory, error) {
 	row, err := r.q.UpdateInventory(ctx, sqlc.UpdateInventoryParams{
-		ID:          uuidToPg(id),
+		ID:          shared.UUIDToPg(id),
 		Name:        name,
 		Description: description,
 	})
@@ -161,7 +87,7 @@ func (r *pgRepository) UpdateInventory(ctx context.Context, id uuid.UUID, name s
 }
 
 func (r *pgRepository) DeleteInventory(ctx context.Context, id uuid.UUID) error {
-	if err := r.q.DeleteInventory(ctx, uuidToPg(id)); err != nil {
+	if err := r.q.DeleteInventory(ctx, shared.UUIDToPg(id)); err != nil {
 		return fmt.Errorf("delete inventory: %w", err)
 	}
 	return nil
@@ -171,14 +97,14 @@ func (r *pgRepository) DeleteInventory(ctx context.Context, id uuid.UUID) error 
 
 func (r *pgRepository) toItem(row sqlc.InventoryItem) *InventoryItem {
 	return &InventoryItem{
-		ID:             pgToUUID(row.ID),
-		InventoryID:    pgToUUID(row.InventoryID),
+		ID:             shared.PgToUUID(row.ID),
+		InventoryID:    shared.PgToUUID(row.InventoryID),
 		Name:           row.Name,
-		Category:       strFromPtr(row.Category),
-		Unit:           strFromPtr(row.Unit),
-		TargetQuantity: pgNumericToFloat(row.TargetQuantity),
+		Category:       shared.PtrStr(row.Category),
+		Unit:           shared.PtrStr(row.Unit),
+		TargetQuantity: shared.PgNumericToFloat(row.TargetQuantity),
 		Notes:          row.Notes,
-		DeletedAt:      pgToTimePtr(row.DeletedAt),
+		DeletedAt:      shared.PgToTimePtr(row.DeletedAt),
 		CreatedAt:      row.CreatedAt.Time,
 		UpdatedAt:      row.UpdatedAt.Time,
 	}
@@ -186,11 +112,11 @@ func (r *pgRepository) toItem(row sqlc.InventoryItem) *InventoryItem {
 
 func (r *pgRepository) CreateItem(ctx context.Context, inventoryID uuid.UUID, name, category, unit string, targetQuantity float64, notes *string) (*InventoryItem, error) {
 	row, err := r.q.CreateInventoryItem(ctx, sqlc.CreateInventoryItemParams{
-		InventoryID:    uuidToPg(inventoryID),
+		InventoryID:    shared.UUIDToPg(inventoryID),
 		Name:           name,
-		Category:       ptrStr(category),
-		Unit:           ptrStr(unit),
-		TargetQuantity: floatToPgNumeric(targetQuantity),
+		Category:       shared.StrToPtr(category),
+		Unit:           shared.StrToPtr(unit),
+		TargetQuantity: shared.FloatToPgNumeric(targetQuantity),
 		Notes:          notes,
 	})
 	if err != nil {
@@ -200,7 +126,7 @@ func (r *pgRepository) CreateItem(ctx context.Context, inventoryID uuid.UUID, na
 }
 
 func (r *pgRepository) GetItem(ctx context.Context, id uuid.UUID) (*InventoryItem, error) {
-	row, err := r.q.GetInventoryItemByID(ctx, uuidToPg(id))
+	row, err := r.q.GetInventoryItemByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get item: %w", ErrNotFound)
@@ -211,7 +137,7 @@ func (r *pgRepository) GetItem(ctx context.Context, id uuid.UUID) (*InventoryIte
 }
 
 func (r *pgRepository) ListItems(ctx context.Context, inventoryID uuid.UUID) ([]*InventoryItem, error) {
-	rows, err := r.q.ListInventoryItems(ctx, uuidToPg(inventoryID))
+	rows, err := r.q.ListInventoryItems(ctx, shared.UUIDToPg(inventoryID))
 	if err != nil {
 		return nil, fmt.Errorf("list items: %w", err)
 	}
@@ -224,11 +150,11 @@ func (r *pgRepository) ListItems(ctx context.Context, inventoryID uuid.UUID) ([]
 
 func (r *pgRepository) UpdateItem(ctx context.Context, id uuid.UUID, name, category, unit string, targetQuantity float64, notes *string) (*InventoryItem, error) {
 	row, err := r.q.UpdateInventoryItem(ctx, sqlc.UpdateInventoryItemParams{
-		ID:             uuidToPg(id),
+		ID:             shared.UUIDToPg(id),
 		Name:           name,
-		Category:       ptrStr(category),
-		Unit:           ptrStr(unit),
-		TargetQuantity: floatToPgNumeric(targetQuantity),
+		Category:       shared.StrToPtr(category),
+		Unit:           shared.StrToPtr(unit),
+		TargetQuantity: shared.FloatToPgNumeric(targetQuantity),
 		Notes:          notes,
 	})
 	if err != nil {
@@ -241,30 +167,30 @@ func (r *pgRepository) UpdateItem(ctx context.Context, id uuid.UUID, name, categ
 }
 
 func (r *pgRepository) SoftDeleteItem(ctx context.Context, id uuid.UUID) error {
-	if err := r.q.SoftDeleteInventoryItem(ctx, uuidToPg(id)); err != nil {
+	if err := r.q.SoftDeleteInventoryItem(ctx, shared.UUIDToPg(id)); err != nil {
 		return fmt.Errorf("soft delete item: %w", err)
 	}
 	return nil
 }
 
 func (r *pgRepository) GetItemQuantity(ctx context.Context, itemID uuid.UUID) (float64, error) {
-	n, err := r.q.GetInventoryItemQuantity(ctx, uuidToPg(itemID))
+	n, err := r.q.GetInventoryItemQuantity(ctx, shared.UUIDToPg(itemID))
 	if err != nil {
 		return 0, fmt.Errorf("get item quantity: %w", err)
 	}
-	return pgNumericToFloat(n), nil
+	return shared.PgNumericToFloat(n), nil
 }
 
 // --- batches ---
 
 func (r *pgRepository) toBatch(row sqlc.InventoryBatch) *InventoryBatch {
 	return &InventoryBatch{
-		ID:        pgToUUID(row.ID),
-		ItemID:    pgToUUID(row.ItemID),
-		Quantity:  pgNumericToFloat(row.Quantity),
-		ExpiresAt: pgToTimePtr(row.ExpiresAt),
+		ID:        shared.PgToUUID(row.ID),
+		ItemID:    shared.PgToUUID(row.ItemID),
+		Quantity:  shared.PgNumericToFloat(row.Quantity),
+		ExpiresAt: shared.PgToTimePtr(row.ExpiresAt),
 		AddedAt:   row.AddedAt.Time,
-		EmptiedAt: pgToTimePtr(row.EmptiedAt),
+		EmptiedAt: shared.PgToTimePtr(row.EmptiedAt),
 		Notes:     row.Notes,
 		CreatedAt: row.CreatedAt.Time,
 	}
@@ -272,9 +198,9 @@ func (r *pgRepository) toBatch(row sqlc.InventoryBatch) *InventoryBatch {
 
 func (r *pgRepository) AddBatch(ctx context.Context, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error) {
 	row, err := r.q.CreateInventoryBatch(ctx, sqlc.CreateInventoryBatchParams{
-		ItemID:    uuidToPg(itemID),
-		Quantity:  floatToPgNumeric(quantity),
-		ExpiresAt: timeToPg(expiresAt),
+		ItemID:    shared.UUIDToPg(itemID),
+		Quantity:  shared.FloatToPgNumeric(quantity),
+		ExpiresAt: shared.TimePtrToPg(expiresAt),
 		Notes:     notes,
 	})
 	if err != nil {
@@ -284,7 +210,7 @@ func (r *pgRepository) AddBatch(ctx context.Context, itemID uuid.UUID, quantity 
 }
 
 func (r *pgRepository) GetBatch(ctx context.Context, id uuid.UUID) (*InventoryBatch, error) {
-	row, err := r.q.GetInventoryBatchByID(ctx, uuidToPg(id))
+	row, err := r.q.GetInventoryBatchByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get batch: %w", ErrNotFound)
@@ -295,7 +221,7 @@ func (r *pgRepository) GetBatch(ctx context.Context, id uuid.UUID) (*InventoryBa
 }
 
 func (r *pgRepository) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*InventoryBatch, error) {
-	rows, err := r.q.ListActiveBatchesByItem(ctx, uuidToPg(itemID))
+	rows, err := r.q.ListActiveBatchesByItem(ctx, shared.UUIDToPg(itemID))
 	if err != nil {
 		return nil, fmt.Errorf("list active batches: %w", err)
 	}
@@ -307,7 +233,7 @@ func (r *pgRepository) ListActiveBatches(ctx context.Context, itemID uuid.UUID) 
 }
 
 func (r *pgRepository) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
-	if err := r.q.MarkBatchEmptied(ctx, uuidToPg(id)); err != nil {
+	if err := r.q.MarkBatchEmptied(ctx, shared.UUIDToPg(id)); err != nil {
 		return fmt.Errorf("mark batch emptied: %w", err)
 	}
 	return nil

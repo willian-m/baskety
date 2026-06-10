@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -100,10 +101,26 @@ func (w *ProcessPurchaseTransactionWorker) Work(ctx context.Context, args Proces
 		return fmt.Errorf("process purchase transaction: update refs: %w", err)
 	}
 
-	// Add a batch to the mapped inventory item, when present.
+	// Add a batch to the mapped inventory item, when present. Guard against
+	// soft-deleted items: the worker bypasses the inventory service layer, so we
+	// re-check the item state here. The purchase transaction is already
+	// committed, so a soft-deleted item is logged and skipped rather than failing
+	// the job.
 	if refs.inventoryItemID != nil && txn.Quantity != nil && *txn.Quantity > 0 {
-		if _, err := w.inventoryRepo.AddBatch(ctx, *refs.inventoryItemID, *txn.Quantity, nil, nil); err != nil {
-			return fmt.Errorf("process purchase transaction: add inventory batch: %w", err)
+		item, ierr := w.inventoryRepo.GetItem(ctx, *refs.inventoryItemID)
+		switch {
+		case errors.Is(ierr, inventory.ErrNotFound):
+			slog.Warn("skipping inventory batch: item not found",
+				"inventory_item_id", refs.inventoryItemID, "transaction_id", txnID)
+		case ierr != nil:
+			return fmt.Errorf("process purchase transaction: get inventory item: %w", ierr)
+		case item.DeletedAt != nil:
+			slog.Warn("skipping inventory batch: item is soft-deleted",
+				"inventory_item_id", refs.inventoryItemID, "transaction_id", txnID)
+		default:
+			if _, err := w.inventoryRepo.AddBatch(ctx, *refs.inventoryItemID, *txn.Quantity, nil, nil); err != nil {
+				return fmt.Errorf("process purchase transaction: add inventory batch: %w", err)
+			}
 		}
 	}
 

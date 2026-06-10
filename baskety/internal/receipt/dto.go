@@ -4,12 +4,6 @@ import "time"
 
 // --- Requests ---
 
-// UploadScanRequest carries optional metadata; the image itself arrives as the
-// multipart form field "image".
-type UploadScanRequest struct {
-	GroceryListID *string `json:"grocery_list_id"`
-}
-
 type UpdateScanItemRequest struct {
 	Status              string   `json:"status"`
 	CorrectedName       *string  `json:"corrected_name"`
