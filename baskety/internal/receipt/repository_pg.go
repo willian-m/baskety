@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
+	"github.com/willian-m/baskety/internal/shared"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -27,77 +27,36 @@ func NewPgRepository(pool *pgxpool.Pool) Repository {
 
 // --- pg helpers ---
 
-func uuidToPg(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
-}
-
-func uuidPtrToPg(id *uuid.UUID) pgtype.UUID {
-	if id == nil {
-		return pgtype.UUID{}
-	}
-	return pgtype.UUID{Bytes: *id, Valid: true}
-}
-
-func pgToUUID(id pgtype.UUID) uuid.UUID {
-	return uuid.UUID(id.Bytes)
-}
-
-func pgToUUIDPtr(id pgtype.UUID) *uuid.UUID {
-	if !id.Valid {
-		return nil
-	}
-	u := uuid.UUID(id.Bytes)
-	return &u
-}
-
+// floatPtrToPgNumeric converts a *float64 to pgtype.Numeric (invalid when nil).
 func floatPtrToPgNumeric(f *float64) pgtype.Numeric {
 	if f == nil {
 		return pgtype.Numeric{}
 	}
-	var n pgtype.Numeric
-	_ = n.Scan(fmt.Sprintf("%v", *f))
-	return n
+	return shared.FloatToPgNumeric(*f)
 }
 
+// pgNumericToFloatPtr converts a pgtype.Numeric to *float64 (nil when invalid).
 func pgNumericToFloatPtr(n pgtype.Numeric) *float64 {
-	if !n.Valid || n.NaN {
+	if !n.Valid || n.NaN || n.Int == nil {
 		return nil
 	}
-	f := new(big.Float).SetInt(n.Int)
-	if n.Exp != 0 {
-		f.Mul(f, big.NewFloat(pow10(n.Exp)))
-	}
-	res, _ := f.Float64()
-	return &res
-}
-
-func pow10(exp int32) float64 {
-	r := 1.0
-	if exp >= 0 {
-		for i := int32(0); i < exp; i++ {
-			r *= 10
-		}
-	} else {
-		for i := int32(0); i < -exp; i++ {
-			r /= 10
-		}
-	}
-	return r
+	f := shared.PgNumericToFloat(n)
+	return &f
 }
 
 // --- mappers ---
 
 func toScan(row sqlc.ReceiptScan) *ReceiptScan {
 	return &ReceiptScan{
-		ID:              pgToUUID(row.ID),
-		HouseholdID:     pgToUUID(row.HouseholdID),
-		GroceryListID:   pgToUUIDPtr(row.GroceryListID),
+		ID:              shared.PgToUUID(row.ID),
+		HouseholdID:     shared.PgToUUID(row.HouseholdID),
+		GroceryListID:   shared.PgToUUIDPtr(row.GroceryListID),
 		RawImagePath:    row.RawImagePath,
 		OCRText:         row.OcrText,
 		LLMRawResponse:  row.LlmRawResponse,
 		Status:          row.Status,
 		ErrorMessage:    row.ErrorMessage,
-		CreatedByUserID: pgToUUID(row.CreatedByUserID),
+		CreatedByUserID: shared.PgToUUID(row.CreatedByUserID),
 		CreatedAt:       row.CreatedAt.Time,
 		UpdatedAt:       row.UpdatedAt.Time,
 	}
@@ -105,8 +64,8 @@ func toScan(row sqlc.ReceiptScan) *ReceiptScan {
 
 func toScanItem(row sqlc.ReceiptScanItem) *ReceiptScanItem {
 	return &ReceiptScanItem{
-		ID:                  pgToUUID(row.ID),
-		ReceiptScanID:       pgToUUID(row.ReceiptScanID),
+		ID:                  shared.PgToUUID(row.ID),
+		ReceiptScanID:       shared.PgToUUID(row.ReceiptScanID),
 		RawText:             row.RawText,
 		ParsedName:          row.ParsedName,
 		ParsedBrand:         row.ParsedBrand,
@@ -117,7 +76,7 @@ func toScanItem(row sqlc.ReceiptScanItem) *ReceiptScanItem {
 		ParsedStoreName:     row.ParsedStoreName,
 		ConfidenceScore:     pgNumericToFloatPtr(row.ConfidenceScore),
 		Status:              row.Status,
-		InventoryItemID:     pgToUUIDPtr(row.InventoryItemID),
+		InventoryItemID:     shared.PgToUUIDPtr(row.InventoryItemID),
 		CorrectedName:       row.CorrectedName,
 		CorrectedBrand:      row.CorrectedBrand,
 		CorrectedQuantity:   pgNumericToFloatPtr(row.CorrectedQuantity),
@@ -131,12 +90,12 @@ func toScanItem(row sqlc.ReceiptScanItem) *ReceiptScanItem {
 
 func toPurchaseTransaction(row sqlc.PurchaseTransaction) *PurchaseTransaction {
 	return &PurchaseTransaction{
-		ID:                pgToUUID(row.ID),
-		HouseholdID:       pgToUUID(row.HouseholdID),
-		StoreID:           pgToUUIDPtr(row.StoreID),
-		GroceryListItemID: pgToUUIDPtr(row.GroceryListItemID),
-		ReceiptScanItemID: pgToUUIDPtr(row.ReceiptScanItemID),
-		CatalogEntryID:    pgToUUIDPtr(row.CatalogEntryID),
+		ID:                shared.PgToUUID(row.ID),
+		HouseholdID:       shared.PgToUUID(row.HouseholdID),
+		StoreID:           shared.PgToUUIDPtr(row.StoreID),
+		GroceryListItemID: shared.PgToUUIDPtr(row.GroceryListItemID),
+		ReceiptScanItemID: shared.PgToUUIDPtr(row.ReceiptScanItemID),
+		CatalogEntryID:    shared.PgToUUIDPtr(row.CatalogEntryID),
 		PricePerUnitMinor: row.PricePerUnitMinor,
 		Currency:          row.Currency,
 		Quantity:          pgNumericToFloatPtr(row.Quantity),
@@ -149,10 +108,10 @@ func toPurchaseTransaction(row sqlc.PurchaseTransaction) *PurchaseTransaction {
 
 func (r *pgRepository) CreateScan(ctx context.Context, householdID uuid.UUID, groceryListID *uuid.UUID, imagePath string, createdBy uuid.UUID) (*ReceiptScan, error) {
 	row, err := r.q.CreateReceiptScan(ctx, sqlc.CreateReceiptScanParams{
-		HouseholdID:     uuidToPg(householdID),
-		GroceryListID:   uuidPtrToPg(groceryListID),
+		HouseholdID:     shared.UUIDToPg(householdID),
+		GroceryListID:   shared.UUIDPtrToPg(groceryListID),
 		RawImagePath:    imagePath,
-		CreatedByUserID: uuidToPg(createdBy),
+		CreatedByUserID: shared.UUIDToPg(createdBy),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create scan: %w", err)
@@ -161,7 +120,7 @@ func (r *pgRepository) CreateScan(ctx context.Context, householdID uuid.UUID, gr
 }
 
 func (r *pgRepository) GetScan(ctx context.Context, id uuid.UUID) (*ReceiptScan, error) {
-	row, err := r.q.GetReceiptScanByID(ctx, uuidToPg(id))
+	row, err := r.q.GetReceiptScanByID(ctx, shared.UUIDToPg(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get scan: %w", ErrNotFound)
@@ -172,7 +131,7 @@ func (r *pgRepository) GetScan(ctx context.Context, id uuid.UUID) (*ReceiptScan,
 }
 
 func (r *pgRepository) ListScansByHousehold(ctx context.Context, householdID uuid.UUID) ([]*ReceiptScan, error) {
-	rows, err := r.q.ListReceiptScansByHousehold(ctx, uuidToPg(householdID))
+	rows, err := r.q.ListReceiptScansByHousehold(ctx, shared.UUIDToPg(householdID))
 	if err != nil {
 		return nil, fmt.Errorf("list scans: %w", err)
 	}
@@ -185,7 +144,7 @@ func (r *pgRepository) ListScansByHousehold(ctx context.Context, householdID uui
 
 func (r *pgRepository) UpdateScanStatus(ctx context.Context, id uuid.UUID, status string, errMsg *string) (*ReceiptScan, error) {
 	row, err := r.q.UpdateReceiptScanStatus(ctx, sqlc.UpdateReceiptScanStatusParams{
-		ID:           uuidToPg(id),
+		ID:           shared.UUIDToPg(id),
 		Status:       status,
 		ErrorMessage: errMsg,
 	})
@@ -200,7 +159,7 @@ func (r *pgRepository) UpdateScanStatus(ctx context.Context, id uuid.UUID, statu
 
 func (r *pgRepository) SetOCRResult(ctx context.Context, id uuid.UUID, ocrText string) (*ReceiptScan, error) {
 	row, err := r.q.SetReceiptScanOCRResult(ctx, sqlc.SetReceiptScanOCRResultParams{
-		ID:      uuidToPg(id),
+		ID:      shared.UUIDToPg(id),
 		OcrText: &ocrText,
 	})
 	if err != nil {
@@ -211,7 +170,7 @@ func (r *pgRepository) SetOCRResult(ctx context.Context, id uuid.UUID, ocrText s
 
 func (r *pgRepository) SetLLMResult(ctx context.Context, id uuid.UUID, llmRaw string) (*ReceiptScan, error) {
 	row, err := r.q.SetReceiptScanLLMResult(ctx, sqlc.SetReceiptScanLLMResultParams{
-		ID:             uuidToPg(id),
+		ID:             shared.UUIDToPg(id),
 		LlmRawResponse: &llmRaw,
 	})
 	if err != nil {
@@ -224,7 +183,7 @@ func (r *pgRepository) SetLLMResult(ctx context.Context, id uuid.UUID, llmRaw st
 
 func (r *pgRepository) CreateScanItem(ctx context.Context, scanID uuid.UUID, item ParsedLineItem) (*ReceiptScanItem, error) {
 	row, err := r.q.CreateReceiptScanItem(ctx, sqlc.CreateReceiptScanItemParams{
-		ReceiptScanID:           uuidToPg(scanID),
+		ReceiptScanID:           shared.UUIDToPg(scanID),
 		RawText:                 item.RawText,
 		ParsedName:              item.ParsedName,
 		ParsedBrand:             item.ParsedBrand,
@@ -242,7 +201,7 @@ func (r *pgRepository) CreateScanItem(ctx context.Context, scanID uuid.UUID, ite
 }
 
 func (r *pgRepository) ListScanItems(ctx context.Context, scanID uuid.UUID) ([]*ReceiptScanItem, error) {
-	rows, err := r.q.ListReceiptScanItems(ctx, uuidToPg(scanID))
+	rows, err := r.q.ListReceiptScanItems(ctx, shared.UUIDToPg(scanID))
 	if err != nil {
 		return nil, fmt.Errorf("list scan items: %w", err)
 	}
@@ -255,7 +214,7 @@ func (r *pgRepository) ListScanItems(ctx context.Context, scanID uuid.UUID) ([]*
 
 func (r *pgRepository) UpdateScanItem(ctx context.Context, id uuid.UUID, req UpdateScanItemRequest) (*ReceiptScanItem, error) {
 	row, err := r.q.UpdateReceiptScanItemStatus(ctx, sqlc.UpdateReceiptScanItemStatusParams{
-		ID:                         uuidToPg(id),
+		ID:                         shared.UUIDToPg(id),
 		Status:                     req.Status,
 		CorrectedName:              req.CorrectedName,
 		CorrectedBrand:             req.CorrectedBrand,
@@ -301,8 +260,8 @@ func (r *pgRepository) CreatePurchaseTransaction(ctx context.Context, householdI
 	}
 
 	row, err := r.q.CreatePurchaseTransaction(ctx, sqlc.CreatePurchaseTransactionParams{
-		HouseholdID:       uuidToPg(householdID),
-		ReceiptScanItemID: uuidToPg(scanItemID),
+		HouseholdID:       shared.UUIDToPg(householdID),
+		ReceiptScanItemID: shared.UUIDToPg(scanItemID),
 		PricePerUnitMinor: price,
 		Currency:          currency,
 		Quantity:          floatPtrToPgNumeric(qty),
@@ -325,7 +284,7 @@ func (r *pgRepository) getScanItem(ctx context.Context, id uuid.UUID) (*ReceiptS
 		created_at, updated_at
 		FROM receipt_scan_items WHERE id = $1`
 	var row sqlc.ReceiptScanItem
-	err := r.pool.QueryRow(ctx, q, uuidToPg(id)).Scan(
+	err := r.pool.QueryRow(ctx, q, shared.UUIDToPg(id)).Scan(
 		&row.ID, &row.ReceiptScanID, &row.RawText, &row.ParsedName, &row.ParsedBrand,
 		&row.ParsedQuantity, &row.ParsedUnit, &row.ParsedPricePerUnitMinor, &row.ParsedCurrency,
 		&row.ParsedStoreName, &row.ConfidenceScore, &row.Status, &row.InventoryItemID,
