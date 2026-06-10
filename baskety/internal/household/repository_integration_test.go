@@ -119,12 +119,12 @@ func TestIntegration_Household_Members(t *testing.T) {
 	assert.Equal(t, ownerID, m.InvitedByUserID)
 	assert.False(t, m.JoinedAt.IsZero(), "joined_at should be set")
 
-	// Find member
+	// Find member — N3: verify role round-trips correctly.
 	found, err := repo.FindMember(ctx, h.ID, memberID)
 	require.NoError(t, err)
 	assert.Equal(t, m.HouseholdID, found.HouseholdID)
 	assert.Equal(t, m.UserID, found.UserID)
-	assert.Equal(t, m.Role, found.Role)
+	assert.Equal(t, "member", found.Role, "role should round-trip from AddMember to FindMember")
 
 	// Remove member
 	err = repo.RemoveMember(ctx, h.ID, memberID)
@@ -134,6 +134,12 @@ func TestIntegration_Household_Members(t *testing.T) {
 	_, err = repo.FindMember(ctx, h.ID, memberID)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, household.ErrNotFound), "expected ErrNotFound after removal, got %v", err)
+
+	// N2: GetHouseholdMember filters revoked_at IS NULL and expires_at checks, but
+	// RemoveMember is a hard DELETE and there is no Revoke method on the Repository
+	// interface. The DB-level revoke/expiry filter path is therefore untestable without
+	// extending the interface. Skipping; revisit if a RevokeShareLink or similar method
+	// is added.
 }
 
 func TestIntegration_Household_ListForUser(t *testing.T) {
@@ -149,11 +155,20 @@ func TestIntegration_Household_ListForUser(t *testing.T) {
 	h1, err := repo.CreateHousehold(ctx, "Household Alpha", userID)
 	require.NoError(t, err)
 
+	// B1: CreateHousehold does NOT auto-insert a membership row; add it explicitly.
+	_, err = repo.AddMember(ctx, h1.ID, userID, userID, "owner")
+	require.NoError(t, err)
+
 	h2, err := repo.CreateHousehold(ctx, "Household Beta", userID)
 	require.NoError(t, err)
 
 	// Add userID as explicit member of h2 as well (invited by themselves)
 	_, err = repo.AddMember(ctx, h2.ID, userID, userID, "owner")
+	require.NoError(t, err)
+
+	// N1: Create a third household that userID is NOT a member of.
+	otherUserID := seedUser(ctx, t, pool)
+	h3, err := repo.CreateHousehold(ctx, "Household Gamma", otherUserID)
 	require.NoError(t, err)
 
 	list, err := repo.ListHouseholdsForUser(ctx, userID)
@@ -165,6 +180,7 @@ func TestIntegration_Household_ListForUser(t *testing.T) {
 	}
 	assert.Contains(t, ids, h1.ID, "h1 should appear in user's household list")
 	assert.Contains(t, ids, h2.ID, "h2 should appear in user's household list")
+	assert.NotContains(t, ids, h3.ID, "h3 should NOT appear — userID has no membership in it")
 }
 
 func TestIntegration_Household_ShareLink(t *testing.T) {
@@ -179,6 +195,7 @@ func TestIntegration_Household_ShareLink(t *testing.T) {
 	householdID := seedHousehold(ctx, t, pool, userID)
 	inventoryID := seedInventory(ctx, t, pool, householdID)
 
+	// Sub-case 1: nil passwordHash
 	token := uuid.NewString()
 	expiresAt := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
 
@@ -192,6 +209,15 @@ func TestIntegration_Household_ShareLink(t *testing.T) {
 	assert.Nil(t, link.PasswordHash)
 	assert.Nil(t, link.RevokedAt)
 	require.NotNil(t, link.ExpiresAt)
-	assert.WithinDuration(t, expiresAt, *link.ExpiresAt, time.Second)
+	// N5: compare UTC-truncated values directly instead of a loose WithinDuration.
+	assert.Equal(t, expiresAt, link.ExpiresAt.UTC().Truncate(time.Microsecond), "expires_at should round-trip exactly")
 	assert.False(t, link.CreatedAt.IsZero(), "created_at should be set")
+
+	// N6: Sub-case 2: non-nil passwordHash should round-trip correctly.
+	token2 := uuid.NewString()
+	passwordHash := "somehashedpassword"
+	link2, err := repo.CreateShareLink(ctx, inventoryID, userID, token2, &passwordHash, &expiresAt)
+	require.NoError(t, err)
+	require.NotNil(t, link2.PasswordHash, "password_hash should not be nil when provided")
+	assert.Equal(t, passwordHash, *link2.PasswordHash, "password_hash should round-trip correctly")
 }
