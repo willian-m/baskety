@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/willian-m/baskety/internal/auth"
+	"github.com/willian-m/baskety/internal/household"
 	"github.com/willian-m/baskety/internal/shared"
 )
 
@@ -69,14 +71,36 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
+	authRepo := auth.NewPgRepository(pool)
+	authSvc := auth.NewService(authRepo)
+	authHandler := auth.NewHandler(authSvc)
+
+	householdRepo := household.NewPgRepository(pool)
+	householdSvc := household.NewService(householdRepo)
+	householdHandler := household.NewHandler(householdSvc)
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(stubAuthMiddleware)
-	r.Use(stubHouseholdScopeMiddleware)
 
 	r.Get("/healthz", shared.HealthHandler(pool))
+
+	r.Route("/api/v1", func(r chi.Router) {
+		// public auth routes — no auth middleware
+		r.Route("/auth", func(r chi.Router) {
+			auth.RegisterRoutes(r, authHandler)
+		})
+		// authenticated routes
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Middleware(authRepo))
+			r.Use(household.ScopeMiddleware(householdRepo))
+			r.Route("/households", func(r chi.Router) {
+				household.RegisterRoutes(r, householdHandler)
+			})
+		})
+	})
+
 	r.Handle("/*", shared.SPAHandler())
 
 	srv := &http.Server{
@@ -109,18 +133,4 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
-}
-
-// stubAuthMiddleware is a pass-through placeholder for future authentication logic.
-func stubAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
-	})
-}
-
-// stubHouseholdScopeMiddleware is a pass-through placeholder for future household scoping.
-func stubHouseholdScopeMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
-	})
 }
