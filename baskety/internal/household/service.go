@@ -12,6 +12,7 @@ import (
 )
 
 var ErrForbidden = errors.New("forbidden")
+var ErrInvalidInput = errors.New("invalid input")
 
 // ServiceIface allows handler testing with mocks.
 type ServiceIface interface {
@@ -68,7 +69,7 @@ func (s *Service) ListHouseholds(ctx context.Context, userID uuid.UUID) ([]House
 func (s *Service) AddMember(ctx context.Context, householdID, invitedByUserID uuid.UUID, req AddMemberRequest) (*MemberResponse, error) {
 	memberUserID, err := uuid.Parse(req.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user_id: %w", err)
+		return nil, fmt.Errorf("invalid user_id: %w", ErrInvalidInput)
 	}
 	m, err := s.repo.AddMember(ctx, householdID, memberUserID, invitedByUserID, req.Role)
 	if err != nil {
@@ -84,7 +85,7 @@ func (s *Service) RemoveMember(ctx context.Context, householdID, userID uuid.UUI
 func (s *Service) CreateShareLink(ctx context.Context, req CreateShareLinkRequest, createdByUserID uuid.UUID) (*ShareLinkResponse, error) {
 	inventoryID, err := uuid.Parse(req.InventoryID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid inventory_id: %w", err)
+		return nil, fmt.Errorf("invalid inventory_id: %w", ErrInvalidInput)
 	}
 	rawBytes := make([]byte, 32)
 	if _, err := rand.Read(rawBytes); err != nil {

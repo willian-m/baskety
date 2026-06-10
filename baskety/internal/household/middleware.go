@@ -2,6 +2,7 @@ package household
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -20,7 +21,9 @@ func ScopeMiddleware(repo Repository) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := auth.GetUserID(r.Context())
 			if !ok {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 
@@ -29,18 +32,30 @@ func ScopeMiddleware(repo Repository) func(http.Handler) http.Handler {
 			if headerVal := r.Header.Get("X-Household-ID"); headerVal != "" {
 				id, err := uuid.Parse(headerVal)
 				if err != nil {
-					http.Error(w, `{"error":"invalid X-Household-ID"}`, http.StatusBadRequest)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":"invalid X-Household-ID"}`))
 					return
 				}
-				if _, err := repo.FindMember(r.Context(), id, userID); err != nil {
-					http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				_, err = repo.FindMember(r.Context(), id, userID)
+				if errors.Is(err, ErrNotFound) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"error":"forbidden"}`))
+					return
+				} else if err != nil {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte(`{"error":"internal error"}`))
 					return
 				}
 				householdID = id
 			} else {
 				households, err := repo.ListHouseholdsForUser(r.Context(), userID)
 				if err != nil || len(households) == 0 {
-					http.Error(w, `{"error":"no household available"}`, http.StatusForbidden)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"error":"no household available"}`))
 					return
 				}
 				householdID = households[0].ID

@@ -93,6 +93,10 @@ func (h *Handler) HandleAddMember(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := h.svc.AddMember(r.Context(), householdID, inviterID, req)
 	if err != nil {
+		if errors.Is(err, ErrInvalidInput) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
@@ -130,6 +134,10 @@ func (h *Handler) HandleCreateShareLink(w http.ResponseWriter, r *http.Request) 
 	}
 	resp, err := h.svc.CreateShareLink(r.Context(), req, userID)
 	if err != nil {
+		if errors.Is(err, ErrInvalidInput) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
