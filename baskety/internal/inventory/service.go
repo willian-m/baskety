@@ -61,6 +61,12 @@ func (s *Service) assertItemScope(ctx context.Context, itemID, householdID uuid.
 	if err != nil {
 		return nil, err
 	}
+	// Soft-deleted items are invisible through every API path. The repository
+	// still reads the row for internal integrity, but the service treats a
+	// non-nil DeletedAt as if the item does not exist.
+	if item.DeletedAt != nil {
+		return nil, fmt.Errorf("item soft-deleted: %w", ErrNotFound)
+	}
 	if _, err := s.assertInventoryScope(ctx, item.InventoryID, householdID); err != nil {
 		return nil, err
 	}

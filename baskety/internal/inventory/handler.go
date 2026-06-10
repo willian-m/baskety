@@ -239,6 +239,23 @@ func (h *Handler) HandleDeleteItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) HandleGetEffectiveQuantity(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	itemID, ok := parseParam(w, r, "itemID", "item ID")
+	if !ok {
+		return
+	}
+	qty, err := h.svc.GetEffectiveQuantity(r.Context(), itemID, hid)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]float64{"quantity": qty}})
+}
+
 // --- batches ---
 
 func (h *Handler) HandleAddBatch(w http.ResponseWriter, r *http.Request) {
