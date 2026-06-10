@@ -12,10 +12,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/willian-m/baskety/internal/adapters/llm"
+	"github.com/willian-m/baskety/internal/adapters/ocr"
+	"github.com/willian-m/baskety/internal/adapters/storage"
 	"github.com/willian-m/baskety/internal/auth"
 	"github.com/willian-m/baskety/internal/grocery"
 	"github.com/willian-m/baskety/internal/household"
 	"github.com/willian-m/baskety/internal/inventory"
+	"github.com/willian-m/baskety/internal/receipt"
 	"github.com/willian-m/baskety/internal/shared"
 )
 
@@ -89,6 +93,22 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	grocerySvc := grocery.NewService(groceryRepo, inventorySvc)
 	groceryHandler := grocery.NewHandler(grocerySvc)
 
+	// Receipt domain: file storage + OCR/LLM adapters + in-process job queue.
+	// Defaults target a self-hosted stack (local disk, Tesseract, Ollama). These
+	// are configurable via env in a later sprint; see internal/adapters/*.
+	fileStore := storage.NewLocalFileStore("./uploads")
+	ocrProvider := ocr.NewTesseractOCR("")
+	llmProvider := llm.NewOllamaLLM("", "")
+
+	jobQueue := receipt.NewInProcessQueue(2, 64)
+	receiptRepo := receipt.NewPgRepository(pool)
+	receiptWorker := receipt.NewProcessReceiptScanWorker(receiptRepo, ocrProvider, llmProvider)
+	jobQueue.Register(receipt.JobProcessReceiptScan, receiptWorker.HandleJob)
+	defer jobQueue.Shutdown()
+
+	receiptSvc := receipt.NewService(receiptRepo, fileStore, jobQueue)
+	receiptHandler := receipt.NewHandler(receiptSvc)
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
@@ -111,6 +131,9 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 			r.Route("/inventories", func(r chi.Router) {
 				inventory.RegisterRoutes(r, inventoryHandler)
 				grocery.RegisterRoutes(r, groceryHandler)
+			})
+			r.Route("/receipts", func(r chi.Router) {
+				receipt.RegisterRoutes(r, receiptHandler)
 			})
 		})
 	})
