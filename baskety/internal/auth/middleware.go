@@ -26,7 +26,9 @@ func Middleware(repo Repository) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if !strings.HasPrefix(authHeader, "Bearer ") {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
@@ -35,15 +37,21 @@ func Middleware(repo Repository) func(http.Handler) http.Handler {
 
 			session, err := repo.FindSessionByTokenHash(r.Context(), tokenHash)
 			if err != nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
-			if session.ExpiresAt != nil && session.ExpiresAt.Before(time.Now()) {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			if session.ExpiresAt != nil && session.ExpiresAt.Before(time.Now().UTC()) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 			if session.RevokedAt != nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 

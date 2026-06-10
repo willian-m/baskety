@@ -43,7 +43,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*UserRespo
 	}
 	user, err := s.repo.CreateUser(ctx, req.Email, req.Name, string(hash))
 	if err != nil {
-		if errors.Is(err, ErrEmailTaken) {
+		if errors.Is(err, ErrDuplicate) {
 			return nil, ErrEmailTaken
 		}
 		return nil, fmt.Errorf("creating user: %w", err)

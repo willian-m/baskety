@@ -4,17 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrDuplicate = errors.New("duplicate")
 
 type pgRepository struct {
 	q *sqlc.Queries
@@ -54,7 +55,7 @@ func (r *pgRepository) CreateUser(ctx context.Context, email, name, passwordHash
 	})
 	if err != nil {
 		if isDuplicateError(err) {
-			return nil, fmt.Errorf("create user: %w", ErrEmailTaken)
+			return nil, fmt.Errorf("create user: %w", ErrDuplicate)
 		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -131,5 +132,6 @@ func (r *pgRepository) RevokeSession(ctx context.Context, sessionID uuid.UUID) e
 }
 
 func isDuplicateError(err error) bool {
-	return err != nil && (strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique"))
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
