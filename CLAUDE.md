@@ -29,10 +29,112 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Receipt scan:** raw image → OCR text → LLM-parsed line items (name, qty, price, store, brand) → pending review → committed to inventory
 - **Price history:** per-item price tracking across stores and brands over time
 
+## Project Structure
+
+```
+GroceryStoreList/
+├── baskety/                  # Go backend (single binary)
+│   ├── cmd/baskety/main.go   # entry point — wires all deps, starts server
+│   ├── internal/
+│   │   ├── auth/             # session auth: register, login, logout, middleware
+│   │   ├── household/        # households, members, share links, scope middleware
+│   │   ├── inventory/        # (Sprint 4 — not yet implemented)
+│   │   ├── grocery/          # (Sprint 5 — not yet implemented)
+│   │   ├── receipt/          # (Sprint 6 — not yet implemented)
+│   │   ├── catalog/          # (Sprint 7 — not yet implemented)
+│   │   ├── settings/         # (Sprint 7 — not yet implemented)
+│   │   ├── shared/           # config, DB pool, migrations, health, SPA handler
+│   │   ├── adapters/         # OCR, LLM, storage adapter stubs
+│   │   └── testutil/         # testcontainers-go harness for integration tests
+│   ├── db/
+│   │   ├── migrations/       # goose .sql migration files (00001–00007)
+│   │   └── queries/          # sqlc .sql query files (input to codegen)
+│   └── gen/sqlc/             # sqlc-generated Go code — committed, never hand-edited
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── superpowers/
+│       ├── specs/            # locked architecture decisions (DB, backend, frontend, etc.)
+│       └── sprints/          # sprint plan + per-sprint task files
+└── compose.dev.yml           # Docker Compose for local dev (Postgres only)
+```
+
 ## Build / Run Commands
 
-> Commands will be added here once the project structure is scaffolded.
+```bash
+# Start Postgres for local dev
+docker compose -f compose.dev.yml up -d
+
+# Run the server (applies migrations on startup)
+cd baskety && go run ./cmd/baskety serve
+
+# Run migrations only
+cd baskety && go run ./cmd/baskety migrate
+
+# Unit tests (no DB required)
+cd baskety && go test ./internal/auth/... ./internal/household/...
+
+# Full test suite (requires Docker for testcontainers)
+cd baskety && go test ./...
+
+# Build binary
+cd baskety && go build ./cmd/baskety
+```
+
+API base: `http://localhost:8080`  
+Health check: `GET /healthz`
+
+## Implemented API Endpoints
+
+All authenticated routes require `Authorization: Bearer <token>`. Household-scoped routes accept an optional `X-Household-ID` header (falls back to the caller's first household).
+
+```
+POST   /api/v1/auth/register
+POST   /api/v1/auth/login
+DELETE /api/v1/auth/session          (auth required)
+
+GET    /api/v1/households            (auth + household scope)
+POST   /api/v1/households
+GET    /api/v1/households/:id
+POST   /api/v1/households/:id/members
+DELETE /api/v1/households/:id/members/:userID
+POST   /api/v1/households/:id/share-links
+```
+
+## Domain Package Conventions
+
+Every domain under `internal/` follows the same shape:
+- `model.go` — domain types (`uuid.UUID`, `time.Time` only; no pgx/sqlc)
+- `repository.go` — Repository interface (no pgx imports)
+- `repository_pg.go` — postgres implementation wrapping sqlc
+- `service.go` — business logic + `ServiceIface` for testability
+- `handler.go` — HTTP handlers using `ServiceIface`
+- `routes.go` — `RegisterRoutes(r chi.Router, h *Handler)`
+- `middleware.go` — domain-owned middleware (auth token validation, household scoping)
+- `*_test.go` — hand-rolled mocks (no mockery); unit tests only at service + handler layers
+
+Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
+
+## Sprint Status
+
+| Sprint | Theme | Status |
+|--------|-------|--------|
+| 1 | Monorepo scaffold + shared packages | Done |
+| 2 | DB migrations, sqlc, test harness | Done |
+| 3 | Auth + Household domains | Done |
+| 4 | Inventory domain | Not started |
+| 5 | Grocery lists domain | Not started |
+| 6 | Receipt scanning domain | Not started |
+| 7 | Catalog, settings, pg_cron, wire-up | Not started |
+| 8 | Integration tests + OpenAPI | Not started |
+| 9–12 | Web frontend | Not started |
+| 13–16 | Mobile (React Native) | Not started |
+| 17–18 | Docker/CI/CD + hardening | Not started |
+
+Sprint plans: `docs/superpowers/sprints/sprint-NN.md`
 
 ## Development Notes
 
 - The `prompts/` directory contains agent-drafting notes — ignore it; it does not reflect current project state.
+- `gen/sqlc/` is committed — contributors can build without installing sqlc. Run `make generate` to regenerate after changing queries.
+- Go module path: `github.com/willian-m/baskety`
+- Go runtime installed via mise: `~/.local/share/mise/installs/go/1.26.4/bin/go`
