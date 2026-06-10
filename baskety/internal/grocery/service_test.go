@@ -269,3 +269,106 @@ func TestAutoGenerate_AtOrAboveTarget(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, added)
 }
+
+func TestAutoGenerate_EmptyInventory(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	added := 0
+	repo := &mockRepo{
+		createListFn: func(_ context.Context, inventoryID uuid.UUID, name string, createdBy uuid.UUID) (*grocery.GroceryList, error) {
+			return &grocery.GroceryList{ID: uuid.New(), InventoryID: inventoryID, Name: name, Status: "active"}, nil
+		},
+		addItemFn: func(_ context.Context, _ uuid.UUID, _ *uuid.UUID, _ string, _ float64, _ string, _ *string, _ int) (*grocery.GroceryListItem, error) {
+			added++
+			return &grocery.GroceryListItem{ID: uuid.New()}, nil
+		},
+	}
+	inv := okInventory(hID)
+	inv.listItemsFn = func(_ context.Context, _, _ uuid.UUID) ([]*inventory.ItemResponse, error) {
+		return []*inventory.ItemResponse{}, nil
+	}
+	svc := grocery.NewService(repo, inv)
+	resp, err := svc.AutoGenerate(context.Background(), invID, hID, uuid.New(), grocery.AutoGenerateRequest{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, 0, added)
+}
+
+func TestAutoGenerate_Mixed(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	belowID := uuid.New()
+	atTargetID := uuid.New()
+	added := 0
+	repo := &mockRepo{
+		createListFn: func(_ context.Context, inventoryID uuid.UUID, name string, createdBy uuid.UUID) (*grocery.GroceryList, error) {
+			return &grocery.GroceryList{ID: uuid.New(), InventoryID: inventoryID, Name: name, Status: "active"}, nil
+		},
+		addItemFn: func(_ context.Context, _ uuid.UUID, invItemID *uuid.UUID, name string, qty float64, _ string, _ *string, _ int) (*grocery.GroceryListItem, error) {
+			added++
+			require.NotNil(t, invItemID)
+			assert.Equal(t, belowID, *invItemID)
+			assert.Equal(t, "Bread", name)
+			assert.InDelta(t, 3.0, qty, 0.0001) // target 5 - effective 2
+			return &grocery.GroceryListItem{ID: uuid.New(), Name: name, Quantity: qty}, nil
+		},
+	}
+	inv := okInventory(hID)
+	inv.listItemsFn = func(_ context.Context, _, _ uuid.UUID) ([]*inventory.ItemResponse, error) {
+		return []*inventory.ItemResponse{
+			{ID: belowID.String(), Name: "Bread", TargetQuantity: 5},
+			{ID: atTargetID.String(), Name: "Rice", TargetQuantity: 3},
+		}, nil
+	}
+	inv.getEffectiveQtyFn = func(_ context.Context, itemID, _ uuid.UUID) (float64, error) {
+		if itemID == belowID {
+			return 2, nil
+		}
+		return 3, nil
+	}
+	svc := grocery.NewService(repo, inv)
+	resp, err := svc.AutoGenerate(context.Background(), invID, hID, uuid.New(), grocery.AutoGenerateRequest{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.ID)
+	assert.Equal(t, 1, added)
+}
+
+func TestAutoGenerate_WrongHousehold(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	createCalled := 0
+	repo := &mockRepo{
+		createListFn: func(_ context.Context, inventoryID uuid.UUID, name string, createdBy uuid.UUID) (*grocery.GroceryList, error) {
+			createCalled++
+			return &grocery.GroceryList{ID: uuid.New(), InventoryID: inventoryID, Name: name, Status: "active"}, nil
+		},
+	}
+	inv := &mockInventory{
+		getInventoryFn: func(_ context.Context, _, _ uuid.UUID) (*inventory.InventoryResponse, error) {
+			return nil, inventory.ErrNotFound
+		},
+	}
+	svc := grocery.NewService(repo, inv)
+	_, err := svc.AutoGenerate(context.Background(), invID, hID, uuid.New(), grocery.AutoGenerateRequest{})
+	assert.ErrorIs(t, err, grocery.ErrNotFound)
+	assert.Equal(t, 0, createCalled)
+}
+
+func TestAssertItemScope_CrossListRejection(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	listID := uuid.New()
+	otherListID := uuid.New()
+	itemID := uuid.New()
+	repo := &mockRepo{
+		getItemFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryListItem, error) {
+			return &grocery.GroceryListItem{ID: id, GroceryListID: otherListID, Name: "Stray"}, nil
+		},
+		getListFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryList, error) {
+			return &grocery.GroceryList{ID: id, InventoryID: invID, Status: "active"}, nil
+		},
+	}
+	svc := grocery.NewService(repo, okInventory(hID))
+	_, err := svc.GetItem(context.Background(), itemID, listID, hID)
+	assert.ErrorIs(t, err, grocery.ErrNotFound)
+}
