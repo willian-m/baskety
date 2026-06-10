@@ -1,9 +1,8 @@
 package shared
 
 import (
-	"math"
-	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,18 +46,35 @@ func FloatToPgNumeric(f float64) pgtype.Numeric {
 
 // PgNumericToFloat converts a pgtype.Numeric to float64.
 func PgNumericToFloat(n pgtype.Numeric) float64 {
-	if !n.Valid || n.Int == nil {
+	if !n.Valid {
 		return 0
 	}
-	f, _ := new(big.Float).SetInt(n.Int).Float64()
-	if n.Exp != 0 {
-		scale := new(big.Float).SetFloat64(math.Pow10(int(n.Exp)))
-		f, _ = new(big.Float).Mul(new(big.Float).SetFloat64(f), scale).Float64()
+	v, err := n.Float64Value()
+	if err != nil || !v.Valid {
+		return 0
 	}
-	if n.InfinityModifier == pgtype.NegativeInfinity {
-		return -f
+	return v.Float64
+}
+
+// TimeToPg converts a time.Time to pgtype.Timestamptz.
+func TimeToPg(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: true}
+}
+
+// TimePtrToPg converts a *time.Time to pgtype.Timestamptz (invalid when nil).
+func TimePtrToPg(t *time.Time) pgtype.Timestamptz {
+	if t == nil {
+		return pgtype.Timestamptz{}
 	}
-	return f
+	return pgtype.Timestamptz{Time: *t, Valid: true}
+}
+
+// PgToTimePtr converts a pgtype.Timestamptz to *time.Time (nil when invalid).
+func PgToTimePtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	return &t.Time
 }
 
 // PtrStr converts *string to string (empty string when nil).

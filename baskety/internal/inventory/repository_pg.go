@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
 	"github.com/willian-m/baskety/internal/shared"
@@ -22,20 +21,6 @@ type pgRepository struct {
 
 func NewPgRepository(pool *pgxpool.Pool) Repository {
 	return &pgRepository{q: sqlc.New(pool)}
-}
-
-func timeToPg(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func pgToTimePtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
 }
 
 // --- inventories ---
@@ -119,7 +104,7 @@ func (r *pgRepository) toItem(row sqlc.InventoryItem) *InventoryItem {
 		Unit:           shared.PtrStr(row.Unit),
 		TargetQuantity: shared.PgNumericToFloat(row.TargetQuantity),
 		Notes:          row.Notes,
-		DeletedAt:      pgToTimePtr(row.DeletedAt),
+		DeletedAt:      shared.PgToTimePtr(row.DeletedAt),
 		CreatedAt:      row.CreatedAt.Time,
 		UpdatedAt:      row.UpdatedAt.Time,
 	}
@@ -203,9 +188,9 @@ func (r *pgRepository) toBatch(row sqlc.InventoryBatch) *InventoryBatch {
 		ID:        shared.PgToUUID(row.ID),
 		ItemID:    shared.PgToUUID(row.ItemID),
 		Quantity:  shared.PgNumericToFloat(row.Quantity),
-		ExpiresAt: pgToTimePtr(row.ExpiresAt),
+		ExpiresAt: shared.PgToTimePtr(row.ExpiresAt),
 		AddedAt:   row.AddedAt.Time,
-		EmptiedAt: pgToTimePtr(row.EmptiedAt),
+		EmptiedAt: shared.PgToTimePtr(row.EmptiedAt),
 		Notes:     row.Notes,
 		CreatedAt: row.CreatedAt.Time,
 	}
@@ -215,7 +200,7 @@ func (r *pgRepository) AddBatch(ctx context.Context, itemID uuid.UUID, quantity 
 	row, err := r.q.CreateInventoryBatch(ctx, sqlc.CreateInventoryBatchParams{
 		ItemID:    shared.UUIDToPg(itemID),
 		Quantity:  shared.FloatToPgNumeric(quantity),
-		ExpiresAt: timeToPg(expiresAt),
+		ExpiresAt: shared.TimePtrToPg(expiresAt),
 		Notes:     notes,
 	})
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/willian-m/baskety/gen/sqlc"
 	"github.com/willian-m/baskety/internal/shared"
@@ -24,20 +23,6 @@ func NewPgRepository(pool *pgxpool.Pool) Repository {
 	return &pgRepository{q: sqlc.New(pool)}
 }
 
-func timeToPg(t *time.Time) pgtype.Timestamptz {
-	if t == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
-}
-
-func pgToTimePtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
 // --- lists ---
 
 func (r *pgRepository) toList(row sqlc.GroceryList) *GroceryList {
@@ -47,9 +32,9 @@ func (r *pgRepository) toList(row sqlc.GroceryList) *GroceryList {
 		Name:            row.Name,
 		Status:          row.Status,
 		CreatedByUserID: shared.PgToUUID(row.CreatedByUserID),
-		CompletedAt:     pgToTimePtr(row.CompletedAt),
-		PinnedAt:        pgToTimePtr(row.PinnedAt),
-		ExpiresAt:       pgToTimePtr(row.ExpiresAt),
+		CompletedAt:     shared.PgToTimePtr(row.CompletedAt),
+		PinnedAt:        shared.PgToTimePtr(row.PinnedAt),
+		ExpiresAt:       shared.PgToTimePtr(row.ExpiresAt),
 		CreatedAt:       row.CreatedAt.Time,
 		UpdatedAt:       row.UpdatedAt.Time,
 	}
@@ -94,7 +79,7 @@ func (r *pgRepository) UpdateListStatus(ctx context.Context, id uuid.UUID, statu
 	row, err := r.q.UpdateGroceryListStatus(ctx, sqlc.UpdateGroceryListStatusParams{
 		ID:          shared.UUIDToPg(id),
 		Status:      status,
-		CompletedAt: timeToPg(completedAt),
+		CompletedAt: shared.TimePtrToPg(completedAt),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
