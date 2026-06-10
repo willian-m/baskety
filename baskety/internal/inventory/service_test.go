@@ -1,0 +1,183 @@
+package inventory_test
+
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/willian-m/baskety/internal/inventory"
+)
+
+type mockRepo struct {
+	createInventoryFn   func(ctx context.Context, householdID uuid.UUID, name string, description *string) (*inventory.Inventory, error)
+	getInventoryFn      func(ctx context.Context, id uuid.UUID) (*inventory.Inventory, error)
+	listInventoriesFn   func(ctx context.Context, householdID uuid.UUID) ([]*inventory.Inventory, error)
+	updateInventoryFn   func(ctx context.Context, id uuid.UUID, name string, description *string) (*inventory.Inventory, error)
+	deleteInventoryFn   func(ctx context.Context, id uuid.UUID) error
+	createItemFn        func(ctx context.Context, inventoryID uuid.UUID, name, category, unit string, target float64, notes *string) (*inventory.InventoryItem, error)
+	getItemFn           func(ctx context.Context, id uuid.UUID) (*inventory.InventoryItem, error)
+	listItemsFn         func(ctx context.Context, inventoryID uuid.UUID) ([]*inventory.InventoryItem, error)
+	updateItemFn        func(ctx context.Context, id uuid.UUID, name, category, unit string, target float64, notes *string) (*inventory.InventoryItem, error)
+	softDeleteItemFn    func(ctx context.Context, id uuid.UUID) error
+	getItemQuantityFn   func(ctx context.Context, itemID uuid.UUID) (float64, error)
+	addBatchFn          func(ctx context.Context, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error)
+	getBatchFn          func(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error)
+	listActiveBatchesFn func(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error)
+	markBatchEmptiedFn  func(ctx context.Context, id uuid.UUID) error
+}
+
+func (m *mockRepo) CreateInventory(ctx context.Context, householdID uuid.UUID, name string, description *string) (*inventory.Inventory, error) {
+	return m.createInventoryFn(ctx, householdID, name, description)
+}
+func (m *mockRepo) GetInventory(ctx context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+	return m.getInventoryFn(ctx, id)
+}
+func (m *mockRepo) ListInventories(ctx context.Context, householdID uuid.UUID) ([]*inventory.Inventory, error) {
+	return m.listInventoriesFn(ctx, householdID)
+}
+func (m *mockRepo) UpdateInventory(ctx context.Context, id uuid.UUID, name string, description *string) (*inventory.Inventory, error) {
+	return m.updateInventoryFn(ctx, id, name, description)
+}
+func (m *mockRepo) DeleteInventory(ctx context.Context, id uuid.UUID) error {
+	return m.deleteInventoryFn(ctx, id)
+}
+func (m *mockRepo) CreateItem(ctx context.Context, inventoryID uuid.UUID, name, category, unit string, target float64, notes *string) (*inventory.InventoryItem, error) {
+	return m.createItemFn(ctx, inventoryID, name, category, unit, target, notes)
+}
+func (m *mockRepo) GetItem(ctx context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+	return m.getItemFn(ctx, id)
+}
+func (m *mockRepo) ListItems(ctx context.Context, inventoryID uuid.UUID) ([]*inventory.InventoryItem, error) {
+	return m.listItemsFn(ctx, inventoryID)
+}
+func (m *mockRepo) UpdateItem(ctx context.Context, id uuid.UUID, name, category, unit string, target float64, notes *string) (*inventory.InventoryItem, error) {
+	return m.updateItemFn(ctx, id, name, category, unit, target, notes)
+}
+func (m *mockRepo) SoftDeleteItem(ctx context.Context, id uuid.UUID) error {
+	return m.softDeleteItemFn(ctx, id)
+}
+func (m *mockRepo) GetItemQuantity(ctx context.Context, itemID uuid.UUID) (float64, error) {
+	return m.getItemQuantityFn(ctx, itemID)
+}
+func (m *mockRepo) AddBatch(ctx context.Context, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error) {
+	return m.addBatchFn(ctx, itemID, quantity, expiresAt, notes)
+}
+func (m *mockRepo) GetBatch(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error) {
+	return m.getBatchFn(ctx, id)
+}
+func (m *mockRepo) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error) {
+	return m.listActiveBatchesFn(ctx, itemID)
+}
+func (m *mockRepo) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
+	return m.markBatchEmptiedFn(ctx, id)
+}
+
+func TestCreateInventory_Success(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	repo := &mockRepo{
+		createInventoryFn: func(_ context.Context, householdID uuid.UUID, name string, _ *string) (*inventory.Inventory, error) {
+			assert.Equal(t, hID, householdID)
+			return &inventory.Inventory{ID: invID, HouseholdID: householdID, Name: name, CreatedAt: time.Now()}, nil
+		},
+	}
+	svc := inventory.NewService(repo)
+	resp, err := svc.CreateInventory(context.Background(), hID, inventory.CreateInventoryRequest{Name: "Pantry"})
+	require.NoError(t, err)
+	assert.Equal(t, "Pantry", resp.Name)
+	assert.Equal(t, invID.String(), resp.ID)
+}
+
+func TestGetInventory_WrongHousehold(t *testing.T) {
+	invID := uuid.New()
+	ownerHID := uuid.New()
+	otherHID := uuid.New()
+	repo := &mockRepo{
+		getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+			return &inventory.Inventory{ID: id, HouseholdID: ownerHID, Name: "Pantry"}, nil
+		},
+	}
+	svc := inventory.NewService(repo)
+	_, err := svc.GetInventory(context.Background(), invID, otherHID)
+	assert.ErrorIs(t, err, inventory.ErrNotFound)
+}
+
+func TestDeleteItem_SoftDeletesWithScope(t *testing.T) {
+	itemID := uuid.New()
+	invID := uuid.New()
+	hID := uuid.New()
+	deleted := false
+	repo := &mockRepo{
+		getItemFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+			return &inventory.InventoryItem{ID: id, InventoryID: invID}, nil
+		},
+		getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+			return &inventory.Inventory{ID: id, HouseholdID: hID}, nil
+		},
+		softDeleteItemFn: func(_ context.Context, id uuid.UUID) error {
+			assert.Equal(t, itemID, id)
+			deleted = true
+			return nil
+		},
+	}
+	svc := inventory.NewService(repo)
+	require.NoError(t, svc.DeleteItem(context.Background(), itemID, hID))
+	assert.True(t, deleted)
+}
+
+func TestDeleteItem_WrongHousehold(t *testing.T) {
+	itemID := uuid.New()
+	invID := uuid.New()
+	repo := &mockRepo{
+		getItemFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+			return &inventory.InventoryItem{ID: id, InventoryID: invID}, nil
+		},
+		getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+			return &inventory.Inventory{ID: id, HouseholdID: uuid.New()}, nil
+		},
+		softDeleteItemFn: func(_ context.Context, _ uuid.UUID) error {
+			t.Fatal("soft delete should not be called for wrong household")
+			return nil
+		},
+	}
+	svc := inventory.NewService(repo)
+	err := svc.DeleteItem(context.Background(), itemID, uuid.New())
+	assert.ErrorIs(t, err, inventory.ErrNotFound)
+}
+
+func TestGetEffectiveQuantity_SumsActiveBatches(t *testing.T) {
+	itemID := uuid.New()
+	invID := uuid.New()
+	hID := uuid.New()
+	repo := &mockRepo{
+		getItemFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+			return &inventory.InventoryItem{ID: id, InventoryID: invID}, nil
+		},
+		getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+			return &inventory.Inventory{ID: id, HouseholdID: hID}, nil
+		},
+		getItemQuantityFn: func(_ context.Context, id uuid.UUID) (float64, error) {
+			assert.Equal(t, itemID, id)
+			return 5.0, nil
+		},
+	}
+	svc := inventory.NewService(repo)
+	qty, err := svc.GetEffectiveQuantity(context.Background(), itemID, hID)
+	require.NoError(t, err)
+	assert.Equal(t, 5.0, qty)
+}
+
+func TestGetInventory_RepoNotFound(t *testing.T) {
+	repo := &mockRepo{
+		getInventoryFn: func(_ context.Context, _ uuid.UUID) (*inventory.Inventory, error) {
+			return nil, fmt.Errorf("wrap: %w", inventory.ErrNotFound)
+		},
+	}
+	svc := inventory.NewService(repo)
+	_, err := svc.GetInventory(context.Background(), uuid.New(), uuid.New())
+	assert.ErrorIs(t, err, inventory.ErrNotFound)
+}
