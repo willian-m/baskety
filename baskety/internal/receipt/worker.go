@@ -50,17 +50,17 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 		return fmt.Errorf("process receipt scan: invalid scan id: %w", err)
 	}
 
-	scan, err := w.repo.GetScan(ctx, scanID)
-	if err != nil {
-		return fmt.Errorf("process receipt scan: load scan: %w", err)
-	}
-
 	fail := func(stage string, cause error) error {
 		msg := fmt.Sprintf("%s failed: %v", stage, cause)
 		if _, uerr := w.repo.UpdateScanStatus(ctx, scanID, StatusFailed, &msg); uerr != nil {
 			return fmt.Errorf("process receipt scan: %s and status update failed: %v (cause: %w)", stage, uerr, cause)
 		}
 		return fmt.Errorf("process receipt scan: %s: %w", stage, cause)
+	}
+
+	scan, err := w.repo.GetScan(ctx, scanID)
+	if err != nil {
+		return fail("fetch", err)
 	}
 
 	// 1. OCR
@@ -72,7 +72,7 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 		return fail("ocr", err)
 	}
 	if _, err := w.repo.SetOCRResult(ctx, scanID, text); err != nil {
-		return fmt.Errorf("process receipt scan: persist ocr: %w", err)
+		return fail("persist_ocr", err)
 	}
 
 	// 2. LLM
@@ -88,7 +88,7 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 
 	// 3. Record the LLM raw response marker and move to pending_review.
 	if _, err := w.repo.SetLLMResult(ctx, scanID, fmt.Sprintf("%d line items parsed", len(items))); err != nil {
-		return fmt.Errorf("process receipt scan: persist llm result: %w", err)
+		return fail("persist_llm", err)
 	}
 	if _, err := w.repo.UpdateScanStatus(ctx, scanID, StatusPendingReview, nil); err != nil {
 		return fmt.Errorf("process receipt scan: set pending_review: %w", err)

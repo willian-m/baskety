@@ -5,7 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+
+	"github.com/willian-m/baskety/internal/receipt"
 )
+
+var _ receipt.OCRProvider = (*TesseractOCR)(nil)
 
 // TesseractOCR shells out to the tesseract binary to extract text from an image.
 type TesseractOCR struct {
