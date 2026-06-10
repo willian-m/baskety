@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/willian-m/baskety/internal/household"
 	"github.com/willian-m/baskety/internal/inventory"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // InventoryView is the read-only response returned for a valid share token.
@@ -67,21 +67,27 @@ func (h *Handler) HandleGetInventoryByShareToken(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Password-protected?
+	if link.PasswordHash != nil {
+		supplied := r.Header.Get("X-Share-Password")
+		if supplied == "" || bcrypt.CompareHashAndPassword([]byte(*link.PasswordHash), []byte(supplied)) != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid password"})
+			return
+		}
+	}
+
 	items, err := h.inventoryRepo.ListItems(r.Context(), link.InventoryID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 
-	// Filter soft-deleted items and map to ItemResponse.
+	// Map items to ItemResponse.
 	out := make([]*inventory.ItemResponse, 0, len(items))
 	for _, item := range items {
-		if item.DeletedAt != nil {
-			continue
-		}
 		out = append(out, &inventory.ItemResponse{
 			ID:             item.ID.String(),
-			InventoryID:    uuid.UUID(item.InventoryID).String(),
+			InventoryID:    item.InventoryID.String(),
 			Name:           item.Name,
 			Category:       item.Category,
 			Unit:           item.Unit,
