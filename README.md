@@ -5,7 +5,7 @@ A self-hosted, open-source grocery and pantry management app for families.
 
 ---
 
-> **Agentic SDLC:** This project is being designed and implemented entirely through an agentic software development lifecycle — architecture, code, tests, and documentation are generated and evolved through structured LLM-driven sessions. No line of code is written without a preceding architecture decision logged in `docs/superpowers/specs/`.
+> **Agentic SDLC:** This project is being designed and implemented entirely through an agentic software development lifecycle — architecture, code, tests, and documentation are generated and evolved through structured LLM-driven sessions. See details in last section.
 
 ---
 
@@ -121,6 +121,16 @@ For architecture decisions, tech stack rationale, project structure, and databas
 
 ---
 
-## License
+## Agentic SDLC
 
-MIT
+For those unware, SDLC stands for "Software Development Lifecycle". That means the usual loop Plan -> Implement -> Review -> Test -> Deploy -> Monitor. Agentic SDLC means that AI agents plays a significant role in this cycle.
+
+This project is my first personal experiencce on this. It was born of a real need: a good app to do groceries list, avoid forgetting things that needed to be bought plus a curiosity what is my "personal inflation rate" at least for groceries.
+
+> Prices of products are affected by inflation diferently. The inflation rate published by institutions and governments usually refers to standardized basket of products that should reflect the average spending of a person. But each person has different spending habits, so inflation rate mostly certainly for each person is different. This is what I am calling "personal inflation rate".
+
+However, a development for an app like this require significant effort. So I always postponed. Until on first semester 2026 the Agentic SDLC gained traction. I saw myself on a situation where I needed to learn how to use these new tools and always genuinelly curious how far could I take them. It was when I decided to start executing this old idea using these new tools.
+
+Thus, was born this project with the premise: execute it as fast as possible using AI only. My role was to decide the features I wanted, outline the basic architecture, coordinate the agents execution and verify the final delivery of each "sprint" (sprint here is more of a block of features that the AI delivers in a single chat session) is working as intended.
+
+Because of this, all code and documentation is AI written. Only piece that is not AI written is, in fact, the current section. Everything else is AI generated with minor manual tweaks here and there if I believe it was needed.
