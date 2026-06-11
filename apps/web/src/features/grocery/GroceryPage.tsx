@@ -2,16 +2,18 @@ import { useCreateList, useGroceryLists, useInventories } from "@baskety/core";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { SetupWizard } from "../inventory/SetupWizard.js";
+
 export function GroceryPage() {
   const [newListName, setNewListName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
-  const { data: inventories, isLoading: loadingInv } = useInventories();
+  const { data: inventories, isLoading: loadingInv, isError: invError } = useInventories();
   const inventoryId = inventories?.[0]?.id ?? "";
   const { data: lists, isLoading: loadingLists } = useGroceryLists(inventoryId);
   const createList = useCreateList(inventoryId);
 
-  if (loadingInv || loadingLists) {
+  if (loadingInv) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-muted-foreground">Loading…</p>
@@ -19,10 +21,14 @@ export function GroceryPage() {
     );
   }
 
-  if (!inventoryId) {
+  if (invError || !inventoryId) {
+    return <SetupWizard />;
+  }
+
+  if (loadingLists) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-muted-foreground">No inventory found.</p>
+        <p className="text-muted-foreground">Loading…</p>
       </div>
     );
   }

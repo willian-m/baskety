@@ -51,3 +51,17 @@ export function useHouseholds() {
     enabled: !!token,
   });
 }
+
+export function useCreateHousehold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string }) =>
+      request<HouseholdResponse>("/households", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["households"] });
+    },
+  });
+}

@@ -2,15 +2,17 @@ import { useInventories, useInventoryItems } from "@baskety/core";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { SetupWizard } from "./SetupWizard.js";
+
 export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const { data: inventories, isLoading: loadingInv } = useInventories();
+  const { data: inventories, isLoading: loadingInv, isError: invError } = useInventories();
   const inventoryId = inventories?.[0]?.id ?? "";
   const { data: items, isLoading: loadingItems } = useInventoryItems(inventoryId);
 
-  if (loadingInv || loadingItems) {
+  if (loadingInv) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <p className="text-muted-foreground">Loading…</p>
@@ -18,10 +20,14 @@ export function InventoryPage() {
     );
   }
 
-  if (!inventoryId) {
+  if (invError || !inventoryId) {
+    return <SetupWizard />;
+  }
+
+  if (loadingItems) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-muted-foreground">No inventory found.</p>
+        <p className="text-muted-foreground">Loading…</p>
       </div>
     );
   }
@@ -31,11 +37,8 @@ export function InventoryPage() {
   ).sort();
 
   const filtered = (items ?? []).filter((item) => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesCategory =
-      !categoryFilter || item.category === categoryFilter;
+    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = !categoryFilter || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -68,9 +71,7 @@ export function InventoryPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">
-          No items found.
-        </p>
+        <p className="py-12 text-center text-muted-foreground">No items found.</p>
       ) : (
         <div className="rounded-lg border">
           {filtered.map((item, idx) => (

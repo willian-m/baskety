@@ -1,11 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { request } from "../api/client.js";
-import type {
-  BatchResponse,
-  InventoryItemResponse,
-  InventoryResponse,
-} from "../api/types.js";
+import type { BatchResponse, InventoryItemResponse, InventoryResponse } from "../api/types.js";
 
 // ── Request shapes ────────────────────────────────────────────────────────────
 
@@ -40,6 +36,20 @@ export function useInventories() {
   });
 }
 
+export function useCreateInventory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; description?: string | null }) =>
+      request<InventoryResponse>("/inventories", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories"] });
+    },
+  });
+}
+
 export function useInventory(inventoryId: string) {
   return useQuery({
     queryKey: ["inventories", inventoryId],
@@ -53,8 +63,7 @@ export function useInventory(inventoryId: string) {
 export function useInventoryItems(inventoryId: string) {
   return useQuery({
     queryKey: ["inventories", inventoryId, "items"],
-    queryFn: () =>
-      request<InventoryItemResponse[]>(`/inventories/${inventoryId}/items`),
+    queryFn: () => request<InventoryItemResponse[]>(`/inventories/${inventoryId}/items`),
     enabled: !!inventoryId,
   });
 }
@@ -62,10 +71,7 @@ export function useInventoryItems(inventoryId: string) {
 export function useInventoryItem(inventoryId: string, itemId: string) {
   return useQuery({
     queryKey: ["inventories", inventoryId, "items", itemId],
-    queryFn: () =>
-      request<InventoryItemResponse>(
-        `/inventories/${inventoryId}/items/${itemId}`,
-      ),
+    queryFn: () => request<InventoryItemResponse>(`/inventories/${inventoryId}/items/${itemId}`),
     enabled: !!inventoryId && !!itemId,
   });
 }
@@ -90,10 +96,10 @@ export function useUpdateItem(inventoryId: string, itemId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: UpdateItemRequest) =>
-      request<InventoryItemResponse>(
-        `/inventories/${inventoryId}/items/${itemId}`,
-        { method: "PUT", body: JSON.stringify(body) },
-      ),
+      request<InventoryItemResponse>(`/inventories/${inventoryId}/items/${itemId}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: ["inventories", inventoryId, "items"],
@@ -122,10 +128,7 @@ export function useDeleteItem(inventoryId: string) {
 export function useBatches(inventoryId: string, itemId: string) {
   return useQuery({
     queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
-    queryFn: () =>
-      request<BatchResponse[]>(
-        `/inventories/${inventoryId}/items/${itemId}/batches`,
-      ),
+    queryFn: () => request<BatchResponse[]>(`/inventories/${inventoryId}/items/${itemId}/batches`),
     enabled: !!inventoryId && !!itemId,
   });
 }
@@ -134,10 +137,10 @@ export function useAddBatch(inventoryId: string, itemId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateBatchRequest) =>
-      request<BatchResponse>(
-        `/inventories/${inventoryId}/items/${itemId}/batches`,
-        { method: "POST", body: JSON.stringify(body) },
-      ),
+      request<BatchResponse>(`/inventories/${inventoryId}/items/${itemId}/batches`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
