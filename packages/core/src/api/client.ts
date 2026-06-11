@@ -17,16 +17,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (activeHouseholdId) headers.set("X-Household-ID", activeHouseholdId);
 
   const res = await fetch(`${base}/api/v1${path}`, { ...init, headers });
-  // 204 No Content — no body to parse (e.g. logout, soft-deletes)
+
   if (res.status === 204) return undefined as T;
-  const body = await res.json();
-  if (!res.ok)
+
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
     throw new ApiError(
       res.status,
-      body.error as string,
-      body.fields as Record<string, string> | undefined,
+      typeof body["error"] === "string" ? body["error"] : res.statusText,
+      typeof body["fields"] === "object" && body["fields"] !== null
+        ? (body["fields"] as Record<string, string>)
+        : undefined,
     );
-  return body.data as T;
+  }
+  return body["data"] as T;
 }
 
 export { request };
