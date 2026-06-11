@@ -54,7 +54,8 @@ function LLMSection() {
       provider: provider.trim(),
       model: model.trim(),
       endpoint_url: endpoint.trim() || null,
-      api_key: apiKey || null,
+      api_key_encrypted: apiKey || null,
+      is_default: false,
     });
     setProvider("");
     setModel("");
@@ -176,7 +177,8 @@ function OCRSection() {
     await create.mutateAsync({
       provider: provider.trim(),
       endpoint_url: endpoint.trim() || null,
-      api_key: apiKey || null,
+      api_key_encrypted: apiKey || null,
+      is_default: false,
     });
     setProvider("");
     setEndpoint("");

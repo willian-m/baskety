@@ -13,16 +13,16 @@ interface CreateLLMProviderRequest {
   provider: string;
   model: string;
   endpoint_url?: string | null;
-  api_key?: string | null;
-  is_default?: boolean;
+  api_key_encrypted?: string | null;
+  is_default: boolean;
 }
 
 interface CreateOCRProviderRequest {
   provider: string;
   endpoint_url?: string | null;
-  api_key?: string | null;
+  api_key_encrypted?: string | null;
   extra_config?: string | null;
-  is_default?: boolean;
+  is_default: boolean;
 }
 
 // ── Key-value settings ────────────────────────────────────────────────────────
