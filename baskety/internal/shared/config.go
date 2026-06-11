@@ -51,11 +51,11 @@ func Load() (*Config, error) {
 	// AutomaticEnv only resolves keys viper already knows about (via defaults or
 	// config file). Explicitly bind keys that have no default so env vars work
 	// even when no config.yaml is present.
-	v.BindEnv("database.url")           //nolint:errcheck
-	v.BindEnv("server.port")            //nolint:errcheck
-	v.BindEnv("server.public_url")      //nolint:errcheck
-	v.BindEnv("log.level")              //nolint:errcheck
-	v.BindEnv("log.format")             //nolint:errcheck
+	v.BindEnv("database.url")      //nolint:errcheck
+	v.BindEnv("server.port")       //nolint:errcheck
+	v.BindEnv("server.public_url") //nolint:errcheck
+	v.BindEnv("log.level")         //nolint:errcheck
+	v.BindEnv("log.format")        //nolint:errcheck
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
