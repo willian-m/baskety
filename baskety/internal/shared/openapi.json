@@ -1,0 +1,2040 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Baskety API",
+    "version": "1.0.0",
+    "description": "Self-hosted grocery management API"
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Local dev" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "name", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "required": ["token", "expires_at"],
+        "properties": {
+          "token": { "type": "string" },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": ["id", "email", "name", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateHouseholdRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "HouseholdResponse": {
+        "type": "object",
+        "required": ["id", "name", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MemberResponse": {
+        "type": "object",
+        "required": ["user_id", "role", "joined_at"],
+        "properties": {
+          "user_id": { "type": "string", "format": "uuid" },
+          "role": { "type": "string" },
+          "joined_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AddMemberRequest": {
+        "type": "object",
+        "required": ["user_id", "role"],
+        "properties": {
+          "user_id": { "type": "string", "format": "uuid" },
+          "role": { "type": "string" }
+        }
+      },
+      "CreateShareLinkRequest": {
+        "type": "object",
+        "required": ["inventory_id"],
+        "properties": {
+          "inventory_id": { "type": "string", "format": "uuid" },
+          "password": { "type": ["string", "null"] },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "ShareLinkResponse": {
+        "type": "object",
+        "required": ["id", "token", "expires_at", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "token": { "type": "string" },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateInventoryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] }
+        }
+      },
+      "UpdateInventoryRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] }
+        }
+      },
+      "InventoryResponse": {
+        "type": "object",
+        "required": ["id", "household_id", "name", "description", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateItemRequest": {
+        "type": "object",
+        "required": ["name", "category", "unit", "target_quantity"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "unit": { "type": "string" },
+          "target_quantity": { "type": "number" },
+          "notes": { "type": ["string", "null"] }
+        }
+      },
+      "UpdateItemRequest": {
+        "type": "object",
+        "required": ["name", "category", "unit", "target_quantity"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "unit": { "type": "string" },
+          "target_quantity": { "type": "number" },
+          "notes": { "type": ["string", "null"] }
+        }
+      },
+      "ItemResponse": {
+        "type": "object",
+        "required": ["id", "inventory_id", "name", "category", "unit", "target_quantity", "notes", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "inventory_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "unit": { "type": "string" },
+          "target_quantity": { "type": "number" },
+          "notes": { "type": ["string", "null"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AddBatchRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "properties": {
+          "quantity": { "type": "number" },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" },
+          "notes": { "type": ["string", "null"] }
+        }
+      },
+      "BatchResponse": {
+        "type": "object",
+        "required": ["id", "item_id", "quantity", "expires_at", "added_at", "emptied_at", "notes", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "item_id": { "type": "string", "format": "uuid" },
+          "quantity": { "type": "number" },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" },
+          "added_at": { "type": "string", "format": "date-time" },
+          "emptied_at": { "type": ["string", "null"], "format": "date-time" },
+          "notes": { "type": ["string", "null"] },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateListRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "AutoGenerateRequest": {
+        "type": "object",
+        "properties": {
+          "expiry_threshold_days": { "type": "integer", "description": "Default 7 if 0" }
+        }
+      },
+      "GroceryListResponse": {
+        "type": "object",
+        "required": ["id", "inventory_id", "name", "status", "created_by_user_id", "completed_at", "pinned_at", "expires_at", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "inventory_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "completed", "archived"] },
+          "created_by_user_id": { "type": "string", "format": "uuid" },
+          "completed_at": { "type": ["string", "null"], "format": "date-time" },
+          "pinned_at": { "type": ["string", "null"], "format": "date-time" },
+          "expires_at": { "type": ["string", "null"], "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AddGroceryItemRequest": {
+        "type": "object",
+        "required": ["name", "quantity", "unit", "sort_order"],
+        "properties": {
+          "inventory_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "notes": { "type": ["string", "null"] },
+          "sort_order": { "type": "integer" }
+        }
+      },
+      "UpdateItemStatusRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["pending", "bought", "skipped"] }
+        }
+      },
+      "ReorderItemRequest": {
+        "type": "object",
+        "required": ["sort_order"],
+        "properties": {
+          "sort_order": { "type": "integer" }
+        }
+      },
+      "GroceryItemResponse": {
+        "type": "object",
+        "required": ["id", "grocery_list_id", "inventory_item_id", "name", "quantity", "unit", "notes", "status", "sort_order", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "grocery_list_id": { "type": "string", "format": "uuid" },
+          "inventory_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "unit": { "type": "string" },
+          "notes": { "type": ["string", "null"] },
+          "status": { "type": "string", "enum": ["pending", "bought", "skipped"] },
+          "sort_order": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ScanResponse": {
+        "type": "object",
+        "required": ["id", "household_id", "grocery_list_id", "raw_image_path", "ocr_text", "llm_raw_response", "status", "error_message", "created_by_user_id", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": "string", "format": "uuid" },
+          "grocery_list_id": { "type": ["string", "null"], "format": "uuid" },
+          "raw_image_path": { "type": "string" },
+          "ocr_text": { "type": ["string", "null"] },
+          "llm_raw_response": { "type": ["string", "null"] },
+          "status": {
+            "type": "string",
+            "enum": ["uploading", "ocr_processing", "llm_processing", "pending_review", "committed", "failed"]
+          },
+          "error_message": { "type": ["string", "null"] },
+          "created_by_user_id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ScanItemResponse": {
+        "type": "object",
+        "required": ["id", "receipt_scan_id", "raw_text", "parsed_name", "parsed_brand", "parsed_quantity", "parsed_unit", "parsed_price_minor", "parsed_currency", "parsed_store_name", "confidence_score", "status", "inventory_item_id", "corrected_name", "corrected_brand", "corrected_quantity", "corrected_price_minor", "corrected_currency", "corrected_store_name", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "receipt_scan_id": { "type": "string", "format": "uuid" },
+          "raw_text": { "type": "string" },
+          "parsed_name": { "type": ["string", "null"] },
+          "parsed_brand": { "type": ["string", "null"] },
+          "parsed_quantity": { "type": ["number", "null"] },
+          "parsed_unit": { "type": ["string", "null"] },
+          "parsed_price_minor": { "type": ["integer", "null"] },
+          "parsed_currency": { "type": ["string", "null"] },
+          "parsed_store_name": { "type": ["string", "null"] },
+          "confidence_score": { "type": ["number", "null"] },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "rejected", "corrected"]
+          },
+          "inventory_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "corrected_name": { "type": ["string", "null"] },
+          "corrected_brand": { "type": ["string", "null"] },
+          "corrected_quantity": { "type": ["number", "null"] },
+          "corrected_price_minor": { "type": ["integer", "null"] },
+          "corrected_currency": { "type": ["string", "null"] },
+          "corrected_store_name": { "type": ["string", "null"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UpdateScanItemRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "corrected"] },
+          "corrected_name": { "type": ["string", "null"] },
+          "corrected_brand": { "type": ["string", "null"] },
+          "corrected_store_name": { "type": ["string", "null"] },
+          "corrected_quantity": { "type": ["number", "null"] },
+          "corrected_price_minor": { "type": ["integer", "null"] },
+          "corrected_currency": { "type": ["string", "null"] }
+        }
+      },
+      "CommitScanRequest": {
+        "type": "object",
+        "required": ["purchased_at"],
+        "properties": {
+          "purchased_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StoreResponse": {
+        "type": "object",
+        "required": ["id", "name", "chain_name", "address", "canonical_store_id", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "chain_name": { "type": ["string", "null"] },
+          "address": { "type": ["string", "null"] },
+          "canonical_store_id": { "type": ["string", "null"], "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateStoreRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "chain_name": { "type": ["string", "null"] },
+          "address": { "type": ["string", "null"] }
+        }
+      },
+      "CatalogEntryResponse": {
+        "type": "object",
+        "required": ["id", "name", "brand", "unit", "category", "scope", "household_id", "canonical_entry_id", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "brand": { "type": ["string", "null"] },
+          "unit": { "type": ["string", "null"] },
+          "category": { "type": ["string", "null"] },
+          "scope": { "type": "string" },
+          "household_id": { "type": ["string", "null"], "format": "uuid" },
+          "canonical_entry_id": { "type": ["string", "null"], "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateCatalogEntryRequest": {
+        "type": "object",
+        "required": ["name", "scope"],
+        "properties": {
+          "name": { "type": "string" },
+          "brand": { "type": ["string", "null"] },
+          "unit": { "type": ["string", "null"] },
+          "category": { "type": ["string", "null"] },
+          "scope": { "type": "string" }
+        }
+      },
+      "TransactionResponse": {
+        "type": "object",
+        "required": ["id", "household_id", "store_id", "grocery_list_item_id", "receipt_scan_item_id", "catalog_entry_id", "price_per_unit_minor", "currency", "quantity", "purchased_at", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": "string", "format": "uuid" },
+          "store_id": { "type": ["string", "null"], "format": "uuid" },
+          "grocery_list_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "receipt_scan_item_id": { "type": ["string", "null"], "format": "uuid" },
+          "catalog_entry_id": { "type": ["string", "null"], "format": "uuid" },
+          "price_per_unit_minor": { "type": ["integer", "null"] },
+          "currency": { "type": "string" },
+          "quantity": { "type": ["number", "null"] },
+          "purchased_at": { "type": "string", "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SettingResponse": {
+        "type": "object",
+        "required": ["key", "value", "updated_at"],
+        "properties": {
+          "key": { "type": "string" },
+          "value": { "type": "string" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UpsertSettingRequest": {
+        "type": "object",
+        "required": ["value"],
+        "properties": {
+          "value": { "type": "string" }
+        }
+      },
+      "LLMProviderResponse": {
+        "type": "object",
+        "required": ["id", "household_id", "provider", "model", "endpoint_url", "has_api_key", "is_default", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": ["string", "null"], "format": "uuid" },
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "has_api_key": { "type": "boolean" },
+          "is_default": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateLLMProviderRequest": {
+        "type": "object",
+        "required": ["provider", "model", "is_default"],
+        "properties": {
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "api_key_encrypted": { "type": ["string", "null"] },
+          "is_default": { "type": "boolean" }
+        }
+      },
+      "OCRProviderResponse": {
+        "type": "object",
+        "required": ["id", "household_id", "provider", "endpoint_url", "has_api_key", "extra_config", "is_default", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "household_id": { "type": ["string", "null"], "format": "uuid" },
+          "provider": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "has_api_key": { "type": "boolean" },
+          "extra_config": { "type": ["string", "null"] },
+          "is_default": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateOCRProviderRequest": {
+        "type": "object",
+        "required": ["provider", "is_default"],
+        "properties": {
+          "provider": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "api_key_encrypted": { "type": ["string", "null"] },
+          "extra_config": { "type": ["string", "null"] },
+          "is_default": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "healthz",
+        "tags": ["Health"],
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "operationId": "register",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/AuthResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Email already taken", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Login",
+        "operationId": "login",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/AuthResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/auth/session": {
+      "delete": {
+        "summary": "Logout",
+        "operationId": "logout",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Session deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/households": {
+      "get": {
+        "summary": "List households",
+        "operationId": "listHouseholds",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of households",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/HouseholdResponse" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create a household",
+        "operationId": "createHousehold",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateHouseholdRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Household created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/HouseholdResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}": {
+      "get": {
+        "summary": "Get a household",
+        "operationId": "getHousehold",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "householdID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Household",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/HouseholdResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/members": {
+      "post": {
+        "summary": "Add a member to a household",
+        "operationId": "addMember",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "householdID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AddMemberRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Member added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/MemberResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/members/{userID}": {
+      "delete": {
+        "summary": "Remove a member from a household",
+        "operationId": "removeMember",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "householdID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "userID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Member removed" },
+          "400": { "description": "Invalid ID", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/households/{householdID}/share-links": {
+      "post": {
+        "summary": "Create a share link for an inventory",
+        "operationId": "createShareLink",
+        "tags": ["Households"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "householdID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateShareLinkRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Share link created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ShareLinkResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories": {
+      "get": {
+        "summary": "List inventories",
+        "operationId": "listInventories",
+        "tags": ["Inventories"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of inventories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/InventoryResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create an inventory",
+        "operationId": "createInventory",
+        "tags": ["Inventories"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateInventoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inventory created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/InventoryResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}": {
+      "get": {
+        "summary": "Get an inventory",
+        "operationId": "getInventory",
+        "tags": ["Inventories"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/InventoryResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "put": {
+        "summary": "Update an inventory",
+        "operationId": "updateInventory",
+        "tags": ["Inventories"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateInventoryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/InventoryResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete an inventory",
+        "operationId": "deleteInventory",
+        "tags": ["Inventories"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Inventory deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items": {
+      "get": {
+        "summary": "List inventory items",
+        "operationId": "listItems",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ItemResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create an inventory item",
+        "operationId": "createItem",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ItemResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}": {
+      "get": {
+        "summary": "Get an inventory item",
+        "operationId": "getItem",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ItemResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "put": {
+        "summary": "Update an inventory item",
+        "operationId": "updateItem",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ItemResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete an inventory item",
+        "operationId": "deleteItem",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Item deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/quantity": {
+      "get": {
+        "summary": "Get effective quantity for an item",
+        "operationId": "getEffectiveQuantity",
+        "tags": ["Inventory Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective quantity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": { "quantity": { "type": "number" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/batches": {
+      "get": {
+        "summary": "List active batches for an item",
+        "operationId": "listActiveBatches",
+        "tags": ["Batches"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of batches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/BatchResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Add a batch to an item",
+        "operationId": "addBatch",
+        "tags": ["Batches"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AddBatchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Batch added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/BatchResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/items/{itemID}/batches/{batchID}/empty": {
+      "post": {
+        "summary": "Mark a batch as emptied",
+        "operationId": "markBatchEmptied",
+        "tags": ["Batches"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "batchID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch emptied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": { "status": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists": {
+      "get": {
+        "summary": "List grocery lists for an inventory",
+        "operationId": "listGroceryLists",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of grocery lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/GroceryListResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create a grocery list",
+        "operationId": "createGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateListRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Grocery list created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryListResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/auto-generate": {
+      "post": {
+        "summary": "Auto-generate a grocery list from inventory shortfalls",
+        "operationId": "autoGenerateGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AutoGenerateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Auto-generated grocery list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryListResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}": {
+      "get": {
+        "summary": "Get a grocery list",
+        "operationId": "getGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grocery list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryListResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/complete": {
+      "post": {
+        "summary": "Mark grocery list as completed",
+        "operationId": "completeGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grocery list completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryListResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/archive": {
+      "post": {
+        "summary": "Archive a grocery list",
+        "operationId": "archiveGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grocery list archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": { "status": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items": {
+      "get": {
+        "summary": "List items in a grocery list",
+        "operationId": "listGroceryItems",
+        "tags": ["Grocery List Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of grocery items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/GroceryItemResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Add an item to a grocery list",
+        "operationId": "addGroceryItem",
+        "tags": ["Grocery List Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AddGroceryItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryItemResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}/status": {
+      "put": {
+        "summary": "Update grocery item status",
+        "operationId": "updateGroceryItemStatus",
+        "tags": ["Grocery List Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateItemStatusRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryItemResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}/order": {
+      "put": {
+        "summary": "Reorder a grocery item",
+        "operationId": "reorderGroceryItem",
+        "tags": ["Grocery List Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReorderItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item reordered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": { "sort_order": { "type": "integer" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/inventories/{inventoryID}/lists/{listID}/items/{itemID}": {
+      "delete": {
+        "summary": "Delete a grocery item",
+        "operationId": "deleteGroceryItem",
+        "tags": ["Grocery List Items"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Item deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/receipts": {
+      "get": {
+        "summary": "List receipt scans",
+        "operationId": "listScans",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of scans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ScanResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Upload a receipt image",
+        "operationId": "uploadScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": { "type": "string", "format": "binary" },
+                  "grocery_list_id": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Receipt scan created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ScanResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}": {
+      "get": {
+        "summary": "Get a receipt scan",
+        "operationId": "getScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "scanID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ScanResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/items": {
+      "get": {
+        "summary": "Get items for a receipt scan",
+        "operationId": "getScanItems",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "scanID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ScanItemResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/items/{itemID}": {
+      "put": {
+        "summary": "Update a scan item (review/correction)",
+        "operationId": "updateScanItem",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "scanID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateScanItemRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan item updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ScanItemResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/receipts/{scanID}/commit": {
+      "post": {
+        "summary": "Commit a reviewed scan to inventory",
+        "operationId": "commitScan",
+        "tags": ["Receipts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "scanID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommitScanRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/ScanResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/catalog/stores": {
+      "get": {
+        "summary": "List stores",
+        "operationId": "listStores",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of stores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/StoreResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create a store",
+        "operationId": "createStore",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateStoreRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Store created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/StoreResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/catalog/entries": {
+      "get": {
+        "summary": "List catalog entries",
+        "operationId": "listCatalogEntries",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of catalog entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/CatalogEntryResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create a catalog entry",
+        "operationId": "createCatalogEntry",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateCatalogEntryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catalog entry created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/CatalogEntryResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/catalog/transactions": {
+      "get": {
+        "summary": "List purchase transactions",
+        "operationId": "listTransactions",
+        "tags": ["Catalog"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TransactionResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/household/{key}": {
+      "get": {
+        "summary": "Get a household setting",
+        "operationId": "getHouseholdSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/SettingResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "put": {
+        "summary": "Upsert a household setting",
+        "operationId": "upsertHouseholdSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpsertSettingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setting upserted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/SettingResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/user/{key}": {
+      "get": {
+        "summary": "Get a user setting",
+        "operationId": "getUserSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/SettingResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "put": {
+        "summary": "Upsert a user setting",
+        "operationId": "upsertUserSetting",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpsertSettingRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Setting upserted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/SettingResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/providers/llm": {
+      "get": {
+        "summary": "List LLM providers",
+        "operationId": "listLLMProviders",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of LLM providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/LLMProviderResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create an LLM provider",
+        "operationId": "createLLMProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateLLMProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "LLM provider created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/LLMProviderResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/providers/ocr": {
+      "get": {
+        "summary": "List OCR providers",
+        "operationId": "listOCRProviders",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of OCR providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/OCRProviderResponse" } } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "summary": "Create an OCR provider",
+        "operationId": "createOCRProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOCRProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OCR provider created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/OCRProviderResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  }
+}

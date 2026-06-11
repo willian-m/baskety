@@ -133,6 +133,7 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/healthz", shared.HealthHandler(pool))
+	shared.RegisterOpenAPIRoute(r)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// public auth routes — no auth middleware
