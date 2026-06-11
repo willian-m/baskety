@@ -144,13 +144,17 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 		r.Route("/share", func(r chi.Router) {
 			share.RegisterRoutes(r, shareHandler)
 		})
-		// authenticated routes
+		// authenticated routes — auth middleware only (household management does not require a pre-existing household)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.Middleware(authRepo))
-			r.Use(household.ScopeMiddleware(householdRepo))
 			r.Route("/households", func(r chi.Router) {
 				household.RegisterRoutes(r, householdHandler)
 			})
+		})
+		// authenticated + household-scoped routes
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Middleware(authRepo))
+			r.Use(household.ScopeMiddleware(householdRepo))
 			r.Route("/inventories", func(r chi.Router) {
 				inventory.RegisterRoutes(r, inventoryHandler)
 				grocery.RegisterRoutes(r, groceryHandler)
