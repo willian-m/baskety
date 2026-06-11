@@ -6,7 +6,7 @@ interface UiState {
   activeHouseholdId: string | null;
   activeServerUrl: string | null;
   sidebarCollapsed: boolean;
-  setSession: (token: string, firstHouseholdId: string) => void;
+  setSession: (token: string, firstHouseholdId?: string) => void;
   clearSession: () => void;
   setActiveHousehold: (id: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -20,7 +20,8 @@ export const useUiStore = create<UiState>()(
       activeHouseholdId: null,
       activeServerUrl: null,
       sidebarCollapsed: false,
-      setSession: (token, firstHouseholdId) => set({ token, activeHouseholdId: firstHouseholdId }),
+      setSession: (token, firstHouseholdId) =>
+        set({ token, activeHouseholdId: firstHouseholdId ?? null }),
       clearSession: () => set({ token: null, activeHouseholdId: null }),
       setActiveHousehold: (id) => set({ activeHouseholdId: id }),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),

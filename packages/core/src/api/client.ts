@@ -17,6 +17,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (activeHouseholdId) headers.set("X-Household-ID", activeHouseholdId);
 
   const res = await fetch(`${base}/api/v1${path}`, { ...init, headers });
+  // 204 No Content — no body to parse (e.g. logout, soft-deletes)
+  if (res.status === 204) return undefined as T;
   const body = await res.json();
   if (!res.ok)
     throw new ApiError(
