@@ -474,17 +474,6 @@
           "is_default": { "type": "boolean" }
         }
       },
-      "ShareInventoryResponse": {
-        "type": "object",
-        "required": ["inventory_id", "items"],
-        "properties": {
-          "inventory_id": { "type": "string", "format": "uuid" },
-          "items": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/ItemResponse" }
-          }
-        }
-      }
     }
   },
   "paths": {
@@ -731,32 +720,6 @@
           },
           "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
-        }
-      }
-    },
-    "/api/v1/share/{token}/inventory": {
-      "get": {
-        "summary": "Get inventory via share token (unauthenticated)",
-        "operationId": "getSharedInventory",
-        "tags": ["Share"],
-        "parameters": [
-          { "name": "token", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "X-Share-Password", "in": "header", "required": false, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Shared inventory",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": { "data": { "$ref": "#/components/schemas/ShareInventoryResponse" } }
-                }
-              }
-            }
-          },
-          "401": { "description": "Password required or invalid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "404": { "description": "Token not found or expired", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
