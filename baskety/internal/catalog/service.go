@@ -19,7 +19,7 @@ type ServiceIface interface {
 	ListStores(ctx context.Context, householdID uuid.UUID) ([]*StoreResponse, error)
 	CreateCatalogEntry(ctx context.Context, householdID uuid.UUID, req CreateCatalogEntryRequest) (*CatalogEntryResponse, error)
 	ListCatalogEntries(ctx context.Context, householdID uuid.UUID) ([]*CatalogEntryResponse, error)
-	ListTransactions(ctx context.Context, householdID uuid.UUID) ([]*TransactionResponse, error)
+	ListTransactions(ctx context.Context, householdID uuid.UUID, catalogEntryID *uuid.UUID) ([]*TransactionResponse, error)
 }
 
 type Service struct {
@@ -91,8 +91,16 @@ func (s *Service) ListCatalogEntries(ctx context.Context, householdID uuid.UUID)
 	return out, nil
 }
 
-func (s *Service) ListTransactions(ctx context.Context, householdID uuid.UUID) ([]*TransactionResponse, error) {
-	txns, err := s.repo.ListTransactionsByHousehold(ctx, householdID)
+func (s *Service) ListTransactions(ctx context.Context, householdID uuid.UUID, catalogEntryID *uuid.UUID) ([]*TransactionResponse, error) {
+	var (
+		txns []*PurchaseTransaction
+		err  error
+	)
+	if catalogEntryID != nil {
+		txns, err = s.repo.ListTransactionsByCatalogEntry(ctx, *catalogEntryID)
+	} else {
+		txns, err = s.repo.ListTransactionsByHousehold(ctx, householdID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("listing transactions: %w", err)
 	}

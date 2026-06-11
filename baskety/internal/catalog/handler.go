@@ -112,7 +112,16 @@ func (h *Handler) HandleListTransactions(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	resp, err := h.svc.ListTransactions(r.Context(), hid)
+	var catalogEntryID *uuid.UUID
+	if raw := r.URL.Query().Get("catalog_entry_id"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid catalog_entry_id"})
+			return
+		}
+		catalogEntryID = &id
+	}
+	resp, err := h.svc.ListTransactions(r.Context(), hid, catalogEntryID)
 	if err != nil {
 		writeErr(w, err)
 		return

@@ -131,7 +131,7 @@ func TestCreateCatalogEntryRejectsBadScope(t *testing.T) {
 func TestListTransactions(t *testing.T) {
 	repo := &mockRepo{txns: []*PurchaseTransaction{{ID: uuid.New(), HouseholdID: uuid.New(), Currency: "USD"}}}
 	svc := NewService(repo)
-	out, err := svc.ListTransactions(context.Background(), uuid.New())
+	out, err := svc.ListTransactions(context.Background(), uuid.New(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -17,20 +17,15 @@ export function useCatalogEntries() {
   });
 }
 
-interface PriceHistoryFilters {
-  catalog_entry_id?: string;
-}
-
-export function usePriceHistory(catalogEntryId?: string, filters?: PriceHistoryFilters) {
-  const entryId = filters?.catalog_entry_id ?? catalogEntryId;
+export function usePriceHistory(catalogEntryId?: string) {
   return useQuery({
-    queryKey: ["catalog", "transactions", entryId],
+    queryKey: ["catalog", "transactions", catalogEntryId],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (entryId) params.set("catalog_entry_id", entryId);
+      if (catalogEntryId) params.set("catalog_entry_id", catalogEntryId);
       const qs = params.toString();
       return request<TransactionResponse[]>(`/catalog/transactions${qs ? `?${qs}` : ""}`);
     },
-    enabled: !!entryId,
+    enabled: !!catalogEntryId,
   });
 }

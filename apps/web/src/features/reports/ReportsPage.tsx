@@ -46,16 +46,19 @@ export function ReportsPage() {
     new Set((transactions ?? []).map((t) => t.store_id).filter((id): id is string => !!id)),
   );
 
+  type ChartRow = Record<string, string | number>;
+
   const chartData = (() => {
     if (!transactions?.length) return [];
 
-    const byDate = new Map<string, Record<string, number>>();
+    const byDate = new Map<string, ChartRow>();
     for (const tx of transactions) {
       if (tx.price_per_unit_minor === null) continue;
       const date = tx.purchased_at.slice(0, 10);
       const storeKey = tx.store_id ?? "unknown";
-      if (!byDate.has(date)) byDate.set(date, { date: date as unknown as number });
-      byDate.get(date)![storeKey] = tx.price_per_unit_minor / 100;
+      if (!byDate.has(date)) byDate.set(date, { date });
+      const row = byDate.get(date)!;
+      row[storeKey] = tx.price_per_unit_minor / 100;
     }
 
     return Array.from(byDate.entries())
