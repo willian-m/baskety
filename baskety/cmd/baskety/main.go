@@ -22,6 +22,7 @@ import (
 	"github.com/willian-m/baskety/internal/inventory"
 	"github.com/willian-m/baskety/internal/receipt"
 	"github.com/willian-m/baskety/internal/settings"
+	"github.com/willian-m/baskety/internal/share"
 	"github.com/willian-m/baskety/internal/shared"
 )
 
@@ -90,6 +91,7 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	inventoryRepo := inventory.NewPgRepository(pool)
 	inventorySvc := inventory.NewService(inventoryRepo)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
+	shareHandler := share.NewHandler(householdRepo, inventoryRepo)
 
 	groceryRepo := grocery.NewPgRepository(pool)
 	grocerySvc := grocery.NewService(groceryRepo, inventorySvc)
@@ -136,6 +138,10 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 		// public auth routes — no auth middleware
 		r.Route("/auth", func(r chi.Router) {
 			auth.RegisterRoutes(r, authHandler)
+		})
+		// public share-token routes — no auth middleware
+		r.Route("/share", func(r chi.Router) {
+			share.RegisterRoutes(r, shareHandler)
 		})
 		// authenticated routes
 		r.Group(func(r chi.Router) {
