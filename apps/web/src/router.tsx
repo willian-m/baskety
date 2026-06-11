@@ -1,8 +1,8 @@
 import { createRouter } from "@tanstack/react-router";
 
 import { Route as RootRoute } from "./routes/__root.js";
-import { Route as AppIndexRoute } from "./routes/_app.index.js";
 import { Route as AppRoute } from "./routes/_app.js";
+import { Route as AppIndexRoute } from "./routes/_app.index.js";
 import { Route as AuthRoute } from "./routes/_auth.js";
 import { Route as LoginRoute } from "./routes/_auth.login.js";
 import { Route as RegisterRoute } from "./routes/_auth.register.js";

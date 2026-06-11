@@ -1,7 +1,11 @@
 import { useUiStore } from "@baskety/core";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createRoute, Outlet, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/_auth")({
+import { Route as RootRoute } from "./__root.js";
+
+export const Route = createRoute({
+  getParentRoute: () => RootRoute,
+  id: "_auth",
   beforeLoad: () => {
     const token = useUiStore.getState().token;
     if (token) throw redirect({ to: "/" });

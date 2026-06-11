@@ -1,7 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createRoute } from "@tanstack/react-router";
 
 import { LoginPage } from "../features/auth/LoginPage.js";
 
-export const Route = createFileRoute("/_auth/login")({
+import { Route as AuthRoute } from "./_auth.js";
+
+export const Route = createRoute({
+  getParentRoute: () => AuthRoute,
+  path: "/login",
   component: LoginPage,
 });

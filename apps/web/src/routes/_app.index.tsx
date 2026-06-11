@@ -1,9 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/_app/")({
-  component: () => (
-    <div>
-      <h1>Welcome to Baskety</h1>
-    </div>
-  ),
+import { Route as AppRoute } from "./_app.js";
+
+export const Route = createRoute({
+  getParentRoute: () => AppRoute,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/inventory" });
+  },
+  component: () => null,
 });
