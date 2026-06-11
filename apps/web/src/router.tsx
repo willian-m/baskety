@@ -19,6 +19,7 @@ import { Route as SettingsRoute } from "./routes/_app.settings.js";
 import { Route as AuthRoute } from "./routes/_auth.js";
 import { Route as LoginRoute } from "./routes/_auth.login.js";
 import { Route as RegisterRoute } from "./routes/_auth.register.js";
+import { Route as ShareTokenRoute } from "./routes/share.$token.js";
 
 const routeTree = RootRoute.addChildren([
   AppRoute.addChildren([
@@ -30,6 +31,7 @@ const routeTree = RootRoute.addChildren([
     SettingsRoute.addChildren([SettingsIndexRoute]),
   ]),
   AuthRoute.addChildren([LoginRoute, RegisterRoute]),
+  ShareTokenRoute,
 ]);
 
 export const router = createRouter({ routeTree });
