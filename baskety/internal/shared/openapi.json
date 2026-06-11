@@ -473,7 +473,7 @@
           "extra_config": { "type": ["string", "null"] },
           "is_default": { "type": "boolean" }
         }
-      },
+      }
     }
   },
   "paths": {
