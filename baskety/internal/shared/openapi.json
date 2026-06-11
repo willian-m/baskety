@@ -2035,6 +2035,41 @@
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
+    },
+    "/api/v1/share/{token}/inventory": {
+      "get": {
+        "summary": "Get shared inventory view (unauthenticated)",
+        "operationId": "getSharedInventory",
+        "tags": ["Share"],
+        "parameters": [
+          { "name": "token", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Share-Password", "in": "header", "required": false, "schema": { "type": "string" }, "description": "Required if the share link is password-protected" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "inventory_id": { "type": "string", "format": "uuid" },
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/InventoryItemResponse" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid password", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Token not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "410": { "description": "Link revoked or expired", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
     }
   }
 }
