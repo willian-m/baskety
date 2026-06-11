@@ -38,11 +38,11 @@ GroceryStoreList/
 │   ├── internal/
 │   │   ├── auth/             # session auth: register, login, logout, middleware
 │   │   ├── household/        # households, members, share links, scope middleware
-│   │   ├── inventory/        # (Sprint 4 — not yet implemented)
-│   │   ├── grocery/          # (Sprint 5 — not yet implemented)
-│   │   ├── receipt/          # (Sprint 6 — not yet implemented)
-│   │   ├── catalog/          # (Sprint 7 — not yet implemented)
-│   │   ├── settings/         # (Sprint 7 — not yet implemented)
+│   │   ├── inventory/        # Sprint 4 — inventory items, batches, soft-delete
+│   │   ├── grocery/          # Sprint 5 — grocery lists, auto-generation
+│   │   ├── receipt/          # Sprint 6 — receipt scanning, OCR/LLM pipeline, job queue
+│   │   ├── catalog/          # Sprint 7 — catalog entries, stores, price history
+│   │   ├── settings/         # Sprint 7 — LLM/OCR provider settings
 │   │   ├── shared/           # config, DB pool, migrations, health, SPA handler
 │   │   ├── adapters/         # OCR, LLM, storage adapter stubs
 │   │   └── testutil/         # testcontainers-go harness for integration tests
@@ -85,19 +85,29 @@ Health check: `GET /healthz`
 
 ## Implemented API Endpoints
 
-All authenticated routes require `Authorization: Bearer <token>`. Household-scoped routes accept an optional `X-Household-ID` header (falls back to the caller's first household).
+All authenticated routes require `Authorization: Bearer <token>`. Household-scoped routes accept an optional `X-Household-ID` header (falls back to the caller's first household). Full spec: `GET /api/v1/openapi.json`.
 
 ```
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
-DELETE /api/v1/auth/session          (auth required)
+DELETE /api/v1/auth/session
 
-GET    /api/v1/households            (auth + household scope)
+GET    /api/v1/households
 POST   /api/v1/households
 GET    /api/v1/households/:id
 POST   /api/v1/households/:id/members
 DELETE /api/v1/households/:id/members/:userID
 POST   /api/v1/households/:id/share-links
+
+GET/POST/DELETE  /api/v1/inventories/...       (items, batches, quantity)
+GET/POST/PATCH   /api/v1/inventories/:id/lists/... (grocery lists + auto-generate)
+GET/POST/PATCH   /api/v1/receipts/...          (scans, scan items, commit)
+GET/POST/PATCH   /api/v1/catalog/...           (stores, entries, transactions)
+GET/PUT/DELETE   /api/v1/settings/...          (LLM/OCR providers, key-value settings)
+
+GET    /api/v1/share/:token/inventory          (unauthenticated; X-Share-Password header if protected)
+GET    /api/v1/openapi.json                    (OpenAPI 3.1 spec)
+GET    /healthz
 ```
 
 ## Domain Package Conventions
@@ -121,11 +131,11 @@ Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
 | 1 | Monorepo scaffold + shared packages | Done |
 | 2 | DB migrations, sqlc, test harness | Done |
 | 3 | Auth + Household domains | Done |
-| 4 | Inventory domain | Not started |
-| 5 | Grocery lists domain | Not started |
-| 6 | Receipt scanning domain | Not started |
-| 7 | Catalog, settings, pg_cron, wire-up | Not started |
-| 8 | Integration tests + OpenAPI | Not started |
+| 4 | Inventory domain | Done |
+| 5 | Grocery lists domain | Done |
+| 6 | Receipt scanning domain | Done |
+| 7 | Catalog, settings, pg_cron, wire-up | Done |
+| 8 | Integration tests + OpenAPI | Done |
 | 9–12 | Web frontend | Not started |
 | 13–16 | Mobile (React Native) | Not started |
 | 17–18 | Docker/CI/CD + hardening | Not started |
