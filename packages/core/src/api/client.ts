@@ -38,7 +38,7 @@ async function requestShare<T>(path: string, password?: string): Promise<T> {
   const base = activeServerUrl ?? "";
   const headers = new Headers();
   if (password) headers.set("X-Share-Password", password);
-  const res = await fetch(`${base}${path}`, { headers });
+  const res = await fetch(`${base}/api/v1${path}`, { headers });
   if (res.status === 204) return undefined as T;
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {

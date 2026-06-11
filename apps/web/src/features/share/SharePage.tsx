@@ -1,39 +1,23 @@
 import { ApiError, useShareInventory } from "@baskety/core";
-import { useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-function ExpiryStatus({ expires_at }: { expires_at: string | null }) {
-  if (!expires_at) return null;
-  const expiry = new Date(expires_at);
-  const now = new Date();
-  const diffMs = expiry.getTime() - now.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-  if (diffMs < 0) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-        Expired
-      </span>
-    );
-  }
-  if (diffDays <= 7) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
-        Expiring soon
-      </span>
-    );
-  }
-  return null;
-}
+import { Route } from "../../routes/share.$token.js";
 
 export function SharePage() {
-  const { token } = useParams({ from: "/share/$token" });
+  const { token } = Route.useParams();
   const [password, setPassword] = useState("");
   const [submittedPassword, setSubmittedPassword] = useState<string | undefined>(undefined);
+  const [passwordError, setPasswordError] = useState(false);
 
   const { data, isLoading, error } = useShareInventory(token, submittedPassword);
 
   const is401 = error instanceof ApiError && error.status === 401;
+
+  useEffect(() => {
+    if (is401 && submittedPassword !== undefined) {
+      setPasswordError(true);
+    }
+  }, [is401, submittedPassword]);
 
   if (isLoading) {
     return (
@@ -43,7 +27,7 @@ export function SharePage() {
     );
   }
 
-  if (is401 && submittedPassword === undefined) {
+  if (is401) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-6">
         <div className="w-full max-w-sm rounded-lg border p-6">
@@ -51,9 +35,14 @@ export function SharePage() {
           <p className="mb-4 text-sm text-muted-foreground">
             This shared inventory is password-protected.
           </p>
+          {passwordError && (
+            <p className="mb-3 text-sm text-red-600">Incorrect password, please try again.</p>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!password) return;
+              setPasswordError(false);
               setSubmittedPassword(password);
             }}
           >
@@ -66,7 +55,8 @@ export function SharePage() {
             />
             <button
               type="submit"
-              className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              disabled={!password}
+              className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               Unlock
             </button>
@@ -106,7 +96,7 @@ export function SharePage() {
                 <span className="text-xs text-muted-foreground">{item.category}</span>
               </div>
               <div className="flex items-center gap-3">
-                <ExpiryStatus expires_at={null} />
+                {/* expiry indicators require batch data — not returned by share endpoint */}
                 <span className="text-sm font-medium text-foreground">
                   {item.target_quantity} {item.unit}
                 </span>

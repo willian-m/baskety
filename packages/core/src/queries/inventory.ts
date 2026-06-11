@@ -133,8 +133,7 @@ export function useDeleteItem(inventoryId: string) {
 export function useShareInventory(token: string, password?: string) {
   return useQuery({
     queryKey: ["share", token],
-    queryFn: () =>
-      requestShare<ShareInventoryResponse>(`/api/v1/share/${token}/inventory`, password),
+    queryFn: () => requestShare<ShareInventoryResponse>(`/share/${token}/inventory`, password),
     enabled: !!token,
     retry: false,
   });
