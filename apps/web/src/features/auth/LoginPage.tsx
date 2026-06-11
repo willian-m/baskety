@@ -40,7 +40,7 @@ export function LoginPage() {
         <h1 className="text-3xl font-bold tracking-tight">Baskety</h1>
         <p className="text-muted-foreground">Sign in to your account</p>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium">
             Email

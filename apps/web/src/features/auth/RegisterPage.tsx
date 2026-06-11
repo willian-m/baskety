@@ -44,7 +44,7 @@ export function RegisterPage() {
         <h1 className="text-3xl font-bold tracking-tight">Baskety</h1>
         <p className="text-muted-foreground">Create your account</p>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div className="space-y-2">
           <label htmlFor="name" className="text-sm font-medium">
             Name
