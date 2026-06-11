@@ -1,13 +1,10 @@
 import {
   useCreateLLMProvider,
   useCreateOCRProvider,
-  useDeleteLLMProvider,
-  useDeleteOCRProvider,
   useHouseholds,
   useLLMProviders,
   useOCRProviders,
-  useUpdateLLMProvider,
-  useUpdateOCRProvider,
+  useUiStore,
 } from "@baskety/core";
 import { useState } from "react";
 
@@ -20,68 +17,6 @@ const inputCls =
 // ── LLM Provider section ──────────────────────────────────────────────────────
 
 function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
-  const [editing, setEditing] = useState(false);
-  const [model, setModel] = useState(p.model);
-  const [endpoint, setEndpoint] = useState(p.endpoint_url ?? "");
-  const [apiKey, setApiKey] = useState("");
-  const update = useUpdateLLMProvider();
-  const del = useDeleteLLMProvider();
-
-  const save = async () => {
-    await update.mutateAsync({
-      id: p.id,
-      body: {
-        model,
-        endpoint_url: endpoint || null,
-        ...(apiKey ? { api_key: apiKey } : {}),
-      },
-    });
-    setEditing(false);
-    setApiKey("");
-  };
-
-  if (editing) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 border-t px-4 py-3">
-        <span className="min-w-[6rem] text-sm font-medium">{p.provider}</span>
-        <input
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          placeholder="Model"
-          className={`${inputCls} w-40`}
-        />
-        <input
-          value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
-          placeholder="Endpoint URL (optional)"
-          className={`${inputCls} flex-1`}
-        />
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="API key (leave blank to keep)"
-          className={`${inputCls} w-52`}
-        />
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={update.isPending}
-          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {update.isPending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
-        >
-          Cancel
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center justify-between border-t px-4 py-3">
       <div className="flex flex-col gap-0.5">
@@ -99,23 +34,6 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
         {p.has_api_key && (
           <span className="text-xs text-muted-foreground">API key configured</span>
         )}
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="inline-flex h-8 items-center rounded-md border px-3 text-xs hover:bg-muted"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={() => void del.mutateAsync(p.id)}
-          disabled={del.isPending}
-          className="inline-flex h-8 items-center rounded-md border border-destructive px-3 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-        >
-          Delete
-        </button>
       </div>
     </div>
   );
@@ -197,6 +115,11 @@ function LLMSection() {
               {create.isPending ? "Adding…" : "Add"}
             </button>
           </div>
+          {create.isError && (
+            <p className="mt-2 text-sm text-destructive">
+              {(create.error as Error).message ?? "Failed to add provider."}
+            </p>
+          )}
         </div>
       )}
 
@@ -218,60 +141,6 @@ function LLMSection() {
 // ── OCR Provider section ──────────────────────────────────────────────────────
 
 function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
-  const [editing, setEditing] = useState(false);
-  const [endpoint, setEndpoint] = useState(p.endpoint_url ?? "");
-  const [apiKey, setApiKey] = useState("");
-  const update = useUpdateOCRProvider();
-  const del = useDeleteOCRProvider();
-
-  const save = async () => {
-    await update.mutateAsync({
-      id: p.id,
-      body: {
-        endpoint_url: endpoint || null,
-        ...(apiKey ? { api_key: apiKey } : {}),
-      },
-    });
-    setEditing(false);
-    setApiKey("");
-  };
-
-  if (editing) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 border-t px-4 py-3">
-        <span className="min-w-[6rem] text-sm font-medium">{p.provider}</span>
-        <input
-          value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
-          placeholder="Endpoint URL (optional)"
-          className={`${inputCls} flex-1`}
-        />
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="API key (leave blank to keep)"
-          className={`${inputCls} w-52`}
-        />
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={update.isPending}
-          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {update.isPending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
-        >
-          Cancel
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center justify-between border-t px-4 py-3">
       <div className="flex flex-col gap-0.5">
@@ -289,23 +158,6 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
         {p.has_api_key && (
           <span className="text-xs text-muted-foreground">API key configured</span>
         )}
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="inline-flex h-8 items-center rounded-md border px-3 text-xs hover:bg-muted"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={() => void del.mutateAsync(p.id)}
-          disabled={del.isPending}
-          className="inline-flex h-8 items-center rounded-md border border-destructive px-3 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-        >
-          Delete
-        </button>
       </div>
     </div>
   );
@@ -378,6 +230,11 @@ function OCRSection() {
               {create.isPending ? "Adding…" : "Add"}
             </button>
           </div>
+          {create.isError && (
+            <p className="mt-2 text-sm text-destructive">
+              {(create.error as Error).message ?? "Failed to add provider."}
+            </p>
+          )}
         </div>
       )}
 
@@ -399,8 +256,9 @@ function OCRSection() {
 // ── Household section ─────────────────────────────────────────────────────────
 
 function HouseholdSection() {
+  const activeHouseholdId = useUiStore((s) => s.activeHouseholdId);
   const { data: households, isLoading } = useHouseholds();
-  const active = households?.[0];
+  const active = households?.find((h) => h.id === activeHouseholdId) ?? households?.[0];
 
   return (
     <section>

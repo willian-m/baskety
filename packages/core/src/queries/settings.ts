@@ -17,14 +17,6 @@ interface CreateLLMProviderRequest {
   is_default?: boolean;
 }
 
-interface UpdateLLMProviderRequest {
-  provider?: string;
-  model?: string;
-  endpoint_url?: string | null;
-  api_key?: string | null;
-  is_default?: boolean;
-}
-
 interface CreateOCRProviderRequest {
   provider: string;
   endpoint_url?: string | null;
@@ -33,22 +25,7 @@ interface CreateOCRProviderRequest {
   is_default?: boolean;
 }
 
-interface UpdateOCRProviderRequest {
-  provider?: string;
-  endpoint_url?: string | null;
-  api_key?: string | null;
-  extra_config?: string | null;
-  is_default?: boolean;
-}
-
 // ── Key-value settings ────────────────────────────────────────────────────────
-
-export function useSettings(scope: "household" | "user" = "household") {
-  return useQuery({
-    queryKey: ["settings", scope],
-    queryFn: () => request<SettingResponse[]>(`/settings/${scope}`),
-  });
-}
 
 export function useUpdateSetting(scope: "household" | "user" = "household") {
   const qc = useQueryClient();
@@ -68,7 +45,7 @@ export function useUpdateSetting(scope: "household" | "user" = "household") {
 
 export function useLLMProviders() {
   return useQuery({
-    queryKey: ["settings", "providers", "llm"],
+    queryKey: ["llm-providers"],
     queryFn: () => request<LLMProviderResponse[]>("/settings/providers/llm"),
   });
 }
@@ -82,32 +59,7 @@ export function useCreateLLMProvider() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "llm"] });
-    },
-  });
-}
-
-export function useUpdateLLMProvider() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: UpdateLLMProviderRequest }) =>
-      request<LLMProviderResponse>(`/settings/providers/llm/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(body),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "llm"] });
-    },
-  });
-}
-
-export function useDeleteLLMProvider() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      request<void>(`/settings/providers/llm/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "llm"] });
+      void qc.invalidateQueries({ queryKey: ["llm-providers"] });
     },
   });
 }
@@ -116,7 +68,7 @@ export function useDeleteLLMProvider() {
 
 export function useOCRProviders() {
   return useQuery({
-    queryKey: ["settings", "providers", "ocr"],
+    queryKey: ["ocr-providers"],
     queryFn: () => request<OCRProviderResponse[]>("/settings/providers/ocr"),
   });
 }
@@ -130,32 +82,7 @@ export function useCreateOCRProvider() {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "ocr"] });
-    },
-  });
-}
-
-export function useUpdateOCRProvider() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: UpdateOCRProviderRequest }) =>
-      request<OCRProviderResponse>(`/settings/providers/ocr/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(body),
-      }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "ocr"] });
-    },
-  });
-}
-
-export function useDeleteOCRProvider() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      request<void>(`/settings/providers/ocr/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["settings", "providers", "ocr"] });
+      void qc.invalidateQueries({ queryKey: ["ocr-providers"] });
     },
   });
 }
