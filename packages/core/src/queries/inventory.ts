@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { request } from "../api/client.js";
-import type { BatchResponse, InventoryItemResponse, InventoryResponse } from "../api/types.js";
+import { request, requestShare } from "../api/client.js";
+import type {
+  BatchResponse,
+  InventoryItemResponse,
+  InventoryResponse,
+  ShareInventoryResponse,
+} from "../api/types.js";
 
 // ── Request shapes ────────────────────────────────────────────────────────────
 
@@ -120,6 +125,18 @@ export function useDeleteItem(inventoryId: string) {
         queryKey: ["inventories", inventoryId, "items"],
       });
     },
+  });
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+
+export function useShareInventory(token: string, password?: string) {
+  return useQuery({
+    queryKey: ["share", token],
+    queryFn: () =>
+      requestShare<ShareInventoryResponse>(`/api/v1/share/${token}/inventory`, password),
+    enabled: !!token,
+    retry: false,
   });
 }
 

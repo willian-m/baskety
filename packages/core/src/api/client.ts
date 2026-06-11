@@ -33,4 +33,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body["data"] as T;
 }
 
-export { request };
+async function requestShare<T>(path: string, password?: string): Promise<T> {
+  const { activeServerUrl } = useUiStore.getState();
+  const base = activeServerUrl ?? "";
+  const headers = new Headers();
+  if (password) headers.set("X-Share-Password", password);
+  const res = await fetch(`${base}${path}`, { headers });
+  if (res.status === 204) return undefined as T;
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      typeof body["error"] === "string" ? body["error"] : res.statusText,
+    );
+  }
+  return body["data"] as T;
+}
+
+export { request, requestShare };
