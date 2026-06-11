@@ -18,7 +18,7 @@ export function useLogin() {
     onSuccess: (data) => {
       // Auth response contains only the token; household is fetched separately via useHouseholds.
       // Store token now; the caller should follow up with setActiveHousehold once households load.
-      setSession(data.token, "");
+      setSession(data.token);
     },
   });
 }
