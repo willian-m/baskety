@@ -134,7 +134,7 @@ function ScanItemRow({
 }
 
 export function ReceiptReviewPage() {
-  const { scanId } = useParams({ from: "/_app/receipt/$scanId" });
+  const { scanId } = useParams({ from: "/_app/receipt/$scanId/review" });
   const navigate = useNavigate();
 
   const { data: scan, isLoading: loadingScan } = useScan(scanId);
