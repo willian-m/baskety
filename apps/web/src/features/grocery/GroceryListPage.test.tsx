@@ -4,140 +4,58 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import { groceryItemFixture, groceryListFixture } from "../../test/fixtures.js";
 import { server } from "../../test/server.js";
 
 import { GroceryListPage } from "./GroceryListPage.js";
 
-// Avoid React version mismatch: mock @baskety/core hooks to use the web app's own React
-vi.mock("@baskety/core", async () => {
-  const { useQuery, useMutation } = await import("@tanstack/react-query");
+const mockNavigate = vi.fn();
+vi.mock("@tanstack/react-router", () => ({
+  useParams: () => ({ listId: "test-list-id" }),
+  useNavigate: () => mockNavigate,
+  Link: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
-  return {
-    useInventories: () =>
-      useQuery({
-        queryKey: ["inventories"],
-        queryFn: () =>
-          fetch("/api/v1/inventories")
-            .then((r) => r.json())
-            .then((r) => r.data),
-      }),
-    useGroceryList: (invId: string, listId: string) =>
-      useQuery({
-        queryKey: ["grocery-list", invId, listId],
-        queryFn: () =>
-          fetch(`/api/v1/inventories/${invId}/lists/${listId}`)
-            .then((r) => r.json())
-            .then((r) => r.data),
-        enabled: !!invId && !!listId,
-      }),
-    useGroceryItems: (invId: string, listId: string) =>
-      useQuery({
-        queryKey: ["grocery-items", invId, listId],
-        queryFn: () =>
-          fetch(`/api/v1/inventories/${invId}/lists/${listId}/items`)
-            .then((r) => r.json())
-            .then((r) => r.data),
-        enabled: !!invId && !!listId,
-      }),
-    useUpdateListItem: (invId: string, listId: string) =>
-      useMutation({
-        mutationFn: ({ itemId, status }: { itemId: string; status: string }) =>
-          fetch(`/api/v1/inventories/${invId}/lists/${listId}/items/${itemId}/status`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          })
-            .then((r) => r.json())
-            .then((r) => r.data),
-      }),
-    useAddListItem: (invId: string, listId: string) =>
-      useMutation({
-        mutationFn: (body: { name: string; quantity: number; unit: string }) =>
-          fetch(`/api/v1/inventories/${invId}/lists/${listId}/items`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          })
-            .then((r) => r.json())
-            .then((r) => r.data),
-      }),
-    useCompleteList: (invId: string, listId: string) =>
-      useMutation({
-        mutationFn: () =>
-          fetch(`/api/v1/inventories/${invId}/lists/${listId}/complete`, {
-            method: "POST",
-          }).then(() => undefined),
-      }),
-  };
-});
-
-// Mock useParams and useNavigate to avoid complex router hierarchy with auth guards
-vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
-  return {
-    ...actual,
-    useParams: () => ({ listId: "test-list-id" }),
-    useNavigate: () => vi.fn(),
-  };
-});
-
-function renderPage() {
+function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <GroceryListPage />
-    </QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 describe("GroceryListPage", () => {
-  it("shows loading state", () => {
-    renderPage();
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+  it("shows loading state then resolves", async () => {
+    renderWithProviders(<GroceryListPage />);
+    const loading = screen.getByText("Loading…");
+    expect(loading).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Loading…")).not.toBeInTheDocument());
   });
 
   it("renders grocery list items", async () => {
-    renderPage();
+    renderWithProviders(<GroceryListPage />);
     await waitFor(() => expect(screen.getByText("Test Grocery Item")).toBeInTheDocument());
   });
 
   it("toggles item from pending to bought", async () => {
     const user = userEvent.setup();
-    let wasCalled = false;
+    let capturedBody: unknown;
     server.use(
-      http.put("/api/v1/inventories/:invId/lists/:listId/items/:itemId/status", () => {
-        wasCalled = true;
-        return HttpResponse.json({
-          data: {
-            id: "item-1",
-            grocery_list_id: "test-list-id",
-            inventory_item_id: null,
-            name: "Test Grocery Item",
-            quantity: 1,
-            unit: "pcs",
-            notes: null,
-            status: "bought",
-            sort_order: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        });
-      }),
+      http.put(
+        "/api/v1/inventories/:invId/lists/:listId/items/:itemId/status",
+        async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({ data: groceryItemFixture({ status: "bought" }) });
+        },
+      ),
     );
-
-    renderPage();
-    await waitFor(() => expect(screen.getByText("Test Grocery Item")).toBeInTheDocument());
-
-    const checkbox = screen.getByRole("checkbox");
+    renderWithProviders(<GroceryListPage />);
+    const checkbox = await screen.findByRole("checkbox");
     await user.click(checkbox);
-
-    await waitFor(() => expect(wasCalled).toBe(true));
+    await waitFor(() => expect((capturedBody as { status: string }).status).toBe("bought"));
   });
 
   it("shows complete list button", async () => {
-    renderPage();
+    renderWithProviders(<GroceryListPage />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Complete list" })).toBeInTheDocument(),
     );
@@ -153,7 +71,7 @@ describe("GroceryListPage", () => {
       }),
     );
 
-    renderPage();
+    renderWithProviders(<GroceryListPage />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Complete list" })).toBeInTheDocument(),
     );
@@ -161,5 +79,18 @@ describe("GroceryListPage", () => {
     await user.click(screen.getByRole("button", { name: "Complete list" }));
 
     await waitFor(() => expect(wasCalled).toBe(true));
+  });
+
+  it("hides complete button when list is already completed", async () => {
+    server.use(
+      http.get("/api/v1/inventories/:invId/lists/:listId", ({ params }) =>
+        HttpResponse.json({
+          data: groceryListFixture({ id: params.listId as string, status: "completed" }),
+        }),
+      ),
+    );
+    renderWithProviders(<GroceryListPage />);
+    await screen.findByText("Test Grocery Item"); // wait for data to load
+    expect(screen.queryByRole("button", { name: /complete list/i })).not.toBeInTheDocument();
   });
 });
