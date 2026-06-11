@@ -43,6 +43,8 @@ export const handlers = [
   http.get(`${BASE}/inventories`, () => ok([inventoryFixture({ id: "inv-1" })])),
   http.post(`${BASE}/inventories`, () => ok(inventoryFixture())),
   http.get(`${BASE}/inventories/:id`, ({ params }) => ok(inventoryFixture({ id: params.id }))),
+  http.put(`${BASE}/inventories/:id`, ({ params }) => ok(inventoryFixture({ id: params.id }))),
+  http.delete(`${BASE}/inventories/:id`, () => new HttpResponse(null, { status: 204 })),
 
   // Inventory items
   http.get(`${BASE}/inventories/:id/items`, () => ok([inventoryItemFixture()])),
