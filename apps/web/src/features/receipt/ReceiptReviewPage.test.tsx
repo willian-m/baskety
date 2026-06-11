@@ -169,13 +169,27 @@ describe("ReceiptReviewPage", () => {
     setupHandlers({ status: "ocr_processing" }, [{ id: "item-1" }]);
     renderPage();
 
+    // The status is rendered in a <span> badge inside the page header; it is
+    // unique on the page (not repeated in item rows), so findByText is safe.
     await waitFor(() => {
       expect(screen.getByText("ocr_processing")).toBeInTheDocument();
     });
   });
 
-  it("accept button is present and clickable", async () => {
-    setupHandlers();
+  it("accept button sends accepted status to API", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({ data: [scanItemFixture({ id: "item-1", receipt_scan_id: SCAN_ID })] }),
+      ),
+      http.put(`/api/v1/receipts/${SCAN_ID}/items/:itemId`, async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ data: scanItemFixture({ status: "accepted" }) });
+      }),
+    );
     const user = userEvent.setup();
     renderPage();
 
@@ -185,12 +199,23 @@ describe("ReceiptReviewPage", () => {
     expect(acceptBtn).not.toBeDisabled();
     await user.click(acceptBtn);
 
-    // Button remains in DOM after click
-    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    await waitFor(() => expect((capturedBody as { status: string }).status).toBe("accepted"));
   });
 
-  it("reject button is present and clickable", async () => {
-    setupHandlers();
+  it("reject button sends rejected status to API", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({ data: [scanItemFixture({ id: "item-1", receipt_scan_id: SCAN_ID })] }),
+      ),
+      http.put(`/api/v1/receipts/${SCAN_ID}/items/:itemId`, async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({ data: scanItemFixture({ status: "rejected" }) });
+      }),
+    );
     const user = userEvent.setup();
     renderPage();
 
@@ -200,7 +225,22 @@ describe("ReceiptReviewPage", () => {
     expect(rejectBtn).not.toBeDisabled();
     await user.click(rejectBtn);
 
-    expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    await waitFor(() => expect((capturedBody as { status: string }).status).toBe("rejected"));
+  });
+
+  it("accept button is disabled when item is already accepted", async () => {
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({ data: [scanItemFixture({ status: "accepted" })] }),
+      ),
+    );
+    renderPage();
+
+    const acceptBtn = await screen.findByRole("button", { name: /accept/i });
+    expect(acceptBtn).toBeDisabled();
   });
 
   it("commit button is disabled when items have pending status", async () => {
@@ -223,5 +263,43 @@ describe("ReceiptReviewPage", () => {
       const commitBtn = screen.getByRole("button", { name: "Commit to inventory" });
       expect(commitBtn).not.toBeDisabled();
     });
+  });
+
+  it("commit button is enabled when all items are corrected", async () => {
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({ data: [scanItemFixture({ status: "corrected" })] }),
+      ),
+    );
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /commit/i })).not.toBeDisabled());
+  });
+
+  it("clicking commit sends POST to commit endpoint", async () => {
+    let commitCalled = false;
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({ data: [scanItemFixture({ status: "accepted" })] }),
+      ),
+      http.post(`/api/v1/receipts/${SCAN_ID}/commit`, () => {
+        commitCalled = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const commitBtn = await screen.findByRole("button", { name: /commit/i });
+    await waitFor(() => expect(commitBtn).not.toBeDisabled());
+    await user.click(commitBtn);
+
+    await waitFor(() => expect(commitCalled).toBe(true));
   });
 });
