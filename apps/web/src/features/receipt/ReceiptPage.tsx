@@ -3,9 +3,11 @@ import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  done: "bg-green-100 text-green-800",
+  uploading: "bg-yellow-100 text-yellow-800",
+  ocr_processing: "bg-blue-100 text-blue-800",
+  llm_processing: "bg-blue-100 text-blue-800",
+  pending_review: "bg-yellow-100 text-yellow-800",
+  committed: "bg-green-100 text-green-800",
   failed: "bg-red-100 text-red-800",
 };
 

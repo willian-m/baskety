@@ -3,10 +3,12 @@ import type { ScanItemResponse } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 
+const PROCESSING_STATUSES = new Set(["uploading", "ocr_processing", "llm_processing"]);
+
 function ConfidenceBadge({ score }: { score: number | null }) {
   if (score === null) return <span className="text-xs text-muted-foreground">—</span>;
   const pct = Math.round(score * 100);
-  const color = score > 0.8 ? "bg-green-500" : score > 0.5 ? "bg-yellow-500" : "bg-red-500";
+  const color = score >= 0.8 ? "bg-green-500" : score >= 0.5 ? "bg-yellow-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-1.5">
       <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
@@ -37,23 +39,34 @@ function ScanItemRow({
         : "",
   );
 
+  // Saves inline edits as "corrected" status. The backend requires status in
+  // every PUT — empty string fails validation — so we always send "corrected"
+  // when saving field corrections, marking the item for commit inclusion.
   const saveCorrections = () => {
+    const parsedQty = qty !== "" ? parseFloat(qty) : null;
+    const parsedPrice = price !== "" ? parseFloat(price) : null;
     void update.mutateAsync({
       itemId: item.id,
       body: {
+        status: "corrected",
         corrected_name: name || null,
-        corrected_quantity: qty !== "" ? parseFloat(qty) : null,
-        corrected_price_minor: price !== "" ? Math.round(parseFloat(price) * 100) : null,
+        corrected_quantity: parsedQty != null && Number.isFinite(parsedQty) ? parsedQty : null,
+        corrected_price_minor:
+          parsedPrice != null && Number.isFinite(parsedPrice)
+            ? Math.round(parsedPrice * 100)
+            : null,
       },
     });
   };
 
+  // Accept/Reject send only the status; disable the input blur-save while a
+  // status mutation is in flight to avoid the two writes racing each other.
   const setStatus = (status: "accepted" | "rejected") => {
     void update.mutateAsync({ itemId: item.id, body: { status } });
   };
 
   const statusColor =
-    item.status === "accepted"
+    item.status === "accepted" || item.status === "corrected"
       ? "text-green-700"
       : item.status === "rejected"
         ? "text-red-700"
@@ -67,7 +80,8 @@ function ScanItemRow({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={saveCorrections}
-          className="flex h-8 w-full rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          disabled={update.isPending}
+          className="flex h-8 w-full rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-2">
@@ -76,7 +90,8 @@ function ScanItemRow({
           value={qty}
           onChange={(e) => setQty(e.target.value)}
           onBlur={saveCorrections}
-          className="flex h-8 w-20 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          disabled={update.isPending}
+          className="flex h-8 w-20 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-2">
@@ -86,7 +101,8 @@ function ScanItemRow({
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           onBlur={saveCorrections}
-          className="flex h-8 w-24 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          disabled={update.isPending}
+          className="flex h-8 w-24 rounded border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
         />
       </td>
       <td className="px-3 py-2">
@@ -125,15 +141,17 @@ export function ReceiptReviewPage() {
   const { data: items, isLoading: loadingItems } = useScanItems(scanId);
   const commitScan = useCommitScan();
 
-  const isProcessing = scan?.status === "pending" || scan?.status === "processing";
+  const isProcessing = PROCESSING_STATUSES.has(scan?.status ?? "");
 
   const allReviewed =
     !!items &&
     items.length > 0 &&
-    items.every((i) => i.status === "accepted" || i.status === "rejected");
+    items.every(
+      (i) => i.status === "accepted" || i.status === "rejected" || i.status === "corrected",
+    );
 
   const handleCommit = async () => {
-    await commitScan.mutateAsync(scanId);
+    await commitScan.mutateAsync({ scanId, purchasedAt: new Date().toISOString() });
     void navigate({ to: "/receipt" });
   };
 
@@ -165,7 +183,7 @@ export function ReceiptReviewPage() {
         {scan && !isProcessing && (
           <span
             className={`rounded-full px-3 py-0.5 text-sm font-medium ${
-              scan.status === "done"
+              scan.status === "committed"
                 ? "bg-green-100 text-green-800"
                 : scan.status === "failed"
                   ? "bg-red-100 text-red-800"
@@ -203,7 +221,7 @@ export function ReceiptReviewPage() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <ScanItemRow key={item.id} item={item} scanId={scanId} />
+                <ScanItemRow key={`${item.id}-${item.updated_at}`} item={item} scanId={scanId} />
               ))}
             </tbody>
           </table>
