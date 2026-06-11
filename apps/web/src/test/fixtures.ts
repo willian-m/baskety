@@ -15,6 +15,21 @@ export const householdFixture = (overrides?: Record<string, unknown>) => ({
   ...overrides,
 });
 
+export const memberFixture = (overrides?: Record<string, unknown>) => ({
+  user_id: nextId(),
+  role: "member",
+  joined_at: now(),
+  ...overrides,
+});
+
+export const shareLinkFixture = (overrides?: Record<string, unknown>) => ({
+  id: nextId(),
+  token: "share-token",
+  expires_at: null,
+  created_at: now(),
+  ...overrides,
+});
+
 export const inventoryFixture = (overrides?: Record<string, unknown>) => ({
   id: nextId(),
   household_id: nextId(),
@@ -142,5 +157,44 @@ export const ocrProviderFixture = (overrides?: Record<string, unknown>) => ({
   is_default: true,
   created_at: now(),
   updated_at: now(),
+  ...overrides,
+});
+
+export const storeFixture = (overrides?: Record<string, unknown>) => ({
+  id: nextId(),
+  name: "Test Store",
+  chain_name: null,
+  address: null,
+  canonical_store_id: null,
+  created_at: now(),
+  updated_at: now(),
+  ...overrides,
+});
+
+export const catalogEntryFixture = (overrides?: Record<string, unknown>) => ({
+  id: nextId(),
+  name: "Test Product",
+  brand: null,
+  unit: null,
+  category: null,
+  scope: "global",
+  household_id: null,
+  canonical_entry_id: null,
+  created_at: now(),
+  updated_at: now(),
+  ...overrides,
+});
+
+export const transactionFixture = (overrides?: Record<string, unknown>) => ({
+  id: nextId(),
+  household_id: nextId(),
+  store_id: null,
+  grocery_list_item_id: null,
+  receipt_scan_item_id: null,
+  catalog_entry_id: null,
+  price_per_unit_minor: null,
+  currency: "USD",
+  quantity: null,
+  purchased_at: now(),
   ...overrides,
 });
