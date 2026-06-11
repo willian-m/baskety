@@ -13,8 +13,14 @@
   "dependencies": {
     "@baskety/core": "workspace:*",
     "@baskety/ui": "workspace:*",
+    "@hookform/resolvers": "^5.4.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-router": "^1.170.15",
+    "@tanstack/router-devtools": "^1.167.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "react-hook-form": "^7.78.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
