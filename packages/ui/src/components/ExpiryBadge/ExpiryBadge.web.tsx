@@ -18,7 +18,7 @@ export function ExpiryBadge({ expiresAt }: ExpiryBadgeProps) {
   if (days <= 7) {
     return (
       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
-        Expiring in {days}d
+        {days === 0 ? "Expiring today" : `Expiring in ${days}d`}
       </span>
     );
   }
