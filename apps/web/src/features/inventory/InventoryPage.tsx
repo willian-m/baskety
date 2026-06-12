@@ -108,6 +108,7 @@ export function InventoryPage() {
             />
             <button
               type="button"
+              data-testid="add-item-submit"
               onClick={() => void handleAddItem()}
               disabled={
                 !newName.trim() || !newCategory.trim() || !newUnit.trim() || createItem.isPending

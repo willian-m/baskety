@@ -150,6 +150,7 @@ export function GroceryListPage() {
             />
             <button
               type="button"
+              data-testid="add-item-submit"
               onClick={() => void handleAddItem()}
               disabled={!newName.trim() || addItem.isPending}
               className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"

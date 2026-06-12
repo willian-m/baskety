@@ -1,7 +1,7 @@
 import { expect, type Page, request as pwRequest, test } from "@playwright/test";
 
 const BASE = "http://localhost:8080";
-const EMAIL = "f03-flow@baskety.test";
+const EMAIL = `f03-flow-${Date.now()}@baskety.test`;
 const PASSWORD = "F03P@ss123";
 
 let token = "";
@@ -118,7 +118,7 @@ test.describe.serial("F03: Auto-generate grocery list from inventory shortfalls"
     await page.getByRole("button", { name: "Add item" }).click();
     await page.getByPlaceholder("Item name").fill("Butter");
     // quantity defaults to 1, unit to "pcs"
-    await page.getByRole("button", { name: "Add" }).click();
+    await page.getByTestId("add-item-submit").click();
 
     await expect(page.getByText("Butter")).toBeVisible({ timeout: 10_000 });
   });
