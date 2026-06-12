@@ -90,6 +90,11 @@ func (h *Handler) HandleUploadScan(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	if header.Size > maxUploadBytes {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "file exceeds maximum upload size of 10 MB"})
+		return
+	}
+
 	var groceryListID *uuid.UUID
 	if raw := r.FormValue("grocery_list_id"); raw != "" {
 		gl, perr := uuid.Parse(raw)

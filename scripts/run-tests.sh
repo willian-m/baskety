@@ -57,6 +57,8 @@ done
 # ── Go backend ────────────────────────────────────────────────────────────────
 export BASKETY_DATABASE_URL="postgres://baskety:baskety@localhost:5432/baskety?sslmode=disable"
 echo ""
+echo "==> Killing any existing process on port 8080..."
+lsof -ti:8080 | xargs kill -9 2>/dev/null || true
 echo "==> Starting Go backend..."
 cd "$PROJECT_ROOT/baskety"
 "$GO_BIN" run ./cmd/baskety serve &
