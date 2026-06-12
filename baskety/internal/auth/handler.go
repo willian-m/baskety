@@ -26,6 +26,10 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
+	if req.Email == "" || req.Name == "" || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email, name, and password are required"})
+		return
+	}
 	resp, err := h.svc.Register(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, ErrEmailTaken) {
