@@ -105,7 +105,7 @@ test.describe.serial("F02: Inventory item and batch management via UI", () => {
     await page.getByPlaceholder("Quantity").fill("2");
     await page.getByRole("button", { name: "Add", exact: true }).click();
 
-    // Batch row should show "2 kg"
-    await expect(page.getByText(/2 kg/)).toBeVisible({ timeout: 10_000 });
+    // Batch row should show "2 kg" (exact match avoids collision with "(total: 2 kg)" summary)
+    await expect(page.getByText("2 kg", { exact: true })).toBeVisible({ timeout: 10_000 });
   });
 });
