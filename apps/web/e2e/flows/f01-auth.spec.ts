@@ -15,8 +15,8 @@ test.describe.serial("F01: Registration, login, and logout", () => {
     await page.fill("#password", PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
 
-    // RegisterPage auto-logs in on success and redirects to "/"
-    await expect(page).toHaveURL(/^\/(inventory)?(\?.*)?$/, { timeout: 15_000 });
+    // RegisterPage auto-logs in on success and redirects to "/" which then redirects to "/inventory"
+    await expect(page).toHaveURL(/\/(inventory)?(\?.*)?$/, { timeout: 15_000 });
 
     // Nav bar rendered by AppLayout should be visible
     await expect(page.getByTestId("logout-button")).toBeVisible({ timeout: 10_000 });
@@ -33,7 +33,7 @@ test.describe.serial("F01: Registration, login, and logout", () => {
     await page.fill("#password", PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/^\/(inventory)?(\?.*)?$/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/(inventory)?(\?.*)?$/, { timeout: 15_000 });
     await expect(page.getByTestId("logout-button")).toBeVisible();
   });
 });
