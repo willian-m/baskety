@@ -16,6 +16,5 @@
     "sourceMap": true,
     "outDir": "./dist"
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.native.tsx", "src/**/*.native.ts"]
+  "include": ["src"]
 }
