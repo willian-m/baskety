@@ -1,9 +1,24 @@
-import { Text } from "react-native";
+import React from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export interface SpinnerProps {
   size?: "sm" | "md" | "lg";
 }
 
-export function Spinner(_props: SpinnerProps) {
-  return <Text>Loading…</Text>;
+const rnSizeMap: Record<string, "small" | "large"> = {
+  sm: "small",
+  md: "small",
+  lg: "large",
+};
+
+export function Spinner({ size = "md" }: SpinnerProps) {
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size={rnSizeMap[size]} color="#2563eb" />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: { alignItems: "center", justifyContent: "center" },
+});
