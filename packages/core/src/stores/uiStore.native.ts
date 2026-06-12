@@ -1,5 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface NetworkProfile {
   id: string;
@@ -63,6 +64,7 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: "baskety-ui",
+      storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         token: state.token,
         activeHouseholdId: state.activeHouseholdId,
