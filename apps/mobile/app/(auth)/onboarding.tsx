@@ -1,4 +1,4 @@
-import { useUiStore } from "@baskety/core";
+import { useUiStore, isValidUrl } from "@baskety/core";
 import type { NetworkProfile } from "@baskety/core";
 import { Button, TextInput } from "@baskety/ui";
 import { useRouter } from "expo-router";
@@ -12,15 +12,6 @@ import {
   View,
 } from "react-native";
 
-function isValidUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "";
-  } catch {
-    return false;
-  }
-}
-
 export default function OnboardingScreen() {
   const router = useRouter();
   const persistExternalUrl = useUiStore((s) => s.setExternalUrl);
@@ -28,11 +19,13 @@ export default function OnboardingScreen() {
 
   const [externalUrl, setExternalUrl] = useState("");
   const [ssid, setSsid] = useState("");
+  const [label, setLabel] = useState("");
   const [localUrl, setLocalUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [localUrlError, setLocalUrlError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
 
-  function handleGetStarted() {
+  async function handleGetStarted() {
     const trimmed = externalUrl.trim();
     if (!trimmed) {
       setError("Server URL is required.");
@@ -42,20 +35,47 @@ export default function OnboardingScreen() {
       setError("URL must start with http:// or https:// and have a valid host.");
       return;
     }
-    if (ssid.trim() && localUrl.trim() && !isValidUrl(localUrl.trim())) {
+
+    const ssidTrimmed = ssid.trim();
+    const localUrlTrimmed = localUrl.trim();
+    // "Both or neither" — a home-network profile needs both fields.
+    if (Boolean(ssidTrimmed) !== Boolean(localUrlTrimmed)) {
+      setLocalUrlError("Provide both WiFi name and local URL, or leave both empty.");
+      return;
+    }
+    if (ssidTrimmed && localUrlTrimmed && !isValidUrl(localUrlTrimmed)) {
       setLocalUrlError("Local URL must start with http:// or https:// and have a valid host.");
       return;
     }
+
     setError(null);
     setLocalUrlError(null);
+
+    setIsChecking(true);
+    try {
+      const res = await fetch(trimmed + "/healthz", {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        setError("Cannot reach server. Check the URL and try again.");
+        setIsChecking(false);
+        return;
+      }
+    } catch {
+      setError("Cannot reach server. Check the URL and try again.");
+      setIsChecking(false);
+      return;
+    }
+    setIsChecking(false);
+
     persistExternalUrl(trimmed);
     // Persist optional home-network profile
-    if (ssid.trim() && localUrl.trim()) {
+    if (ssidTrimmed && localUrlTrimmed) {
       const profile: NetworkProfile = {
-        id: Date.now().toString(),
-        label: "Home",
-        ssids: [ssid.trim()],
-        serverUrl: localUrl.trim(),
+        id: crypto.randomUUID(),
+        label: label.trim() || "Home",
+        ssids: [ssidTrimmed],
+        serverUrl: localUrlTrimmed,
       };
       addProfile(profile);
     }
@@ -95,9 +115,20 @@ export default function OnboardingScreen() {
           </Text>
           <TextInput
             value={ssid}
-            onChange={setSsid}
+            onChange={(v) => { setSsid(v); setLocalUrlError(null); }}
             placeholder="WiFi network name (SSID)"
           />
+          {ssid.trim() ? (
+            <>
+              <View style={styles.spacer} />
+              <Text style={styles.fieldLabel}>Profile Name</Text>
+              <TextInput
+                value={label}
+                onChange={setLabel}
+                placeholder="e.g. Home"
+              />
+            </>
+          ) : null}
           <View style={styles.spacer} />
           <TextInput
             value={localUrl}
@@ -109,7 +140,12 @@ export default function OnboardingScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Button label="Get Started" onPress={handleGetStarted} />
+        <Button
+          label="Get Started"
+          onPress={handleGetStarted}
+          loading={isChecking}
+          disabled={isChecking}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -128,6 +164,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, color: "#6b7280" },
   section: { gap: 8 },
   label: { fontSize: 16, fontWeight: "600" },
+  fieldLabel: { fontSize: 14, fontWeight: "500" },
   hint: { fontSize: 13, color: "#6b7280" },
   spacer: { height: 8 },
   error: { color: "#ef4444", fontSize: 14 },
