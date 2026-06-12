@@ -8,7 +8,13 @@ function AppLayout() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout.mutateAsync();
+    try {
+      await logout.mutateAsync();
+    } catch {
+      // Server-side revocation may fail if the token was already invalid;
+      // onSettled in useLogout still calls clearSession(), so local state is
+      // always cleaned up.  We navigate to /login regardless.
+    }
     await navigate({ to: "/login" });
   };
 
