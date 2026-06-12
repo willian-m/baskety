@@ -12,7 +12,12 @@ import {
 } from "react-native";
 
 function isValidUrl(url: string): boolean {
-  return url.startsWith("http://") || url.startsWith("https://");
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "";
+  } catch {
+    return false;
+  }
 }
 
 export default function OnboardingScreen() {
@@ -23,6 +28,7 @@ export default function OnboardingScreen() {
   const [ssid, setSsid] = useState("");
   const [localUrl, setLocalUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [localUrlError, setLocalUrlError] = useState<string | null>(null);
 
   function handleGetStarted() {
     const trimmed = externalUrl.trim();
@@ -31,10 +37,15 @@ export default function OnboardingScreen() {
       return;
     }
     if (!isValidUrl(trimmed)) {
-      setError("URL must start with http:// or https://");
+      setError("URL must start with http:// or https:// and have a valid host.");
+      return;
+    }
+    if (ssid.trim() && localUrl.trim() && !isValidUrl(localUrl.trim())) {
+      setLocalUrlError("Local URL must start with http:// or https:// and have a valid host.");
       return;
     }
     setError(null);
+    setLocalUrlError(null);
     setActiveServerUrl(trimmed);
     router.replace("/(auth)/login");
   }
@@ -60,7 +71,7 @@ export default function OnboardingScreen() {
           </Text>
           <TextInput
             value={externalUrl}
-            onChange={setExternalUrl}
+            onChange={(v) => { setExternalUrl(v); setError(null); }}
             placeholder="https://baskety.example.com"
           />
         </View>
@@ -78,9 +89,10 @@ export default function OnboardingScreen() {
           <View style={styles.spacer} />
           <TextInput
             value={localUrl}
-            onChange={setLocalUrl}
+            onChange={(v) => { setLocalUrl(v); setLocalUrlError(null); }}
             placeholder="http://192.168.1.10:8080"
           />
+          {localUrlError ? <Text style={styles.error}>{localUrlError}</Text> : null}
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
