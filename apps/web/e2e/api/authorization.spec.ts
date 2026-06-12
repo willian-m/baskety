@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 const BASE = "/api/v1";
+const RUN_ID = Date.now();
+const emailHAuth = `user-h-auth-${RUN_ID}@baskety.test`;
+const emailZAuth = `user-z-auth-${RUN_ID}@baskety.test`;
 
 async function createUserAndHousehold(
   request: Parameters<Parameters<typeof test>[1]>[0]["request"],
@@ -32,15 +35,9 @@ test.describe.serial("Authorization", () => {
 
   test.beforeAll(async ({ request }) => {
     // User H
-    ({ token: tokenH, householdId: hhH } = await createUserAndHousehold(
-      request,
-      "user-h-auth@baskety.test",
-    ));
+    ({ token: tokenH, householdId: hhH } = await createUserAndHousehold(request, emailHAuth));
     // User Z
-    ({ token: tokenZ, householdId: hhZ } = await createUserAndHousehold(
-      request,
-      "user-z-auth@baskety.test",
-    ));
+    ({ token: tokenZ, householdId: hhZ } = await createUserAndHousehold(request, emailZAuth));
     // Create inventory in hhZ (owned by user Z)
     const invRes = await request.post(`${BASE}/inventories`, {
       headers: {

@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 const BASE = "/api/v1";
+const RUN_ID = Date.now();
+const emailH = `user-h-${RUN_ID}@baskety.test`;
+const emailH2 = `user-h2-${RUN_ID}@baskety.test`;
+const emailH3 = `user-h3-${RUN_ID}@baskety.test`;
 
 test.describe.serial("Household", () => {
   let tokenH: string;
@@ -13,16 +17,16 @@ test.describe.serial("Household", () => {
   test.beforeAll(async ({ request }) => {
     // Register primary user
     await request.post(`${BASE}/auth/register`, {
-      data: { email: "user-h@baskety.test", name: "User H", password: "password123" },
+      data: { email: emailH, name: "User H", password: "password123" },
     });
     const loginRes = await request.post(`${BASE}/auth/login`, {
-      data: { email: "user-h@baskety.test", password: "password123" },
+      data: { email: emailH, password: "password123" },
     });
     tokenH = (await loginRes.json()).data.token as string;
 
     // Register second user to get their ID
     const reg2Res = await request.post(`${BASE}/auth/register`, {
-      data: { email: "user-h2@baskety.test", name: "User H2", password: "password123" },
+      data: { email: emailH2, name: "User H2", password: "password123" },
     });
     userH2Id = (await reg2Res.json()).data.id as string;
   });
@@ -65,10 +69,10 @@ test.describe.serial("Household", () => {
   test("H04 get other user household returns 404", async ({ request }) => {
     // Register third user and create their household
     await request.post(`${BASE}/auth/register`, {
-      data: { email: "user-h3@baskety.test", name: "User H3", password: "password123" },
+      data: { email: emailH3, name: "User H3", password: "password123" },
     });
     const login3Res = await request.post(`${BASE}/auth/login`, {
-      data: { email: "user-h3@baskety.test", password: "password123" },
+      data: { email: emailH3, password: "password123" },
     });
     const token3 = (await login3Res.json()).data.token as string;
     const hh3Res = await request.post(`${BASE}/households`, {

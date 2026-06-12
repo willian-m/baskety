@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const BASE = "/api/v1";
+const RUN_ID = Date.now();
+const emailA01 = `test-a01-${RUN_ID}@baskety.test`;
 
 test.describe.serial("Auth", () => {
   let tokenA01: string;
@@ -8,20 +10,20 @@ test.describe.serial("Auth", () => {
   // A01 — Register new user
   test("A01 register new user", async ({ request }) => {
     const res = await request.post(`${BASE}/auth/register`, {
-      data: { email: "test-a01@baskety.test", name: "Alice", password: "password123" },
+      data: { email: emailA01, name: "Alice", password: "password123" },
     });
     expect(res.status()).toBe(201);
     const body = await res.json();
     expect(body.data.id).toBeTruthy();
     expect(typeof body.data.id).toBe("string");
-    expect(body.data.email).toBe("test-a01@baskety.test");
+    expect(body.data.email).toBe(emailA01);
     expect(body.data).not.toHaveProperty("password");
   });
 
   // A02 — Register duplicate email
   test("A02 register duplicate email", async ({ request }) => {
     const res = await request.post(`${BASE}/auth/register`, {
-      data: { email: "test-a01@baskety.test", name: "Bob", password: "other" },
+      data: { email: emailA01, name: "Bob", password: "other" },
     });
     expect(res.status()).toBe(409);
     const body = await res.json();
@@ -31,7 +33,7 @@ test.describe.serial("Auth", () => {
   // A03 — Register with missing required fields
   test("A03 register missing fields", async ({ request }) => {
     const res = await request.post(`${BASE}/auth/register`, {
-      data: { email: "missing@baskety.test" },
+      data: { email: `missing-${RUN_ID}@baskety.test` },
     });
     expect(res.status()).toBe(400);
     const body = await res.json();
@@ -41,7 +43,7 @@ test.describe.serial("Auth", () => {
   // A04 — Login with valid credentials
   test("A04 login valid credentials", async ({ request }) => {
     const res = await request.post(`${BASE}/auth/login`, {
-      data: { email: "test-a01@baskety.test", password: "password123" },
+      data: { email: emailA01, password: "password123" },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -52,7 +54,7 @@ test.describe.serial("Auth", () => {
   // A05 — Login with invalid password
   test("A05 login invalid password", async ({ request }) => {
     const res = await request.post(`${BASE}/auth/login`, {
-      data: { email: "test-a01@baskety.test", password: "wrongpassword" },
+      data: { email: emailA01, password: "wrongpassword" },
     });
     expect(res.status()).toBe(401);
     const body = await res.json();

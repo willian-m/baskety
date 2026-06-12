@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const BASE = "/api/v1";
+const RUN_ID = Date.now();
+const emailG = `user-g-${RUN_ID}@baskety.test`;
 
 test.describe.serial("Grocery", () => {
   let tokenG: string;
@@ -14,10 +16,10 @@ test.describe.serial("Grocery", () => {
 
   test.beforeAll(async ({ request }) => {
     await request.post(`${BASE}/auth/register`, {
-      data: { email: "user-g@baskety.test", name: "User G", password: "password123" },
+      data: { email: emailG, name: "User G", password: "password123" },
     });
     const loginRes = await request.post(`${BASE}/auth/login`, {
-      data: { email: "user-g@baskety.test", password: "password123" },
+      data: { email: emailG, password: "password123" },
     });
     tokenG = (await loginRes.json()).data.token as string;
 
