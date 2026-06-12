@@ -5,7 +5,7 @@ import React from "react";
 export default function AppLayout() {
   const token = useUiStore((s) => s.token);
   if (!token) {
-    return <Redirect href="/(auth)/onboarding" />;
+    return <Redirect href="/(auth)/login" />;
   }
   return <Stack />;
 }
