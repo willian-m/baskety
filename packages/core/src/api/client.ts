@@ -1,4 +1,4 @@
-import { useUiStore } from "../stores/uiStore.js";
+import { useUiStore } from "../stores/uiStore";
 
 import { ApiError } from "./types.js";
 

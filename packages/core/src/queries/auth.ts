@@ -8,7 +8,7 @@ import type {
   RegisterRequest,
   User,
 } from "../api/types.js";
-import { useUiStore } from "../stores/uiStore.js";
+import { useUiStore } from "../stores/uiStore";
 
 export function useLogin() {
   const setSession = useUiStore((s) => s.setSession);

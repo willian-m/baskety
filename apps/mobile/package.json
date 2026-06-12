@@ -14,6 +14,10 @@
   "dependencies": {
     "@baskety/core": "workspace:*",
     "@baskety/ui": "workspace:*",
+    "@react-native-async-storage/async-storage": "^2.1.2",
+    "@tanstack/query-async-storage-persister": "^5.101.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-persist-client": "^5.101.0",
     "@expo/metro-runtime": "~6.1.2",
     "expo": "~54.0.35",
     "expo-constants": "~18.0.13",

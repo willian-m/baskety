@@ -1,1 +1,1 @@
-export * from "./uiStore.js";
+export * from "./uiStore";
