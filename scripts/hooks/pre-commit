@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# mise-managed runtimes are not on PATH in hook context — add shims
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
 # ── 1. Block .claude/ from ever being committed ──────────────────────────────
 if git diff --cached --name-only | grep -q '^\.claude/'; then
   echo "ERROR: Attempted to commit files under .claude/ — this directory must never be committed."
