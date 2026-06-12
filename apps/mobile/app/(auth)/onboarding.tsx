@@ -51,9 +51,10 @@ export default function OnboardingScreen() {
     setError(null);
     setLocalUrlError(null);
 
+    const base = trimmed.replace(/\/+$/, "");
     setIsChecking(true);
     try {
-      const res = await fetch(trimmed + "/healthz", {
+      const res = await fetch(base + "/healthz", {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {
