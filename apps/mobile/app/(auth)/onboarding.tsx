@@ -1,0 +1,110 @@
+import { useUiStore } from "@baskety/core";
+import { Button, TextInput } from "@baskety/ui";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+function isValidUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+export default function OnboardingScreen() {
+  const router = useRouter();
+  const setActiveServerUrl = useUiStore((s) => s.setActiveServerUrl);
+
+  const [externalUrl, setExternalUrl] = useState("");
+  const [ssid, setSsid] = useState("");
+  const [localUrl, setLocalUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function handleGetStarted() {
+    const trimmed = externalUrl.trim();
+    if (!trimmed) {
+      setError("Server URL is required.");
+      return;
+    }
+    if (!isValidUrl(trimmed)) {
+      setError("URL must start with http:// or https://");
+      return;
+    }
+    setError(null);
+    setActiveServerUrl(trimmed);
+    router.replace("/(auth)/login");
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Text style={styles.logo}>Baskety</Text>
+          <Text style={styles.subtitle}>Self-hosted grocery management</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Server URL</Text>
+          <Text style={styles.hint}>
+            The address where your Baskety server is running.
+          </Text>
+          <TextInput
+            value={externalUrl}
+            onChange={setExternalUrl}
+            placeholder="https://baskety.example.com"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Home Network (optional)</Text>
+          <Text style={styles.hint}>
+            Use a faster local URL when connected to your home WiFi.
+          </Text>
+          <TextInput
+            value={ssid}
+            onChange={setSsid}
+            placeholder="WiFi network name (SSID)"
+          />
+          <View style={styles.spacer} />
+          <TextInput
+            value={localUrl}
+            onChange={setLocalUrl}
+            placeholder="http://192.168.1.10:8080"
+          />
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Button label="Get Started" onPress={handleGetStarted} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  container: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: "center",
+    gap: 24,
+  },
+  header: { alignItems: "center", gap: 8 },
+  logo: { fontSize: 36, fontWeight: "700" },
+  subtitle: { fontSize: 16, color: "#6b7280" },
+  section: { gap: 8 },
+  label: { fontSize: 16, fontWeight: "600" },
+  hint: { fontSize: 13, color: "#6b7280" },
+  spacer: { height: 8 },
+  error: { color: "#ef4444", fontSize: 14 },
+});
