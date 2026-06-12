@@ -1,4 +1,4 @@
-import NetInfo from "@react-native-community/netinfo";
+import NetInfo, { NetInfoStateType } from "@react-native-community/netinfo";
 import { useUiStore } from "@baskety/core";
 import { useEffect } from "react";
 
@@ -9,9 +9,11 @@ export function useServerUrl(): string | null {
   const activeServerUrl = useUiStore((s) => s.activeServerUrl);
 
   useEffect(() => {
-    let cancelled = false;
-
     NetInfo.configure({ shouldFetchWiFiSSID: true });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
 
     function resolve(ssid: string | null): void {
       if (cancelled) return;
@@ -29,7 +31,9 @@ export function useServerUrl(): string | null {
       const state = await NetInfo.fetch();
       if (cancelled) return;
       const ssid =
-        state.type === "wifi" && state.details?.ssid ? state.details.ssid : null;
+        state.type === NetInfoStateType.wifi && state.details.ssid
+          ? state.details.ssid
+          : null;
       resolve(ssid);
     }
 
@@ -37,7 +41,9 @@ export function useServerUrl(): string | null {
 
     const unsubscribe = NetInfo.addEventListener((state) => {
       const ssid =
-        state.type === "wifi" && state.details?.ssid ? state.details.ssid : null;
+        state.type === NetInfoStateType.wifi && state.details.ssid
+          ? state.details.ssid
+          : null;
       resolve(ssid);
     });
 
