@@ -100,6 +100,8 @@ pnpm exec playwright test --project=api 2>&1 || API_EXIT=$?
 
 # ── Vite dev server ───────────────────────────────────────────────────────────
 echo ""
+echo "==> Killing any existing process on port 5173..."
+lsof -ti:5173 | xargs kill -9 2>/dev/null || true
 echo "==> Starting Vite dev server..."
 pnpm --filter @baskety/web dev &
 WEB_PID=$!
