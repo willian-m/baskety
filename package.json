@@ -13,12 +13,15 @@
     "lint": "turbo run lint",
     "lint:root": "eslint .",
     "test": "turbo run test",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=chromium",
     "dev": "turbo run dev",
     "clean": "turbo run clean",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "turbo": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
