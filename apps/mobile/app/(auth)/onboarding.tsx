@@ -1,4 +1,5 @@
 import { useUiStore } from "@baskety/core";
+import type { NetworkProfile } from "@baskety/core";
 import { Button, TextInput } from "@baskety/ui";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -22,7 +23,8 @@ function isValidUrl(url: string): boolean {
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const setActiveServerUrl = useUiStore((s) => s.setActiveServerUrl);
+  const setExternalUrl = useUiStore((s) => s.setExternalUrl);
+  const addProfile = useUiStore((s) => s.addProfile);
 
   const [externalUrl, setExternalUrl] = useState("");
   const [ssid, setSsid] = useState("");
@@ -46,7 +48,17 @@ export default function OnboardingScreen() {
     }
     setError(null);
     setLocalUrlError(null);
-    setActiveServerUrl(trimmed);
+    setExternalUrl(trimmed);
+    // Persist optional home-network profile
+    if (ssid.trim() && localUrl.trim()) {
+      const profile: NetworkProfile = {
+        id: Date.now().toString(),
+        label: "Home",
+        ssids: [ssid.trim()],
+        serverUrl: localUrl.trim(),
+      };
+      addProfile(profile);
+    }
     router.replace("/(auth)/login");
   }
 
