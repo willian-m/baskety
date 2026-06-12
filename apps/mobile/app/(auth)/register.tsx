@@ -1,4 +1,5 @@
-import { ApiError, useLogin, useRegister, useUiStore } from "@baskety/core";
+import { ApiError, request, useLogin, useRegister, useUiStore } from "@baskety/core";
+import type { HouseholdResponse } from "@baskety/core";
 import { Button, TextInput } from "@baskety/ui";
 import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -20,10 +21,9 @@ function validate(name: string, email: string, password: string): string | null 
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const register_ = useRegister();
+  const registerMutation = useRegister();
   const login = useLogin();
   const setActiveHousehold = useUiStore((s) => s.setActiveHousehold);
-  const activeServerUrl = useUiStore((s) => s.activeServerUrl);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,20 +40,13 @@ export default function RegisterScreen() {
     setError(null);
     setLoading(true);
     try {
-      await register_.mutateAsync({ name: name.trim(), email: email.trim(), password });
-      // Auto-login
-      const authData = await login.mutateAsync({ email: email.trim(), password });
-      // Activate first household
+      await registerMutation.mutateAsync({ name: name.trim(), email: email.trim(), password });
+      // Auto-login — setSession is called by the mutation's onSuccess handler.
+      await login.mutateAsync({ email: email.trim(), password });
+      // Use core request() which reads token + base URL from the store.
       try {
-        const res = await fetch(
-          `${activeServerUrl ?? ""}/api/v1/households`,
-          { headers: { Authorization: `Bearer ${authData.token}` } },
-        );
-        if (res.ok) {
-          const body = (await res.json()) as { data?: Array<{ id: string }> };
-          const first = body.data?.[0];
-          if (first) setActiveHousehold(first.id);
-        }
+        const households = await request<HouseholdResponse[]>("/households");
+        if (households.length > 0) setActiveHousehold(households[0].id);
       } catch {
         // Non-fatal
       }
