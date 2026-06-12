@@ -114,3 +114,17 @@ export function useUpdateListItem(inventoryId: string, listId: string) {
     },
   });
 }
+
+export function useAutoGenerateList(inventoryId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      request<GroceryListResponse>(`/inventories/${inventoryId}/lists/auto-generate`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "lists"] });
+    },
+  });
+}

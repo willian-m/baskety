@@ -2,7 +2,9 @@ import type { LLMProviderResponse, OCRProviderResponse } from "@baskety/core";
 import {
   useCreateLLMProvider,
   useCreateOCRProvider,
+  useCreateShareLink,
   useHouseholds,
+  useInventories,
   useLLMProviders,
   useOCRProviders,
   useUiStore,
@@ -271,6 +273,94 @@ function HouseholdSection() {
   );
 }
 
+// ── Share Links section ───────────────────────────────────────────────────────
+
+function ShareLinksSection() {
+  const { data: inventories } = useInventories();
+  const createShareLink = useCreateShareLink();
+  const [selectedInventoryId, setSelectedInventoryId] = useState("");
+  const [password, setPassword] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    if (!selectedInventoryId) return;
+    const link = await createShareLink.mutateAsync({
+      inventory_id: selectedInventoryId,
+      password: password.trim() || null,
+    });
+    const base = window.location.origin;
+    setShareUrl(`${base}/share/${link.token}`);
+    setSelectedInventoryId("");
+    setPassword("");
+  };
+
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-semibold">Share Links</h2>
+      <div className="rounded-lg border p-4">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Create a read-only share link to your inventory.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <select
+            data-testid="share-inventory-select"
+            value={selectedInventoryId}
+            onChange={(e) => setSelectedInventoryId(e.target.value)}
+            className={`${inputCls} w-52`}
+          >
+            <option value="">Select inventory…</option>
+            {(inventories ?? []).map((inv) => (
+              <option key={inv.id} value={inv.id}>
+                {inv.name}
+              </option>
+            ))}
+          </select>
+          <input
+            data-testid="share-password-input"
+            type="text"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (optional)"
+            className={`${inputCls} w-48`}
+          />
+          <button
+            type="button"
+            data-testid="share-create-button"
+            onClick={() => void handleCreate()}
+            disabled={!selectedInventoryId || createShareLink.isPending}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {createShareLink.isPending ? "Creating…" : "Create share link"}
+          </button>
+        </div>
+        {shareUrl && (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              data-testid="share-link-url"
+              readOnly
+              value={shareUrl}
+              className={`${inputCls} flex-1 bg-muted`}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard.writeText(shareUrl)}
+              className="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm hover:bg-muted"
+            >
+              Copy
+            </button>
+          </div>
+        )}
+        {createShareLink.isError && (
+          <p className="mt-2 text-sm text-destructive">
+            {(createShareLink.error as Error).message ?? "Failed to create share link."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -279,6 +369,7 @@ export function SettingsPage() {
       <h1 className="mb-6 text-2xl font-bold tracking-tight">Settings</h1>
       <div className="flex flex-col gap-8">
         <HouseholdSection />
+        <ShareLinksSection />
         <LLMSection />
         <OCRSection />
       </div>

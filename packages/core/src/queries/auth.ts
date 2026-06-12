@@ -6,6 +6,7 @@ import type {
   HouseholdResponse,
   LoginRequest,
   RegisterRequest,
+  ShareLinkResponse,
   User,
 } from "../api/types.js";
 // Extensionless on purpose: lets Metro resolve uiStore.native.ts on native.
@@ -65,5 +66,22 @@ export function useCreateHousehold() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["households"] });
     },
+  });
+}
+
+interface CreateShareLinkRequest {
+  inventory_id: string;
+  password?: string | null;
+  expires_at?: string | null;
+}
+
+export function useCreateShareLink() {
+  const activeHouseholdId = useUiStore((s) => s.activeHouseholdId);
+  return useMutation({
+    mutationFn: (body: CreateShareLinkRequest) =>
+      request<ShareLinkResponse>(`/households/${activeHouseholdId}/share-links`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   });
 }

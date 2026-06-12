@@ -1,5 +1,5 @@
-import { useCreateList, useGroceryLists, useInventories } from "@baskety/core";
-import { Link } from "@tanstack/react-router";
+import { useAutoGenerateList, useCreateList, useGroceryLists, useInventories } from "@baskety/core";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { SetupWizard } from "../inventory/SetupWizard.js";
@@ -12,6 +12,13 @@ export function GroceryPage() {
   const inventoryId = inventories?.[0]?.id ?? "";
   const { data: lists, isLoading: loadingLists } = useGroceryLists(inventoryId);
   const createList = useCreateList(inventoryId);
+  const autoGenerate = useAutoGenerateList(inventoryId);
+  const navigate = useNavigate();
+
+  const handleAutoGenerate = async () => {
+    const list = await autoGenerate.mutateAsync();
+    await navigate({ to: "/grocery/$listId", params: { listId: list.id } });
+  };
 
   if (loadingInv) {
     return (
@@ -56,13 +63,24 @@ export function GroceryPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Grocery Lists</h1>
-        <button
-          type="button"
-          onClick={() => setShowCreate((v) => !v)}
-          className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          New list
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="auto-generate-button"
+            onClick={() => void handleAutoGenerate()}
+            disabled={autoGenerate.isPending || !inventoryId}
+            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {autoGenerate.isPending ? "Generating…" : "Auto-generate"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreate((v) => !v)}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            New list
+          </button>
+        </div>
       </div>
 
       {showCreate && (
