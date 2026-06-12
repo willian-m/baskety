@@ -7,5 +7,5 @@ export default function AppLayout() {
   if (!token) {
     return <Redirect href="/(auth)/login" />;
   }
-  return <Stack />;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
