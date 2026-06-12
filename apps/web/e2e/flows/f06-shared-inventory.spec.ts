@@ -1,7 +1,7 @@
 import { expect, type Page, request as pwRequest, test } from "@playwright/test";
 
 const BASE = "http://localhost:8080";
-const EMAIL = "f06-flow@baskety.test";
+const EMAIL = `f06-flow-${Date.now()}@baskety.test`;
 const PASSWORD = "F06P@ss123";
 const SHARE_PASSWORD = "sharepass6";
 
