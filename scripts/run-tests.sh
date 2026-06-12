@@ -81,7 +81,7 @@ cd "$PROJECT_ROOT"
 echo ""
 echo "==> Installing Playwright dependencies..."
 pnpm install --frozen-lockfile=false 2>/dev/null || pnpm install
-pnpm exec playwright install --with-deps chromium
+pnpm exec playwright install chromium
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 mkdir -p "$PROJECT_ROOT/docs/fixtures"
