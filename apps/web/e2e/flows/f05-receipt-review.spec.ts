@@ -1,10 +1,13 @@
 import * as path from "path";
+import { fileURLToPath } from "url";
 
 import { expect, type Page, request as pwRequest, test } from "@playwright/test";
 
 const BASE = "http://localhost:8080";
-const EMAIL = "f05-flow@baskety.test";
+const EMAIL = `f05-flow-${Date.now()}@baskety.test`;
 const PASSWORD = "F05P@ss123";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const FIXTURE = path.resolve(__dirname, "../../../..", "docs/fixtures/sample_receipt.jpg");
 
 let token = "";
