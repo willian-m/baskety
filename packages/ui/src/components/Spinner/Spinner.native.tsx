@@ -14,7 +14,7 @@ const rnSizeMap: Record<string, "small" | "large"> = {
 export function Spinner({ size = "md" }: SpinnerProps) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size={rnSizeMap[size]} color="#2563eb" />
+      <ActivityIndicator size={rnSizeMap[size]} color="#2563eb" accessibilityLabel="Loading" />
     </View>
   );
 }

@@ -10,8 +10,6 @@ export function ExpiryBadge({ expiresAt }: ExpiryBadgeProps) {
   const diff = new Date(expiresAt).getTime() - Date.now();
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
   if (days < 0) return <Badge label="Expired" variant="danger" />;
-  if (days === 0) return <Badge label="Expiring today" variant="warning" />;
-  if (days <= 3) return <Badge label={`${days}d left`} variant="warning" />;
-  if (days <= 7) return <Badge label={`${days}d left`} variant="info" />;
+  if (days <= 7) return <Badge label={days === 0 ? "Expiring today" : `Expiring in ${days}d`} variant="warning" />;
   return null;
 }
