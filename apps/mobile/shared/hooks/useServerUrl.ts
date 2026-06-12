@@ -1,0 +1,53 @@
+import { useUiStore } from "@baskety/core";
+import NetInfo, { NetInfoStateType } from "@react-native-community/netinfo";
+import { useEffect } from "react";
+
+export function useServerUrl(): string | null {
+  const networkProfiles = useUiStore((s) => s.networkProfiles);
+  const externalUrl = useUiStore((s) => s.externalUrl);
+  const setActiveServerUrl = useUiStore((s) => s.setActiveServerUrl);
+  const activeServerUrl = useUiStore((s) => s.activeServerUrl);
+
+  useEffect(() => {
+    NetInfo.configure({ shouldFetchWiFiSSID: true });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function resolve(ssid: string | null): void {
+      if (cancelled) return;
+      if (ssid) {
+        const match = networkProfiles.find((p) => p.ssids.includes(ssid));
+        if (match) {
+          setActiveServerUrl(match.serverUrl);
+          return;
+        }
+      }
+      setActiveServerUrl(externalUrl);
+    }
+
+    async function resolveFromCurrentState(): Promise<void> {
+      const state = await NetInfo.fetch();
+      if (cancelled) return;
+      const ssid =
+        state.type === NetInfoStateType.wifi && state.details.ssid ? state.details.ssid : null;
+      resolve(ssid);
+    }
+
+    void resolveFromCurrentState();
+
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const ssid =
+        state.type === NetInfoStateType.wifi && state.details.ssid ? state.details.ssid : null;
+      resolve(ssid);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [networkProfiles, externalUrl, setActiveServerUrl]);
+
+  return activeServerUrl;
+}

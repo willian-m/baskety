@@ -16,13 +16,10 @@ interface UiState {
   externalUrl: string | null;
   networkProfiles: NetworkProfile[];
   sidebarCollapsed: boolean;
-  _hasHydrated: boolean;
-  setHasHydrated: (state: boolean) => void;
   setSession: (token: string, firstHouseholdId?: string) => void;
   clearSession: () => void;
   setActiveHousehold: (id: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  toggleSidebar: () => void;
   setActiveServerUrl: (url: string | null) => void;
   setExternalUrl: (url: string | null) => void;
   addProfile: (profile: NetworkProfile) => void;
@@ -39,14 +36,11 @@ export const useUiStore = create<UiState>()(
       externalUrl: null,
       networkProfiles: [],
       sidebarCollapsed: false,
-      _hasHydrated: false,
-      setHasHydrated: (state) => set({ _hasHydrated: state }),
       setSession: (token, firstHouseholdId) =>
         set({ token, activeHouseholdId: firstHouseholdId ?? null }),
       clearSession: () => set({ token: null, activeHouseholdId: null }),
       setActiveHousehold: (id) => set({ activeHouseholdId: id }),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setActiveServerUrl: (url) => set({ activeServerUrl: url }),
       setExternalUrl: (url) => set({ externalUrl: url }),
       addProfile: (profile) => set((s) => ({ networkProfiles: [...s.networkProfiles, profile] })),
@@ -68,12 +62,8 @@ export const useUiStore = create<UiState>()(
         externalUrl: state.externalUrl,
         networkProfiles: state.networkProfiles,
         sidebarCollapsed: state.sidebarCollapsed,
-        // activeServerUrl: NOT persisted — runtime, computed by useServerUrl
-        // _hasHydrated: NOT persisted — recomputed on rehydration
+        // activeServerUrl is NOT persisted — recomputed by useServerUrl on mount
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
     },
   ),
 );
