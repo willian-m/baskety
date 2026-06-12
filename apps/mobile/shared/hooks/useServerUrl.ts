@@ -2,62 +2,50 @@ import NetInfo from "@react-native-community/netinfo";
 import { useUiStore } from "@baskety/core";
 import { useEffect } from "react";
 
-export interface NetworkProfile {
-  ssid: string;
-  localUrl: string;
-}
-
-/**
- * Reads the active WiFi SSID via NetInfo.
- * If it matches a saved network profile, sets the local URL as activeServerUrl.
- * Falls back to the externalUrl stored in the Zustand store.
- * Returns the currently resolved server URL.
- */
-export function useServerUrl(
-  profiles: NetworkProfile[] = [],
-  externalUrl: string | null = null,
-): string | null {
+export function useServerUrl(): string | null {
+  const networkProfiles = useUiStore((s) => s.networkProfiles);
+  const externalUrl = useUiStore((s) => s.externalUrl);
   const setActiveServerUrl = useUiStore((s) => s.setActiveServerUrl);
   const activeServerUrl = useUiStore((s) => s.activeServerUrl);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function resolveUrl() {
-      const state = await NetInfo.fetch();
-      if (cancelled) return;
+    NetInfo.configure({ shouldFetchWiFiSSID: true });
 
-      if (state.type === "wifi" && state.details?.ssid) {
-        const ssid = state.details.ssid;
-        const match = profiles.find((p) => p.ssid === ssid);
+    function resolve(ssid: string | null): void {
+      if (cancelled) return;
+      if (ssid) {
+        const match = networkProfiles.find((p) => p.ssids.includes(ssid));
         if (match) {
-          setActiveServerUrl(match.localUrl);
+          setActiveServerUrl(match.serverUrl);
           return;
         }
       }
       setActiveServerUrl(externalUrl);
     }
 
-    void resolveUrl();
+    async function resolveFromCurrentState(): Promise<void> {
+      const state = await NetInfo.fetch();
+      if (cancelled) return;
+      const ssid =
+        state.type === "wifi" && state.details?.ssid ? state.details.ssid : null;
+      resolve(ssid);
+    }
+
+    void resolveFromCurrentState();
 
     const unsubscribe = NetInfo.addEventListener((state) => {
-      if (cancelled) return;
-      if (state.type === "wifi" && state.details?.ssid) {
-        const ssid = state.details.ssid;
-        const match = profiles.find((p) => p.ssid === ssid);
-        if (match) {
-          setActiveServerUrl(match.localUrl);
-          return;
-        }
-      }
-      setActiveServerUrl(externalUrl);
+      const ssid =
+        state.type === "wifi" && state.details?.ssid ? state.details.ssid : null;
+      resolve(ssid);
     });
 
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [profiles, externalUrl, setActiveServerUrl]);
+  }, [networkProfiles, externalUrl, setActiveServerUrl]);
 
   return activeServerUrl;
 }
