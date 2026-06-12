@@ -103,7 +103,7 @@ test.describe.serial("F02: Inventory item and batch management via UI", () => {
 
     await page.getByRole("button", { name: "Add batch" }).click();
     await page.getByPlaceholder("Quantity").fill("2");
-    await page.getByRole("button", { name: "Add" }).click();
+    await page.getByRole("button", { name: "Add", exact: true }).click();
 
     // Batch row should show "2 kg"
     await expect(page.getByText(/2 kg/)).toBeVisible({ timeout: 10_000 });
