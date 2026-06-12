@@ -20,6 +20,7 @@ type mockRepo struct {
 	removeMemberFn          func(ctx context.Context, householdID, userID uuid.UUID) error
 	findMemberFn            func(ctx context.Context, householdID, userID uuid.UUID) (*household.Member, error)
 	createShareLinkFn       func(ctx context.Context, inventoryID, createdByUserID uuid.UUID, token string, passwordHash *string, expiresAt *time.Time) (*household.ShareLink, error)
+	findShareLinkByTokenFn  func(ctx context.Context, token string) (*household.ShareLink, error)
 }
 
 func (m *mockRepo) CreateHousehold(ctx context.Context, name string, createdBy uuid.UUID) (*household.Household, error) {
@@ -42,6 +43,12 @@ func (m *mockRepo) FindMember(ctx context.Context, householdID, userID uuid.UUID
 }
 func (m *mockRepo) CreateShareLink(ctx context.Context, inventoryID, createdByUserID uuid.UUID, token string, passwordHash *string, expiresAt *time.Time) (*household.ShareLink, error) {
 	return m.createShareLinkFn(ctx, inventoryID, createdByUserID, token, passwordHash, expiresAt)
+}
+func (m *mockRepo) FindShareLinkByToken(ctx context.Context, token string) (*household.ShareLink, error) {
+	if m.findShareLinkByTokenFn != nil {
+		return m.findShareLinkByTokenFn(ctx, token)
+	}
+	return nil, nil
 }
 
 func TestCreateHousehold_Success(t *testing.T) {
