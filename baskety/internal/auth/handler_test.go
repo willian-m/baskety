@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -31,10 +32,30 @@ func (m *mockService) Logout(ctx context.Context, sessionID uuid.UUID) error {
 	return m.logoutFn(ctx, sessionID)
 }
 
+// noopRepo satisfies auth.Repository for handler-level tests that don't
+// exercise the auth middleware (session lookup is done by the middleware, not
+// by the handler itself).  The handler tests that test logout set the session
+// ID directly in the request context, bypassing middleware.
+type noopRepo struct{}
+
+func (noopRepo) CreateUser(_ context.Context, _, _, _ string) (*auth.User, error) {
+	return nil, nil
+}
+func (noopRepo) FindUserByEmail(_ context.Context, _ string) (*auth.User, error) {
+	return nil, auth.ErrNotFound
+}
+func (noopRepo) CreateSession(_ context.Context, _ uuid.UUID, _ string, _ *time.Time) (*auth.Session, error) {
+	return nil, nil
+}
+func (noopRepo) FindSessionByTokenHash(_ context.Context, _ string) (*auth.Session, error) {
+	return nil, auth.ErrNotFound
+}
+func (noopRepo) RevokeSession(_ context.Context, _ uuid.UUID) error { return nil }
+
 func setupRouter(svc auth.ServiceIface) *chi.Mux {
 	r := chi.NewRouter()
 	h := auth.NewHandler(svc)
-	auth.RegisterRoutes(r, h)
+	auth.RegisterRoutes(r, h, noopRepo{})
 	return r
 }
 
@@ -107,6 +128,8 @@ func TestHandleLogin_InvalidCredentials(t *testing.T) {
 }
 
 func TestHandleLogout_Success(t *testing.T) {
+	// Test the handler directly (bypassing the auth middleware) by injecting
+	// the session ID into the request context, as the middleware would do.
 	sessionID := uuid.New()
 	svc := &mockService{
 		logoutFn: func(_ context.Context, id uuid.UUID) error {
@@ -114,20 +137,21 @@ func TestHandleLogout_Success(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(svc)
+	h := auth.NewHandler(svc)
 	req := httptest.NewRequest(http.MethodDelete, "/session", nil)
 	ctx := context.WithValue(req.Context(), auth.SessionIDContextKey, sessionID)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	h.HandleLogout(w, req)
 	assert.Equal(t, http.StatusNoContent, w.Code)
 }
 
 func TestHandleLogout_Unauthorized(t *testing.T) {
+	// Without a session ID in the context the handler must reject the request.
 	svc := &mockService{}
-	r := setupRouter(svc)
+	h := auth.NewHandler(svc)
 	req := httptest.NewRequest(http.MethodDelete, "/session", nil)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	h.HandleLogout(w, req)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }

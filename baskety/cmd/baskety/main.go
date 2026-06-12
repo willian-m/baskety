@@ -136,9 +136,9 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	shared.RegisterOpenAPIRoute(r)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// public auth routes — no auth middleware
+		// auth routes — /register and /login are public; DELETE /session requires auth
 		r.Route("/auth", func(r chi.Router) {
-			auth.RegisterRoutes(r, authHandler)
+			auth.RegisterRoutes(r, authHandler, authRepo)
 		})
 		// public share-token routes — no auth middleware
 		r.Route("/share", func(r chi.Router) {
