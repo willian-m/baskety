@@ -1,4 +1,5 @@
-import { ApiError, useLogin, useUiStore } from "@baskety/core";
+import { ApiError, request, useLogin, useUiStore } from "@baskety/core";
+import type { HouseholdResponse } from "@baskety/core";
 import { Button, TextInput } from "@baskety/ui";
 import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -15,7 +16,6 @@ export default function LoginScreen() {
   const router = useRouter();
   const login = useLogin();
   const setActiveHousehold = useUiStore((s) => s.setActiveHousehold);
-  const activeServerUrl = useUiStore((s) => s.activeServerUrl);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,22 +31,12 @@ export default function LoginScreen() {
     setError(null);
     setLoading(true);
     try {
-      const authData = await login.mutateAsync({
-        email: trimmedEmail,
-        password,
-      });
-      // After mutateAsync resolves, setSession has already been called by the
-      // mutation's onSuccess handler. Fetch the first household and activate it.
+      await login.mutateAsync({ email: trimmedEmail, password });
+      // setSession is called by the mutation's onSuccess — token is in store now.
+      // Use the core request() client which reads token + base URL from the store.
       try {
-        const res = await fetch(
-          `${activeServerUrl ?? ""}/api/v1/households`,
-          { headers: { Authorization: `Bearer ${authData.token}` } },
-        );
-        if (res.ok) {
-          const body = (await res.json()) as { data?: Array<{ id: string }> };
-          const first = body.data?.[0];
-          if (first) setActiveHousehold(first.id);
-        }
+        const households = await request<HouseholdResponse[]>("/households");
+        if (households.length > 0) setActiveHousehold(households[0].id);
       } catch {
         // Non-fatal: household selection can be deferred
       }
