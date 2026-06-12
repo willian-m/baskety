@@ -58,12 +58,17 @@ func (h *Handler) HandleCreateHousehold(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) HandleGetHousehold(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
 	id, err := uuid.Parse(chi.URLParam(r, "householdID"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid household ID"})
 		return
 	}
-	resp, err := h.svc.GetHousehold(r.Context(), id)
+	resp, err := h.svc.GetHousehold(r.Context(), id, userID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})

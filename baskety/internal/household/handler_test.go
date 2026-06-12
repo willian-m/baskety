@@ -18,7 +18,7 @@ import (
 
 type mockService struct {
 	createHouseholdFn func(ctx context.Context, name string, createdBy uuid.UUID) (*household.HouseholdResponse, error)
-	getHouseholdFn    func(ctx context.Context, id uuid.UUID) (*household.HouseholdResponse, error)
+	getHouseholdFn    func(ctx context.Context, id uuid.UUID, requestingUserID uuid.UUID) (*household.HouseholdResponse, error)
 	listHouseholdsFn  func(ctx context.Context, userID uuid.UUID) ([]household.HouseholdResponse, error)
 	addMemberFn       func(ctx context.Context, householdID, invitedByUserID uuid.UUID, req household.AddMemberRequest) (*household.MemberResponse, error)
 	removeMemberFn    func(ctx context.Context, householdID, userID uuid.UUID) error
@@ -28,8 +28,8 @@ type mockService struct {
 func (m *mockService) CreateHousehold(ctx context.Context, name string, createdBy uuid.UUID) (*household.HouseholdResponse, error) {
 	return m.createHouseholdFn(ctx, name, createdBy)
 }
-func (m *mockService) GetHousehold(ctx context.Context, id uuid.UUID) (*household.HouseholdResponse, error) {
-	return m.getHouseholdFn(ctx, id)
+func (m *mockService) GetHousehold(ctx context.Context, id uuid.UUID, requestingUserID uuid.UUID) (*household.HouseholdResponse, error) {
+	return m.getHouseholdFn(ctx, id, requestingUserID)
 }
 func (m *mockService) ListHouseholds(ctx context.Context, userID uuid.UUID) ([]household.HouseholdResponse, error) {
 	return m.listHouseholdsFn(ctx, userID)
@@ -93,26 +93,30 @@ func TestHandleCreateHousehold(t *testing.T) {
 
 func TestHandleGetHousehold(t *testing.T) {
 	hID := uuid.New()
+	userID := uuid.New()
 	svc := &mockService{
-		getHouseholdFn: func(_ context.Context, id uuid.UUID) (*household.HouseholdResponse, error) {
+		getHouseholdFn: func(_ context.Context, id uuid.UUID, _ uuid.UUID) (*household.HouseholdResponse, error) {
 			return &household.HouseholdResponse{ID: id.String(), Name: "H1"}, nil
 		},
 	}
 	r := setupRouter(svc)
 	req := httptest.NewRequest(http.MethodGet, "/"+hID.String(), nil)
+	req = withUserID(req, userID)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestHandleGetHousehold_NotFound(t *testing.T) {
+	userID := uuid.New()
 	svc := &mockService{
-		getHouseholdFn: func(_ context.Context, _ uuid.UUID) (*household.HouseholdResponse, error) {
+		getHouseholdFn: func(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*household.HouseholdResponse, error) {
 			return nil, household.ErrNotFound
 		},
 	}
 	r := setupRouter(svc)
 	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req = withUserID(req, userID)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusNotFound, w.Code)

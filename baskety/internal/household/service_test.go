@@ -78,7 +78,7 @@ func TestGetHousehold_NotFound(t *testing.T) {
 		},
 	}
 	svc := household.NewService(repo)
-	_, err := svc.GetHousehold(context.Background(), uuid.New())
+	_, err := svc.GetHousehold(context.Background(), uuid.New(), uuid.New())
 	assert.Error(t, err)
 }
 

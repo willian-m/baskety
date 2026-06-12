@@ -17,7 +17,7 @@ var ErrInvalidInput = errors.New("invalid input")
 // ServiceIface allows handler testing with mocks.
 type ServiceIface interface {
 	CreateHousehold(ctx context.Context, name string, createdBy uuid.UUID) (*HouseholdResponse, error)
-	GetHousehold(ctx context.Context, id uuid.UUID) (*HouseholdResponse, error)
+	GetHousehold(ctx context.Context, id uuid.UUID, requestingUserID uuid.UUID) (*HouseholdResponse, error)
 	ListHouseholds(ctx context.Context, userID uuid.UUID) ([]HouseholdResponse, error)
 	AddMember(ctx context.Context, householdID, invitedByUserID uuid.UUID, req AddMemberRequest) (*MemberResponse, error)
 	RemoveMember(ctx context.Context, householdID, userID uuid.UUID) error
@@ -46,10 +46,14 @@ func (s *Service) CreateHousehold(ctx context.Context, name string, createdBy uu
 	return &HouseholdResponse{ID: h.ID.String(), Name: h.Name, CreatedAt: h.CreatedAt}, nil
 }
 
-func (s *Service) GetHousehold(ctx context.Context, id uuid.UUID) (*HouseholdResponse, error) {
+func (s *Service) GetHousehold(ctx context.Context, id uuid.UUID, requestingUserID uuid.UUID) (*HouseholdResponse, error) {
 	h, err := s.repo.FindHouseholdByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if _, err := s.repo.FindMember(ctx, id, requestingUserID); err != nil {
+		// Treat any error (including ErrNotFound) as "not a member" → 404
+		return nil, fmt.Errorf("membership check: %w", ErrNotFound)
 	}
 	return &HouseholdResponse{ID: h.ID.String(), Name: h.Name, CreatedAt: h.CreatedAt}, nil
 }
