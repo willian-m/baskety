@@ -1,7 +1,7 @@
 import { expect, type Page, request as pwRequest, test } from "@playwright/test";
 
 const BASE = "http://localhost:8080";
-const EMAIL = "f04-flow@baskety.test";
+const EMAIL = `f04-flow-${Date.now()}@baskety.test`;
 const PASSWORD = "F04P@ss123";
 
 let token = "";
@@ -91,11 +91,18 @@ test.describe.serial("F04: Shopping trip — check off items and complete the li
       timeout: 10_000,
     });
 
-    // Check the first item checkbox
+    // Check the first item checkbox.
+    // Note: after toggling, the item moves from the Pending group to the Bought
+    // group (DOM order: Pending first, then Bought). The positional .first()
+    // locator would then resolve to the remaining pending item, which is still
+    // unchecked. Instead we verify that at least one checked checkbox appears
+    // anywhere on the page — i.e. the item successfully moved to Bought.
     const firstCheckbox = page.locator('input[type="checkbox"]').first();
     await expect(firstCheckbox).not.toBeChecked();
     await firstCheckbox.click();
-    await expect(firstCheckbox).toBeChecked({ timeout: 10_000 });
+    await expect(page.locator('input[type="checkbox"]:checked')).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("complete the list and return to grocery list view", async ({ page }) => {
