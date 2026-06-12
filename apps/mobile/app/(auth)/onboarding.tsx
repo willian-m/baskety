@@ -23,7 +23,7 @@ function isValidUrl(url: string): boolean {
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const setExternalUrl = useUiStore((s) => s.setExternalUrl);
+  const persistExternalUrl = useUiStore((s) => s.setExternalUrl);
   const addProfile = useUiStore((s) => s.addProfile);
 
   const [externalUrl, setExternalUrl] = useState("");
@@ -48,7 +48,7 @@ export default function OnboardingScreen() {
     }
     setError(null);
     setLocalUrlError(null);
-    setExternalUrl(trimmed);
+    persistExternalUrl(trimmed);
     // Persist optional home-network profile
     if (ssid.trim() && localUrl.trim()) {
       const profile: NetworkProfile = {
