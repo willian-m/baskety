@@ -1,3 +1,5 @@
+// Extensionless on purpose: lets Metro resolve uiStore.native.ts on native.
+// Do NOT add a .js extension here — it would defeat platform-specific resolution.
 import { useUiStore } from "../stores/uiStore";
 
 import { ApiError } from "./types.js";

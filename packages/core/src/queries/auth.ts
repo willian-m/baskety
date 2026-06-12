@@ -8,6 +8,8 @@ import type {
   RegisterRequest,
   User,
 } from "../api/types.js";
+// Extensionless on purpose: lets Metro resolve uiStore.native.ts on native.
+// Do NOT add a .js extension here — it would defeat platform-specific resolution.
 import { useUiStore } from "../stores/uiStore";
 
 export function useLogin() {
