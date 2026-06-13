@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"strings"
 )
 
 //go:embed all:dist
@@ -20,8 +21,12 @@ func SPAHandler() http.Handler {
 	}
 	fileServer := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try to open the requested path; fall back to index.html for SPA routing.
-		f, err := sub.Open(r.URL.Path)
+		// embed.FS rejects paths with a leading slash as invalid, so strip it.
+		name := strings.TrimPrefix(r.URL.Path, "/")
+		if name == "" {
+			name = "."
+		}
+		f, err := sub.Open(name)
 		if err != nil {
 			r.URL.Path = "/"
 		} else {
