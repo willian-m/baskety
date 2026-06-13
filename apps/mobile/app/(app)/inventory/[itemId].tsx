@@ -32,12 +32,14 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function BatchRow({ batch }: { batch: BatchResponse }) {
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function BatchRow({ batch, unit }: { batch: BatchResponse; unit: string }) {
   return (
     <Card padding={12}>
       <View style={styles.batchHeader}>
         <Text style={styles.batchQty}>
-          {batch.quantity} units
+          {batch.quantity} {unit}
         </Text>
         <ExpiryBadge expiresAt={batch.expires_at} />
       </View>
@@ -74,10 +76,15 @@ function AddBatchForm({
       Alert.alert("Invalid quantity", "Please enter a positive number.");
       return;
     }
+    const trimmedExpiry = expiresAt.trim();
+    if (trimmedExpiry && !ISO_DATE_RE.test(trimmedExpiry)) {
+      Alert.alert("Invalid date", "Use YYYY-MM-DD format, e.g. 2026-12-31.");
+      return;
+    }
     addBatch.mutate(
       {
         quantity: qty,
-        expires_at: expiresAt.trim() || null,
+        expires_at: trimmedExpiry || null,
         notes: notes.trim() || null,
       },
       {
@@ -150,6 +157,10 @@ function EditItemModal({
   const updateItem = useUpdateItem(inventoryId, item.id);
 
   function handleSave() {
+    if (!name.trim() || !category.trim() || !unit.trim()) {
+      Alert.alert("Required fields", "Name, category, and unit cannot be blank.");
+      return;
+    }
     const qty = parseFloat(targetQty);
     if (isNaN(qty) || qty <= 0) {
       Alert.alert("Invalid target quantity", "Please enter a positive number.");
@@ -302,6 +313,9 @@ function ItemDetailContent({
       style={styles.flex}
       contentContainerStyle={styles.detailContent}
     >
+      <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Text style={styles.backBtnLabel}>← Back</Text>
+      </Pressable>
       <Card>
         <View style={styles.detailHeader}>
           <Text style={styles.itemName}>{item.name}</Text>
@@ -328,7 +342,7 @@ function ItemDetailContent({
         <FlatList
           data={activeBatches}
           keyExtractor={(b) => b.id}
-          renderItem={({ item: batch }) => <BatchRow batch={batch} />}
+          renderItem={({ item: batch }) => <BatchRow batch={batch} unit={item.unit} />}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           scrollEnabled={false}
         />
@@ -472,6 +486,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalBody: { padding: 16, gap: 4 },
+  backBtn: { paddingVertical: 8, paddingHorizontal: 4, marginBottom: 4 },
+  backBtnLabel: { fontSize: 15, color: "#2563eb", fontWeight: "500" },
   errorText: { fontSize: 15, color: "#ef4444" },
   emptyText: { fontSize: 15, color: "#6b7280" },
 });

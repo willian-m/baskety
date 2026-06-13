@@ -34,29 +34,10 @@ function CategoryChip({
   );
 }
 
-function QuantityBar({ targetQuantity, unit }: { targetQuantity: number; unit: string }) {
-  return (
-    <View style={styles.barRow}>
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: "0%" }]} />
-      </View>
-      <Text style={styles.barLabel}>
-        0 / {targetQuantity} {unit}
-      </Text>
-    </View>
-  );
-}
-
-function ItemRow({
-  item,
-  inventoryId,
-}: {
-  item: InventoryItemResponse;
-  inventoryId: string;
-}) {
+function ItemRow({ item }: { item: InventoryItemResponse }) {
   return (
     <Pressable
-      onPress={() => router.push(`/(app)/inventory/${item.id}`)}
+      onPress={() => router.push(`/inventory/${item.id}`)}
       style={({ pressed }) => [pressed && styles.pressed]}
     >
       <Card>
@@ -67,7 +48,9 @@ function ItemRow({
           <ExpiryBadge expiresAt={null} />
         </View>
         <Text style={styles.itemCategory}>{item.category}</Text>
-        <QuantityBar targetQuantity={item.target_quantity} unit={item.unit} />
+        <Text style={styles.itemTarget}>
+          Target: {item.target_quantity} {item.unit}
+        </Text>
       </Card>
     </Pressable>
   );
@@ -145,7 +128,7 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ItemRow item={item} inventoryId={inventoryId} />
+          <ItemRow item={item} />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
@@ -253,26 +236,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  itemCategory: { fontSize: 13, color: "#6b7280", marginBottom: 8 },
-  barRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-  },
-  barTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#e5e7eb",
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    backgroundColor: "#2563eb",
-    borderRadius: 3,
-  },
-  barLabel: { fontSize: 12, color: "#6b7280", minWidth: 60 },
+  itemCategory: { fontSize: 13, color: "#6b7280", marginBottom: 2 },
+  itemTarget: { fontSize: 13, color: "#6b7280" },
   pressed: { opacity: 0.85 },
   errorText: { fontSize: 15, color: "#ef4444" },
   emptyText: { fontSize: 15, color: "#6b7280" },

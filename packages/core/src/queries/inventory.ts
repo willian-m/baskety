@@ -109,6 +109,9 @@ export function useUpdateItem(inventoryId: string, itemId: string) {
       void qc.invalidateQueries({
         queryKey: ["inventories", inventoryId, "items"],
       });
+      void qc.invalidateQueries({
+        queryKey: ["inventories", inventoryId, "items", itemId],
+      });
     },
   });
 }
