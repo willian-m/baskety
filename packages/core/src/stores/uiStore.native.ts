@@ -69,8 +69,12 @@ export const useUiStore = create<UiState>()(
         // activeServerUrl is NOT persisted — recomputed by useServerUrl on mount
         // _hasHydrated is NOT persisted — resets to false on each boot, becomes true after rehydration
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          useUiStore.getState().setHasHydrated(true);
+        } else {
+          state?.setHasHydrated(true);
+        }
       },
     },
   ),
