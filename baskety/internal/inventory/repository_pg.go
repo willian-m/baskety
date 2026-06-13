@@ -136,6 +136,23 @@ func (r *pgRepository) GetItem(ctx context.Context, id uuid.UUID) (*InventoryIte
 	return r.toItem(row), nil
 }
 
+func (r *pgRepository) toItemFromListRow(row sqlc.ListInventoryItemsRow) *InventoryItem {
+	return &InventoryItem{
+		ID:             shared.PgToUUID(row.ID),
+		InventoryID:    shared.PgToUUID(row.InventoryID),
+		Name:           row.Name,
+		Category:       shared.PtrStr(row.Category),
+		Unit:           shared.PtrStr(row.Unit),
+		TargetQuantity: shared.PgNumericToFloat(row.TargetQuantity),
+		Notes:          row.Notes,
+		DeletedAt:      shared.PgToTimePtr(row.DeletedAt),
+		CreatedAt:      row.CreatedAt.Time,
+		UpdatedAt:      row.UpdatedAt.Time,
+		StoredQuantity: shared.PgNumericToFloat(row.StoredQuantity),
+		BatchCount:     row.BatchCount,
+	}
+}
+
 func (r *pgRepository) ListItems(ctx context.Context, inventoryID uuid.UUID) ([]*InventoryItem, error) {
 	rows, err := r.q.ListInventoryItems(ctx, shared.UUIDToPg(inventoryID))
 	if err != nil {
@@ -143,7 +160,7 @@ func (r *pgRepository) ListItems(ctx context.Context, inventoryID uuid.UUID) ([]
 	}
 	out := make([]*InventoryItem, len(rows))
 	for i, row := range rows {
-		out[i] = r.toItem(row)
+		out[i] = r.toItemFromListRow(row)
 	}
 	return out, nil
 }

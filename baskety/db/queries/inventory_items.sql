@@ -7,9 +7,17 @@ RETURNING *;
 SELECT * FROM inventory_items WHERE id = $1;
 
 -- name: ListInventoryItems :many
-SELECT * FROM inventory_items
-WHERE inventory_id = $1 AND deleted_at IS NULL
-ORDER BY name ASC;
+SELECT
+    i.id, i.inventory_id, i.name, i.category, i.unit, i.target_quantity,
+    i.notes, i.deleted_at, i.created_at, i.updated_at,
+    COALESCE(SUM(b.quantity), 0)::numeric AS stored_quantity,
+    COUNT(b.id)::bigint AS batch_count
+FROM inventory_items i
+LEFT JOIN inventory_batches b ON b.item_id = i.id AND b.emptied_at IS NULL
+WHERE i.inventory_id = $1 AND i.deleted_at IS NULL
+GROUP BY i.id, i.inventory_id, i.name, i.category, i.unit, i.target_quantity,
+         i.notes, i.deleted_at, i.created_at, i.updated_at
+ORDER BY i.name ASC;
 
 -- name: UpdateInventoryItem :one
 UPDATE inventory_items

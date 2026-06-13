@@ -135,6 +135,41 @@ func TestHandleGetInventory_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestHandleListItems(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	itemID := uuid.New()
+	svc := &mockService{
+		listItemsFn: func(_ context.Context, _, _ uuid.UUID) ([]*inventory.ItemResponse, error) {
+			return []*inventory.ItemResponse{
+				{
+					ID:             itemID.String(),
+					InventoryID:    invID.String(),
+					Name:           "Milk",
+					Category:       "Dairy",
+					Unit:           "L",
+					TargetQuantity: 4,
+					StoredQuantity: 2.5,
+					BatchCount:     1,
+				},
+			}, nil
+		},
+	}
+	r := setupRouter(svc, hID)
+	req := httptest.NewRequest(http.MethodGet, "/"+invID.String()+"/items", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	data, ok := resp["data"].([]any)
+	require.True(t, ok, "data should be an array")
+	require.Len(t, data, 1)
+	item := data[0].(map[string]any)
+	assert.Equal(t, 2.5, item["stored_quantity"])
+	assert.Equal(t, float64(1), item["batch_count"])
+}
+
 func TestHandleCreateItem(t *testing.T) {
 	hID := uuid.New()
 	invID := uuid.New()

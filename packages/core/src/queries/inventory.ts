@@ -105,13 +105,30 @@ export function useUpdateItem(inventoryId: string, itemId: string) {
         method: "PUT",
         body: JSON.stringify(body),
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["inventories", inventoryId, "items"],
-      });
-      void qc.invalidateQueries({
-        queryKey: ["inventories", inventoryId, "items", itemId],
-      });
+    onMutate: async (body) => {
+      // Cancel any outgoing refetches
+      await qc.cancelQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      // Snapshot previous value
+      const previous = qc.getQueryData<InventoryItemResponse[]>(["inventories", inventoryId, "items"]);
+      // Optimistically update the cache
+      qc.setQueryData<InventoryItemResponse[]>(
+        ["inventories", inventoryId, "items"],
+        (old) =>
+          old?.map((item) =>
+            item.id === itemId ? { ...item, ...body } : item,
+          ) ?? [],
+      );
+      return { previous };
+    },
+    onError: (_err, _body, context) => {
+      // Roll back on error
+      if (context?.previous !== undefined) {
+        qc.setQueryData(["inventories", inventoryId, "items"], context.previous);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items", itemId] });
     },
   });
 }
