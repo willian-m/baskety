@@ -109,14 +109,15 @@ export function useUpdateItem(inventoryId: string, itemId: string) {
       // Cancel any outgoing refetches
       await qc.cancelQueries({ queryKey: ["inventories", inventoryId, "items"] });
       // Snapshot previous value
-      const previous = qc.getQueryData<InventoryItemResponse[]>(["inventories", inventoryId, "items"]);
+      const previous = qc.getQueryData<InventoryItemResponse[]>([
+        "inventories",
+        inventoryId,
+        "items",
+      ]);
       // Optimistically update the cache
       qc.setQueryData<InventoryItemResponse[]>(
         ["inventories", inventoryId, "items"],
-        (old) =>
-          old?.map((item) =>
-            item.id === itemId ? { ...item, ...body } : item,
-          ) ?? [],
+        (old) => old?.map((item) => (item.id === itemId ? { ...item, ...body } : item)) ?? [],
       );
       return { previous };
     },
@@ -161,11 +162,11 @@ export function useShareInventory(token: string, password?: string) {
 
 // ── Batches ───────────────────────────────────────────────────────────────────
 
-export function useBatches(inventoryId: string, itemId: string) {
+export function useBatches(inventoryId: string, itemId: string, enabled = true) {
   return useQuery({
     queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
     queryFn: () => request<BatchResponse[]>(`/inventories/${inventoryId}/items/${itemId}/batches`),
-    enabled: !!inventoryId && !!itemId,
+    enabled: enabled && !!inventoryId && !!itemId,
   });
 }
 

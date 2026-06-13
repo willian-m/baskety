@@ -50,6 +50,8 @@ export const inventoryItemFixture = (overrides?: Record<string, unknown>) => ({
   notes: null,
   created_at: now(),
   updated_at: now(),
+  stored_quantity: 1.5,
+  batch_count: 2,
   ...overrides,
 });
 
