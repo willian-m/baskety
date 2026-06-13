@@ -79,7 +79,7 @@ describe("InventoryPage", () => {
     expect(screen.queryByPlaceholderText("Search items…")).not.toBeInTheDocument();
   });
 
-  it("opens the add item form when 'Add item' button is clicked", async () => {
+  it("shows 'Add this item' when search has no matches, revealing a pre-filled row", async () => {
     const user = userEvent.setup();
     renderWithProviders(() => <InventoryPage />);
 
@@ -87,37 +87,14 @@ describe("InventoryPage", () => {
       expect(screen.getByText("Test Item")).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole("button", { name: "Add item" });
-    await user.click(addButton);
+    const searchInput = screen.getByPlaceholderText("Search items…");
+    await user.type(searchInput, "Quinoa");
 
-    expect(screen.getByPlaceholderText("Name")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Category")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Unit (e.g. kg)")).toBeInTheDocument();
-  });
+    const addThis = await screen.findByRole("button", { name: "Add this item" });
+    await user.click(addThis);
 
-  it("adds a new item when form is submitted with valid data", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(() => <InventoryPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Test Item")).toBeInTheDocument();
-    });
-
-    // Open the add form
-    await user.click(screen.getByRole("button", { name: "Add item" }));
-
-    // Fill in the form fields
-    await user.type(screen.getByPlaceholderText("Name"), "Bananas");
-    await user.type(screen.getByPlaceholderText("Category"), "Fruit");
-    await user.type(screen.getByPlaceholderText("Unit (e.g. kg)"), "kg");
-
-    // Submit
-    const addBtn = screen.getByRole("button", { name: "Add" });
-    await user.click(addBtn);
-
-    // After successful mutation the form should close
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Name")).not.toBeInTheDocument();
-    });
+    // The pre-filled new item row appears with the searched name
+    const nameInput = await screen.findByLabelText("New item name");
+    expect(nameInput).toHaveValue("Quinoa");
   });
 });
