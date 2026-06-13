@@ -97,29 +97,27 @@ export default function GroceryListDetailScreen() {
   const { data: inventories, isLoading: invLoading } = useInventories();
   const inventoryId = inventories?.[0]?.id ?? "";
 
-  const { data: list } = useGroceryList(inventoryId, listId ?? "");
+  const { data: list, isLoading: listLoading } = useGroceryList(inventoryId, listId ?? "");
   const { data: items, isLoading: itemsLoading } = useGroceryItems(inventoryId, listId ?? "");
   const updateItem = useUpdateListItem(inventoryId, listId ?? "");
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
   useEffect(() => {
-    if (list?.name) {
-      navigation.setOptions({
-        title: list.name,
-        headerRight: () => (
-          <Pressable
-            onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
-            style={styles.headerBtn}
-          >
-            <Text style={styles.headerBtnText}>Start Trip</Text>
-          </Pressable>
-        ),
-      });
-    }
+    navigation.setOptions({
+      title: list?.name ?? "List",
+      headerRight: () => (
+        <Pressable
+          onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
+          style={styles.headerBtn}
+        >
+          <Text style={styles.headerBtnText}>Start Trip</Text>
+        </Pressable>
+      ),
+    });
   }, [list?.name, listId, navigation]);
 
-  if (invLoading || itemsLoading) {
+  if (invLoading || listLoading || itemsLoading) {
     return (
       <View style={styles.centered}>
         <Spinner />

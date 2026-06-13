@@ -5,9 +5,10 @@ import {
   useUpdateListItem,
 } from "@baskety/core";
 import { Button, Spinner } from "@baskety/ui";
-import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useEffect } from "react";
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,7 @@ import type { GroceryItemResponse } from "@baskety/core";
 
 export default function ShoppingTripScreen() {
   const { listId } = useLocalSearchParams<{ listId: string }>();
+  const navigation = useNavigation();
 
   const { data: inventories, isLoading: invLoading } = useInventories();
   const inventoryId = inventories?.[0]?.id ?? "";
@@ -27,6 +29,10 @@ export default function ShoppingTripScreen() {
   const { data: items, isLoading: itemsLoading } = useGroceryItems(inventoryId, listId ?? "");
   const updateItem = useUpdateListItem(inventoryId, listId ?? "");
   const completeList = useCompleteList(inventoryId, listId ?? "");
+
+  useEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
   if (invLoading || itemsLoading) {
     return (
@@ -41,6 +47,7 @@ export default function ShoppingTripScreen() {
   const allItems = items ?? [];
   const boughtCount = allItems.filter((i) => i.status === "bought").length;
   const totalCount = allItems.length;
+  const pendingCount = allItems.filter((i) => i.status === "pending").length;
   const progress = totalCount > 0 ? boughtCount / totalCount : 0;
 
   async function handleToggle(item: GroceryItemResponse) {
@@ -52,12 +59,34 @@ export default function ShoppingTripScreen() {
     }
   }
 
-  async function handleCompleteTrip() {
-    try {
-      await completeList.mutateAsync();
-      router.back();
-    } catch {
-      // ignore
+  function handleCompleteTrip() {
+    if (pendingCount > 0) {
+      Alert.alert(
+        "Complete Trip?",
+        `${pendingCount} item${pendingCount === 1 ? "" : "s"} still pending. Completing will mark this list as done.`,
+        [
+          { text: "Keep Shopping", style: "cancel" },
+          {
+            text: "Complete",
+            style: "destructive",
+            onPress: () => {
+              completeList
+                .mutateAsync()
+                .then(() => router.back())
+                .catch(() => {
+                  // ignore
+                });
+            },
+          },
+        ],
+      );
+    } else {
+      completeList
+        .mutateAsync()
+        .then(() => router.back())
+        .catch(() => {
+          // ignore
+        });
     }
   }
 
@@ -73,30 +102,39 @@ export default function ShoppingTripScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent}>
-        {allItems.map((item) => {
-          const isBought = item.status === "bought";
-          return (
-            <Pressable
-              key={item.id}
-              style={[styles.itemRow, isBought && styles.itemRowBought]}
-              onPress={() => handleToggle(item)}
-            >
-              <View style={styles.checkIcon}>
-                <Text style={[styles.checkText, isBought && styles.checkTextDone]}>
-                  {isBought ? "✓" : "□"}
-                </Text>
-              </View>
-              <View style={styles.itemInfo}>
-                <Text style={[styles.itemName, isBought && styles.itemNameDone]}>
-                  {item.name}
-                </Text>
-                <Text style={styles.itemQty}>
-                  {item.quantity} {item.unit}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+        {allItems.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No items in this list.</Text>
+          </View>
+        ) : (
+          allItems.map((item) => {
+            const isBought = item.status === "bought";
+            return (
+              <Pressable
+                key={item.id}
+                style={[styles.itemRow, isBought && styles.itemRowBought]}
+                onPress={() => handleToggle(item)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isBought }}
+                accessibilityLabel={`${item.name}, ${item.quantity} ${item.unit}`}
+              >
+                <View style={styles.checkIcon}>
+                  <Text style={[styles.checkText, isBought && styles.checkTextDone]}>
+                    {isBought ? "✓" : "□"}
+                  </Text>
+                </View>
+                <View style={styles.itemInfo}>
+                  <Text style={[styles.itemName, isBought && styles.itemNameDone]}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.itemQty}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -137,6 +175,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   listContent: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 32 },
+  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 48 },
+  emptyText: { fontSize: 15, color: "#6b7280" },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
