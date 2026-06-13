@@ -50,7 +50,11 @@ export default function RootLayout() {
         dehydrateOptions: {
           shouldDehydrateQuery: (query) => {
             const key = query.queryKey;
-            return Array.isArray(key) && key[2] === "lists";
+            if (!Array.isArray(key)) return false;
+            // key[2] === "lists" covers both shapes:
+            //   ["inventories", id, "lists"]               → grocery lists index
+            //   ["inventories", id, "lists", listId, "items"] → list items
+            return key[2] === "lists";
           },
         },
       }}
