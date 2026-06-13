@@ -62,6 +62,11 @@ vi.mock("@baskety/core", () => ({
   }),
   useUiStore: (selector: (s: { activeHouseholdId: string | null }) => unknown) =>
     selector({ activeHouseholdId: null }),
+  useInventories: () => ({ data: [], isLoading: false }),
+  useCreateShareLink: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ token: "share-abc123" }),
+    isPending: false,
+  }),
 }));
 
 describe("SettingsPage", () => {
