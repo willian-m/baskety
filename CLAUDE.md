@@ -50,6 +50,21 @@ GroceryStoreList/
 │   │   ├── migrations/       # goose .sql migration files (00001–00007)
 │   │   └── queries/          # sqlc .sql query files (input to codegen)
 │   └── gen/sqlc/             # sqlc-generated Go code — committed, never hand-edited
+├── apps/
+│   └── mobile/               # Expo (React Native) app — Sprint 13–16
+│       ├── app/
+│       │   ├── _layout.tsx               # root: PersistQueryClientProvider + hydration gate
+│       │   ├── (auth)/                   # login, register, onboarding screens
+│       │   └── (app)/                    # authenticated screens
+│       │       ├── inventory.tsx         # Sprint 14 — inventory list (search, category filter)
+│       │       ├── inventory/[itemId].tsx # Sprint 14 — item detail (batches, edit, delete)
+│       │       ├── grocery.tsx           # Sprint 14 — grocery lists (pinned/active, FAB)
+│       │       ├── grocery/[listId].tsx  # Sprint 14 — list detail (swipe-to-check, filter tabs)
+│       │       └── grocery/[listId]/trip.tsx # Sprint 14 — shopping trip screen
+│       └── shared/hooks/                 # useServerUrl (network profile auto-detection)
+├── packages/
+│   ├── core/                 # shared TS: API client, TanStack Query hooks, Zustand store
+│   └── ui/                   # shared component library (.native.tsx + .web.tsx variants)
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   └── superpowers/
@@ -137,7 +152,9 @@ Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
 | 7 | Catalog, settings, pg_cron, wire-up | Done |
 | 8 | Integration tests + OpenAPI | Done |
 | 9–12 | Web frontend | Not started |
-| 13–16 | Mobile (React Native) | Not started |
+| 13 | Mobile: Foundation + Auth + Navigation | Done |
+| 14 | Mobile: Inventory + Grocery Screens | Done |
+| 15–16 | Mobile: Receipt scanning + Settings | Not started |
 | 17–18 | Docker/CI/CD + hardening | Not started |
 
 Sprint plans: `docs/superpowers/sprints/sprint-NN.md`
