@@ -57,6 +57,8 @@ type ItemResponse struct {
 	Notes          *string   `json:"notes"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	StoredQuantity float64   `json:"stored_quantity"`
+	BatchCount     int64     `json:"batch_count"`
 }
 
 type BatchResponse struct {
@@ -92,6 +94,8 @@ func toItemResponse(m *InventoryItem) *ItemResponse {
 		Notes:          m.Notes,
 		CreatedAt:      m.CreatedAt,
 		UpdatedAt:      m.UpdatedAt,
+		StoredQuantity: m.StoredQuantity,
+		BatchCount:     m.BatchCount,
 	}
 }
 

@@ -61,6 +61,8 @@ export interface InventoryItemResponse {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  stored_quantity: number;
+  batch_count: number;
 }
 export interface BatchResponse {
   id: string;

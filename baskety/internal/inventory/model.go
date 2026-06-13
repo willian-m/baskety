@@ -26,6 +26,8 @@ type InventoryItem struct {
 	DeletedAt      *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	StoredQuantity float64
+	BatchCount     int64
 }
 
 type InventoryBatch struct {

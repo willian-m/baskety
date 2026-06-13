@@ -87,20 +87,43 @@ func (q *Queries) GetInventoryItemQuantity(ctx context.Context, itemID pgtype.UU
 }
 
 const listInventoryItems = `-- name: ListInventoryItems :many
-SELECT id, inventory_id, name, category, unit, target_quantity, notes, deleted_at, created_at, updated_at FROM inventory_items
-WHERE inventory_id = $1 AND deleted_at IS NULL
-ORDER BY name ASC
+SELECT
+    i.id, i.inventory_id, i.name, i.category, i.unit, i.target_quantity,
+    i.notes, i.deleted_at, i.created_at, i.updated_at,
+    COALESCE(SUM(b.quantity), 0)::numeric AS stored_quantity,
+    COUNT(b.id)::bigint AS batch_count
+FROM inventory_items i
+LEFT JOIN inventory_batches b ON b.item_id = i.id AND b.emptied_at IS NULL
+WHERE i.inventory_id = $1 AND i.deleted_at IS NULL
+GROUP BY i.id, i.inventory_id, i.name, i.category, i.unit, i.target_quantity,
+         i.notes, i.deleted_at, i.created_at, i.updated_at
+ORDER BY i.name ASC
 `
 
-func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID pgtype.UUID) ([]InventoryItem, error) {
+type ListInventoryItemsRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	InventoryID    pgtype.UUID        `json:"inventory_id"`
+	Name           string             `json:"name"`
+	Category       *string            `json:"category"`
+	Unit           *string            `json:"unit"`
+	TargetQuantity pgtype.Numeric     `json:"target_quantity"`
+	Notes          *string            `json:"notes"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	StoredQuantity pgtype.Numeric     `json:"stored_quantity"`
+	BatchCount     int64              `json:"batch_count"`
+}
+
+func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID pgtype.UUID) ([]ListInventoryItemsRow, error) {
 	rows, err := q.db.Query(ctx, listInventoryItems, inventoryID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []InventoryItem
+	var items []ListInventoryItemsRow
 	for rows.Next() {
-		var i InventoryItem
+		var i ListInventoryItemsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.InventoryID,
@@ -112,6 +135,8 @@ func (q *Queries) ListInventoryItems(ctx context.Context, inventoryID pgtype.UUI
 			&i.DeletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.StoredQuantity,
+			&i.BatchCount,
 		); err != nil {
 			return nil, err
 		}
