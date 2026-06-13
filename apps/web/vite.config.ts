@@ -34,5 +34,10 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // Only run TS/TSX unit tests under src/. This deliberately excludes:
+    // - Playwright specs under e2e/ (they use @playwright/test, not vitest)
+    // - compiled .test.js duplicates emitted alongside their .test.tsx twins
+    include: ["src/**/*.test.{ts,tsx}"],
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**", "**/*.test.js"],
   },
 });
