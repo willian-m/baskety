@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
-import Swipeable from "react-native-gesture-handler/Swipeable";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useInventories, useInventoryItems, useUpdateItem } from "@baskety/core";
 import { Card, ExpiryBadge, Spinner } from "@baskety/ui";
 import type { InventoryItemResponse } from "@baskety/core";
@@ -46,6 +46,7 @@ function ItemRow({
   const [category, setCategory] = useState(item.category);
   const [unit, setUnit] = useState(item.unit);
   const [targetQty, setTargetQty] = useState(String(item.target_quantity));
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const isEditing = editingItemId === item.id;
 
@@ -60,13 +61,18 @@ function ItemRow({
   };
 
   const handleSave = async () => {
-    await updateItem.mutateAsync({
-      name,
-      category,
-      unit,
-      target_quantity: parseFloat(targetQty) || 0,
-    });
-    onSaveEdit();
+    setSaveError(null);
+    try {
+      await updateItem.mutateAsync({
+        name,
+        category,
+        unit,
+        target_quantity: parseFloat(targetQty) || 0,
+      });
+      onSaveEdit();
+    } catch {
+      setSaveError("Save failed. Please try again.");
+    }
   };
 
   const renderRightActions = () => (
@@ -109,13 +115,18 @@ function ItemRow({
             keyboardType="numeric"
           />
           <View style={styles.editActions}>
-            <Pressable style={styles.saveButton} onPress={handleSave}>
+            <Pressable
+              style={[styles.saveButton, updateItem.isPending && { opacity: 0.5 }]}
+              onPress={handleSave}
+              disabled={updateItem.isPending}
+            >
               <Text style={styles.saveButtonText}>Save</Text>
             </Pressable>
             <Pressable style={styles.cancelButton} onPress={onCancelEdit}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
           </View>
+          {saveError && <Text style={styles.saveErrorText}>{saveError}</Text>}
         </View>
       </Card>
     );
@@ -378,4 +389,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelButtonText: { color: "#374151", fontWeight: "600" },
+  saveErrorText: { color: "#ef4444", fontSize: 12, marginTop: 4 },
 });
