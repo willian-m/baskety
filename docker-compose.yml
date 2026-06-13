@@ -50,10 +50,48 @@ services:
       retries: 3
     restart: unless-stopped
 
+  ocr-easyocr:
+    profiles: [easyocr]
+    build:
+      context: ./docker/ocr-easyocr
+    volumes:
+      - easyocr_models:/root/.EasyOCR
+    environment:
+      OCR_LANGUAGES: "en"
+    networks:
+      default:
+        aliases: [ocr]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  ocr-paddleocr:
+    profiles: [paddleocr]
+    build:
+      context: ./docker/ocr-paddleocr
+    volumes:
+      - paddleocr_models:/root/.paddleocr
+    environment:
+      OCR_LANG: "en"
+    networks:
+      default:
+        aliases: [ocr]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   baskety_uploads:
   minio_data:
+  easyocr_models:
+  paddleocr_models:
 
 secrets:
   baskety_key:

@@ -7,6 +7,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+// OCRConfig holds configuration for the OCR provider.
+type OCRConfig struct {
+	Provider    string `mapstructure:"provider"`
+	EndpointURL string `mapstructure:"endpoint_url"`
+	BinPath     string `mapstructure:"bin_path"`
+}
+
 // Config holds all application configuration.
 type Config struct {
 	Server struct {
@@ -20,6 +27,7 @@ type Config struct {
 		Level  string `mapstructure:"level"`
 		Format string `mapstructure:"format"`
 	} `mapstructure:"log"`
+	OCR OCRConfig `mapstructure:"ocr"`
 }
 
 // Load reads config.yaml (if present) and applies environment variable overrides.

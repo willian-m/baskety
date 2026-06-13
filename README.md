@@ -80,6 +80,33 @@ POSTGRES_PASSWORD=changeme MINIO_ROOT_USER=baskety MINIO_ROOT_PASSWORD=changeme 
   docker compose --profile minio up -d
 ```
 
+### OCR Services
+
+Baskety supports two self-hosted OCR engines for receipt scanning, selectable via Docker Compose profiles. Both expose the same REST API on port 8000 and are reachable inside the Compose network under the `ocr` hostname.
+
+**EasyOCR** (recommended default):
+
+```bash
+POSTGRES_PASSWORD=changeme docker compose --profile easyocr up -d
+```
+
+**PaddleOCR** (alternative, generally faster on CPU):
+
+```bash
+POSTGRES_PASSWORD=changeme docker compose --profile paddleocr up -d
+```
+
+> **Note:** OCR models download on first container start. This can take several minutes depending on your connection. Subsequent starts use the cached models from the named Docker volume.
+
+To select the active OCR provider set `ocr.provider: http` in `config.yaml` (the default when using Compose). For non-English receipts, adjust the language environment variable:
+
+| Engine | Env var | Example |
+|--------|---------|---------|
+| EasyOCR | `OCR_LANGUAGES` | `OCR_LANGUAGES=en,pt` |
+| PaddleOCR | `OCR_LANG` | `OCR_LANG=pt` |
+
+See [EasyOCR language codes](https://www.jaided.ai/easyocr/) and [PaddleOCR language codes](https://paddlepaddle.github.io/PaddleOCR/latest/en/ppocr/blog/multi_languages.html) for the full list of supported languages.
+
 ### Secrets
 
 The encryption key must never appear in `config.yaml` or environment variables. It is loaded from the path set in `encryption.key_file` (default: `/run/secrets/baskety_key`), which maps to the `secrets/baskety_key` file on your host via Docker secrets.

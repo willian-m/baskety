@@ -65,6 +65,10 @@ GroceryStoreList/
 ├── packages/
 │   ├── core/                 # shared TS: API client, TanStack Query hooks, Zustand store
 │   └── ui/                   # shared component library (.native.tsx + .web.tsx variants)
+├── docker/
+│   ├── postgres/             # custom Postgres image with pg_cron
+│   ├── ocr-easyocr/          # EasyOCR FastAPI service (--profile easyocr)
+│   └── ocr-paddleocr/        # PaddleOCR FastAPI service (--profile paddleocr)
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   └── superpowers/
@@ -78,6 +82,12 @@ GroceryStoreList/
 ```bash
 # Start Postgres for local dev
 docker compose -f compose.dev.yml up -d
+
+# Start with EasyOCR service (recommended for receipt scanning)
+docker compose --profile easyocr up -d
+
+# Start with PaddleOCR service (alternative OCR engine)
+docker compose --profile paddleocr up -d
 
 # Run the server (applies migrations on startup)
 cd baskety && go run ./cmd/baskety serve
@@ -158,6 +168,19 @@ Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
 | 17–18 | Docker/CI/CD + hardening | Not started |
 
 Sprint plans: `docs/superpowers/sprints/sprint-NN.md`
+
+## Configuration Notes
+
+`config.yaml` (based on `config.yaml.example`) supports an `ocr:` section:
+
+```yaml
+ocr:
+  provider: http           # "http" (docker service) | "tesseract" (local binary)
+  endpoint_url: http://ocr:8000
+  bin_path: ""             # path to tesseract binary; empty = use $PATH
+```
+
+When `provider: http`, the Go backend calls the OCR Docker service at `endpoint_url`. The two Compose profiles (`easyocr`, `paddleocr`) both register under the `ocr` network alias, so the URL stays the same regardless of which engine is active.
 
 ## Development Notes
 

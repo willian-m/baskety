@@ -28,3 +28,8 @@ encryption:
 log:
   level: info
   format: json
+
+ocr:
+  provider: http           # "http" (docker service) | "tesseract" (local binary)
+  endpoint_url: http://ocr:8000
+  bin_path: ""             # path to tesseract binary; empty = use $PATH

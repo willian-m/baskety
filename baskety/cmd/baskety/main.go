@@ -101,7 +101,13 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	// Defaults target a self-hosted stack (local disk, Tesseract, Ollama). These
 	// are configurable via env in a later sprint; see internal/adapters/*.
 	fileStore := storage.NewLocalFileStore("./uploads")
-	ocrProvider := ocr.NewTesseractOCR("")
+	var ocrProvider receipt.OCRProvider
+	switch cfg.OCR.Provider {
+	case "http":
+		ocrProvider = ocr.NewHTTPOCR(cfg.OCR.EndpointURL)
+	default:
+		ocrProvider = ocr.NewTesseractOCR(cfg.OCR.BinPath)
+	}
 	llmProvider := llm.NewOllamaLLM("", "")
 
 	jobQueue := receipt.NewInProcessQueue(2, 64)
