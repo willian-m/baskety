@@ -45,14 +45,35 @@ function makeItems() {
   ];
 }
 
-function renderTable(props?: Partial<React.ComponentProps<typeof InventoryTable>>) {
-  const items = props?.items ?? makeItems();
+const UNCATEGORIZED = "Uncategorized";
+
+function applyFilters(
+  items: ReturnType<typeof makeItems>,
+  search: string,
+  categoryFilter: string,
+) {
+  return items.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+    const effectiveCategory = item.category || UNCATEGORIZED;
+    const matchesCategory = !categoryFilter || effectiveCategory === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+}
+
+type RenderTableProps = Partial<React.ComponentProps<typeof InventoryTable>> & {
+  search?: string;
+  categoryFilter?: string;
+};
+
+function renderTable(props?: RenderTableProps) {
+  const search = props?.search ?? "";
+  const categoryFilter = props?.categoryFilter ?? "";
+  const rawItems = props?.items ?? makeItems();
+  const items = applyFilters(rawItems, search, categoryFilter);
   return renderWithProviders(() => (
     <InventoryTable
       inventoryId={INV_ID}
       items={items}
-      search={props?.search ?? ""}
-      categoryFilter={props?.categoryFilter ?? ""}
       newItemName={props?.newItemName ?? ""}
       onNewItemSaved={props?.onNewItemSaved ?? (() => {})}
     />
@@ -213,8 +234,7 @@ describe("InventoryTable", () => {
     const qtyInput = await screen.findByLabelText("Batch quantity");
     await user.type(qtyInput, "3");
 
-    const saveBtns = screen.getAllByRole("button", { name: "Save" });
-    await user.click(saveBtns[saveBtns.length - 1]!);
+    await user.click(screen.getByTestId("add-batch-submit"));
 
     await waitFor(() => {
       expect(addBatch).toHaveBeenCalledTimes(1);

@@ -13,8 +13,6 @@ import { ExpiryBadge } from "./ExpiryBadge.js";
 type Props = {
   inventoryId: string;
   items: InventoryItemResponse[];
-  search: string;
-  categoryFilter: string;
   newItemName: string;
   onNewItemSaved: () => void;
 };
@@ -27,17 +25,13 @@ const inputClass =
 export function InventoryTable({
   inventoryId,
   items,
-  search,
-  categoryFilter,
   newItemName,
   onNewItemSaved,
 }: Props) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
 
-  // Build the grouped + filtered structure
-  const searchLower = search.trim().toLowerCase();
-
+  // Group already-filtered items by category — InventoryPage owns filtering.
   const categories = Array.from(new Set(items.map((i) => i.category || UNCATEGORIZED))).sort(
     (a, b) => a.localeCompare(b),
   );
@@ -70,14 +64,10 @@ export function InventoryTable({
       </thead>
       <tbody>
         {categories.map((category) => {
-          if (categoryFilter && categoryFilter !== category) return null;
-
           const inCategory = items
             .filter((i) => (i.category || UNCATEGORIZED) === category)
-            .filter((i) => !searchLower || i.name.toLowerCase().includes(searchLower))
             .sort((a, b) => a.name.localeCompare(b.name));
 
-          // Hide the whole section if search filtered out every item in it
           if (inCategory.length === 0) return null;
 
           return (
@@ -152,14 +142,22 @@ function ItemRow({
 
   const save = async () => {
     setFailed(false);
+    const savedName = name.trim();
+    const savedCategory = category.trim();
+    const savedUnit = unit.trim();
+    const savedTarget = target;
     try {
       await updateItem.mutateAsync({
-        name: name.trim(),
-        category: category.trim(),
-        unit: unit.trim(),
-        target_quantity: parseFloat(target) || 0,
+        name: savedName,
+        category: savedCategory,
+        unit: savedUnit,
+        target_quantity: parseFloat(savedTarget) || 0,
         notes: item.notes ?? null,
       });
+      setName(savedName);
+      setCategory(savedCategory);
+      setUnit(savedUnit);
+      setTarget(savedTarget);
       onStopEditing();
     } catch {
       setFailed(true);
@@ -319,17 +317,23 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
   const [qty, setQty] = useState("");
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
+  const [failedBatch, setFailedBatch] = useState(false);
 
   const saveBatch = async () => {
-    await addBatch.mutateAsync({
-      quantity: parseFloat(qty) || 0,
-      expires_at: expiry || null,
-      notes: notes || null,
-    });
-    setQty("");
-    setExpiry("");
-    setNotes("");
-    setAdding(false);
+    setFailedBatch(false);
+    try {
+      await addBatch.mutateAsync({
+        quantity: parseFloat(qty) || 0,
+        expires_at: expiry || null,
+        notes: notes || null,
+      });
+      setQty("");
+      setExpiry("");
+      setNotes("");
+      setAdding(false);
+    } catch {
+      setFailedBatch(true);
+    }
   };
 
   if (isLoading) {
@@ -405,6 +409,7 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
                 />
                 <button
                   type="button"
+                  data-testid="add-batch-submit"
                   onClick={() => void saveBatch()}
                   disabled={addBatch.isPending}
                   className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -419,6 +424,9 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
                   Cancel
                 </button>
               </div>
+              {failedBatch && (
+                <p className="text-xs text-red-600">Add batch failed</p>
+              )}
             </td>
           </>
         ) : (

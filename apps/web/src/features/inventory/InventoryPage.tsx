@@ -48,11 +48,16 @@ export function InventoryPage() {
 
   const allItems = items ?? [];
 
-  const categories = Array.from(new Set(allItems.map((i) => i.category).filter(Boolean))).sort();
+  const hasUncategorized = allItems.some((i) => !i.category);
+  const categories = [
+    ...Array.from(new Set(allItems.map((i) => i.category).filter(Boolean))).sort(),
+    ...(hasUncategorized ? ["Uncategorized"] : []),
+  ];
 
   const filtered = allItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !categoryFilter || item.category === categoryFilter;
+    const effectiveCategory = item.category || "Uncategorized";
+    const matchesCategory = !categoryFilter || effectiveCategory === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -102,8 +107,6 @@ export function InventoryPage() {
           <InventoryTable
             inventoryId={inventoryId}
             items={filtered}
-            search={search}
-            categoryFilter={categoryFilter}
             newItemName={newItemName}
             onNewItemSaved={handleNewItemSaved}
           />
