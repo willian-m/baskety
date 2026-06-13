@@ -95,6 +95,7 @@ export function useAddListItem(inventoryId: string, listId: string) {
 
 export function useUpdateListItem(inventoryId: string, listId: string) {
   const qc = useQueryClient();
+  const itemsKey = ["inventories", inventoryId, "lists", listId, "items"] as const;
   return useMutation({
     mutationFn: ({
       itemId,
@@ -107,10 +108,23 @@ export function useUpdateListItem(inventoryId: string, listId: string) {
         `/inventories/${inventoryId}/lists/${listId}/items/${itemId}/status`,
         { method: "PUT", body: JSON.stringify({ status }) },
       ),
+    onMutate: async ({ itemId, status }) => {
+      // Cancel in-flight fetches so they don't overwrite the optimistic update
+      await qc.cancelQueries({ queryKey: itemsKey });
+      const previous = qc.getQueryData<GroceryItemResponse[]>(itemsKey);
+      qc.setQueryData<GroceryItemResponse[]>(itemsKey, (old) =>
+        old?.map((item) => (item.id === itemId ? { ...item, status } : item)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      // Roll back to the snapshot taken before the mutation
+      if (context?.previous !== undefined) {
+        qc.setQueryData(itemsKey, context.previous);
+      }
+    },
     onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["inventories", inventoryId, "lists", listId, "items"],
-      });
+      void qc.invalidateQueries({ queryKey: itemsKey });
     },
   });
 }

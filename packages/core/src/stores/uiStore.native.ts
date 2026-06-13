@@ -16,6 +16,8 @@ interface UiState {
   externalUrl: string | null;
   networkProfiles: NetworkProfile[];
   sidebarCollapsed: boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
   setSession: (token: string, firstHouseholdId?: string) => void;
   clearSession: () => void;
   setActiveHousehold: (id: string) => void;
@@ -36,6 +38,8 @@ export const useUiStore = create<UiState>()(
       externalUrl: null,
       networkProfiles: [],
       sidebarCollapsed: false,
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
       setSession: (token, firstHouseholdId) =>
         set({ token, activeHouseholdId: firstHouseholdId ?? null }),
       clearSession: () => set({ token: null, activeHouseholdId: null }),
@@ -63,7 +67,15 @@ export const useUiStore = create<UiState>()(
         networkProfiles: state.networkProfiles,
         sidebarCollapsed: state.sidebarCollapsed,
         // activeServerUrl is NOT persisted — recomputed by useServerUrl on mount
+        // _hasHydrated is NOT persisted — resets to false on each boot, becomes true after rehydration
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          useUiStore.getState().setHasHydrated(true);
+        } else {
+          state?.setHasHydrated(true);
+        }
+      },
     },
   ),
 );
