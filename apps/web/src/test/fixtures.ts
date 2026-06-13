@@ -1,3 +1,5 @@
+import type { InventoryItemResponse } from "@baskety/core";
+
 let idCounter = 0;
 const nextId = () => `00000000-0000-0000-0000-${String(++idCounter).padStart(12, "0")}`;
 const now = () => new Date().toISOString();
@@ -40,7 +42,9 @@ export const inventoryFixture = (overrides?: Record<string, unknown>) => ({
   ...overrides,
 });
 
-export const inventoryItemFixture = (overrides?: Record<string, unknown>) => ({
+export const inventoryItemFixture = (
+  overrides?: Record<string, unknown>,
+): InventoryItemResponse => ({
   id: nextId(),
   inventory_id: nextId(),
   name: "Test Item",
