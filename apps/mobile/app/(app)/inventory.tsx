@@ -1,15 +1,8 @@
-import React, { useMemo, useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
-import { useInventories, useInventoryItems } from "@baskety/core";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { useInventories, useInventoryItems, useUpdateItem } from "@baskety/core";
 import { Card, ExpiryBadge, Spinner } from "@baskety/ui";
 import type { InventoryItemResponse } from "@baskety/core";
 
@@ -23,36 +16,145 @@ function CategoryChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected]}
-    >
-      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-        {label}
-      </Text>
+    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
+      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text>
     </Pressable>
   );
 }
 
-function ItemRow({ item }: { item: InventoryItemResponse }) {
-  return (
-    <Pressable
-      onPress={() => router.push(`/inventory/${item.id}`)}
-      style={({ pressed }) => [pressed && styles.pressed]}
-    >
-      <Card>
-        <View style={styles.itemHeader}>
-          <Text style={styles.itemName} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <ExpiryBadge expiresAt={null} />
-        </View>
-        <Text style={styles.itemCategory}>{item.category}</Text>
-        <Text style={styles.itemTarget}>
-          Target: {item.target_quantity} {item.unit}
-        </Text>
-      </Card>
+type ItemRowProps = {
+  item: InventoryItemResponse;
+  inventoryId: string;
+  editingItemId: string | null;
+  onStartEdit: (id: string) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+};
+
+function ItemRow({
+  item,
+  inventoryId,
+  editingItemId,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+}: ItemRowProps) {
+  const swipeableRef = useRef<Swipeable>(null);
+  const updateItem = useUpdateItem(inventoryId, item.id);
+
+  const [name, setName] = useState(item.name);
+  const [category, setCategory] = useState(item.category);
+  const [unit, setUnit] = useState(item.unit);
+  const [targetQty, setTargetQty] = useState(String(item.target_quantity));
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const isEditing = editingItemId === item.id;
+
+  const handleStartEdit = () => {
+    // Reset local form state to current item values each time we enter edit
+    setName(item.name);
+    setCategory(item.category);
+    setUnit(item.unit);
+    setTargetQty(String(item.target_quantity));
+    swipeableRef.current?.close();
+    onStartEdit(item.id);
+  };
+
+  const handleSave = async () => {
+    setSaveError(null);
+    try {
+      await updateItem.mutateAsync({
+        name,
+        category,
+        unit,
+        target_quantity: parseFloat(targetQty) || 0,
+      });
+      onSaveEdit();
+    } catch {
+      setSaveError("Save failed. Please try again.");
+    }
+  };
+
+  const renderRightActions = () => (
+    <Pressable style={styles.swipeRightAction} onPress={handleStartEdit}>
+      <Text style={styles.swipeActionText}>Edit</Text>
     </Pressable>
+  );
+
+  if (isEditing) {
+    return (
+      <Card>
+        <View style={styles.editForm}>
+          <TextInput
+            style={styles.editInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Name"
+            placeholderTextColor="#9ca3af"
+          />
+          <TextInput
+            style={styles.editInput}
+            value={category}
+            onChangeText={setCategory}
+            placeholder="Category"
+            placeholderTextColor="#9ca3af"
+          />
+          <TextInput
+            style={styles.editInput}
+            value={unit}
+            onChangeText={setUnit}
+            placeholder="Unit"
+            placeholderTextColor="#9ca3af"
+          />
+          <TextInput
+            style={styles.editInput}
+            value={targetQty}
+            onChangeText={setTargetQty}
+            placeholder="Target quantity"
+            placeholderTextColor="#9ca3af"
+            keyboardType="numeric"
+          />
+          <View style={styles.editActions}>
+            <Pressable
+              style={[styles.saveButton, updateItem.isPending && { opacity: 0.5 }]}
+              onPress={handleSave}
+              disabled={updateItem.isPending}
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </Pressable>
+            <Pressable style={styles.cancelButton} onPress={onCancelEdit}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+          {saveError && <Text style={styles.saveErrorText}>{saveError}</Text>}
+        </View>
+      </Card>
+    );
+  }
+
+  return (
+    <Swipeable ref={swipeableRef} renderRightActions={renderRightActions}>
+      <Pressable
+        onPress={() => router.push(`/inventory/${item.id}`)}
+        style={({ pressed }) => [pressed && styles.pressed]}
+      >
+        <Card>
+          <View style={styles.itemHeader}>
+            <Text style={styles.itemName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <ExpiryBadge expiresAt={null} />
+          </View>
+          <Text style={styles.itemCategory}>{item.category}</Text>
+          <Text style={styles.itemStored}>
+            Stored: {item.stored_quantity} {item.unit}
+          </Text>
+          <Text style={styles.itemTarget}>
+            Target: {item.target_quantity} {item.unit}
+          </Text>
+        </Card>
+      </Pressable>
+    </Swipeable>
   );
 }
 
@@ -60,6 +162,7 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
   const { data: items, isLoading, isError } = useInventoryItems(inventoryId);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     if (!items) return ["All"];
@@ -70,14 +173,15 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
   const filtered = useMemo(() => {
     if (!items) return [];
     return items.filter((item) => {
-      const matchesSearch = item.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
-      const matchesCategory =
-        activeCategory === "All" || item.category === activeCategory;
+      const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = activeCategory === "All" || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [items, search, activeCategory]);
+
+  const handleStartEdit = (id: string) => setEditingItemId(id);
+  const handleSaveEdit = () => setEditingItemId(null);
+  const handleCancelEdit = () => setEditingItemId(null);
 
   if (isLoading) {
     return (
@@ -128,7 +232,14 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ItemRow item={item} />
+          <ItemRow
+            item={item}
+            inventoryId={inventoryId}
+            editingItemId={editingItemId}
+            onStartEdit={handleStartEdit}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+          />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
@@ -237,8 +348,46 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   itemCategory: { fontSize: 13, color: "#6b7280", marginBottom: 2 },
+  itemStored: { fontSize: 13, color: "#6b7280", marginBottom: 2 },
   itemTarget: { fontSize: 13, color: "#6b7280" },
   pressed: { opacity: 0.85 },
   errorText: { fontSize: 15, color: "#ef4444" },
   emptyText: { fontSize: 15, color: "#6b7280" },
+  swipeRightAction: {
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    borderRadius: 12,
+  },
+  swipeActionText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  editForm: { gap: 8 },
+  editInput: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: "#111827",
+    backgroundColor: "#f9fafb",
+  },
+  editActions: { flexDirection: "row", gap: 8, marginTop: 4 },
+  saveButton: {
+    flex: 1,
+    backgroundColor: "#2563eb",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  saveButtonText: { color: "#fff", fontWeight: "600" },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#f3f4f6",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButtonText: { color: "#374151", fontWeight: "600" },
+  saveErrorText: { color: "#ef4444", fontSize: 12, marginTop: 4 },
 });
