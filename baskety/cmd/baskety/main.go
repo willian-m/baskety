@@ -100,7 +100,10 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	// Receipt domain: file storage + OCR/LLM adapters + in-process job queue.
 	// Defaults target a self-hosted stack (local disk, Tesseract, Ollama). These
 	// are configurable via env in a later sprint; see internal/adapters/*.
-	fileStore := storage.NewLocalFileStore("./uploads")
+	if cfg.Storage.LocalPath == "" {
+		cfg.Storage.LocalPath = "./uploads"
+	}
+	fileStore := storage.NewLocalFileStore(cfg.Storage.LocalPath)
 	var ocrProvider receipt.OCRProvider
 	switch cfg.OCR.Provider {
 	case "http":

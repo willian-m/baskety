@@ -14,6 +14,12 @@ type OCRConfig struct {
 	BinPath     string `mapstructure:"bin_path"`
 }
 
+// StorageConfig holds configuration for the file storage backend.
+type StorageConfig struct {
+	Backend   string `mapstructure:"backend"`
+	LocalPath string `mapstructure:"local_path"`
+}
+
 // Config holds all application configuration.
 type Config struct {
 	Server struct {
@@ -27,7 +33,8 @@ type Config struct {
 		Level  string `mapstructure:"level"`
 		Format string `mapstructure:"format"`
 	} `mapstructure:"log"`
-	OCR OCRConfig `mapstructure:"ocr"`
+	OCR     OCRConfig     `mapstructure:"ocr"`
+	Storage StorageConfig `mapstructure:"storage"`
 }
 
 // Load reads config.yaml (if present) and applies environment variable overrides.

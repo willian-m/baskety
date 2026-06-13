@@ -98,7 +98,7 @@ POSTGRES_PASSWORD=changeme docker compose --profile paddleocr up -d
 
 > **Note:** OCR models download on first container start. This can take several minutes depending on your connection. Subsequent starts use the cached models from the named Docker volume.
 
-To select the active OCR provider set `ocr.provider: http` in `config.yaml` (the default when using Compose). For non-English receipts, adjust the language environment variable:
+To use a Docker OCR service, set `ocr.provider: http` in `config.yaml`. Running without a profile starts no OCR service; the default config (`provider: tesseract`) will attempt to shell out to a local `tesseract` binary — if tesseract is not installed, receipt OCR will fail with a clear error. For Docker deployments, using `--profile easyocr` or `--profile paddleocr` is the recommended path. For non-English receipts, adjust the language environment variable:
 
 | Engine | Env var | Example |
 |--------|---------|---------|

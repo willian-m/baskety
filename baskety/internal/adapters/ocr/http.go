@@ -41,7 +41,9 @@ func (a *HTTPOCRAdapter) ExtractText(ctx context.Context, imagePath string) (str
 	if _, err = io.Copy(part, f); err != nil {
 		return "", fmt.Errorf("ocr: copy image: %w", err)
 	}
-	mw.Close()
+	if err := mw.Close(); err != nil {
+		return "", fmt.Errorf("ocr: close multipart: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpointURL+"/ocr", &buf)
 	if err != nil {
@@ -56,7 +58,7 @@ func (a *HTTPOCRAdapter) ExtractText(ctx context.Context, imagePath string) (str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
 		return "", fmt.Errorf("ocr: service returned %d: %s", resp.StatusCode, body)
 	}
 

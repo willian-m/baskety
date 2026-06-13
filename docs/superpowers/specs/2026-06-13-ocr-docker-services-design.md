@@ -133,7 +133,7 @@ default:
 }
 ```
 
-The `default` branch keeps backward compatibility: any unrecognized provider value (including the empty string, which is the zero value when no config is present) falls back to Tesseract. This preserves the existing development workflow where no OCR config is set.
+The `default` branch keeps backward compatibility: any unrecognized provider value (including the empty string, which is the zero value when no config is present) falls back to Tesseract. The config example defaults to `provider: tesseract`; if tesseract is not installed on the host, receipt OCR will fail with a clear error. For Docker deployments, use `--profile easyocr` or `--profile paddleocr` and set `provider: http` in `config.yaml`.
 
 ---
 
@@ -162,7 +162,10 @@ POSTGRES_PASSWORD=secret docker compose --profile paddleocr up -d
 # Portuguese receipts with EasyOCR
 OCR_LANGUAGES=en,pt POSTGRES_PASSWORD=secret docker compose --profile easyocr up -d
 
-# Development without OCR (falls back to local tesseract if installed)
+# Development without an OCR container
+# No OCR service starts. The config defaults to provider: tesseract, so the app
+# attempts to shell out to a local tesseract binary. If tesseract is not installed,
+# receipt OCR will fail with a clear error.
 POSTGRES_PASSWORD=secret docker compose up -d
 ```
 

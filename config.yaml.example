@@ -30,6 +30,6 @@ log:
   format: json
 
 ocr:
-  provider: http           # "http" (docker service) | "tesseract" (local binary)
-  endpoint_url: http://ocr:8000
-  bin_path: ""             # path to tesseract binary; empty = use $PATH
+  provider: tesseract      # "tesseract" (local binary, default) | "http" (docker OCR service)
+  endpoint_url: http://ocr:8000   # used when provider=http; set automatically when using --profile easyocr or --profile paddleocr
+  bin_path: ""             # path to tesseract binary when provider=tesseract; empty = use $PATH
