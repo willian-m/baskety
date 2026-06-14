@@ -1,12 +1,8 @@
-import {
-  useAddBatch,
-  useBatches,
-  useInventories,
-  useInventoryItem,
-  useUpdateItem,
-} from "@baskety/core";
+import { useAddBatch, useBatches, useInventoryItem, useUpdateItem } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
 import { ExpiryBadge } from "./ExpiryBadge.js";
 
@@ -14,8 +10,7 @@ export function ItemDetailPage() {
   const { itemId } = useParams({ from: "/_app/inventory/$itemId" });
   const navigate = useNavigate();
 
-  const { data: inventories } = useInventories();
-  const inventoryId = inventories?.[0]?.id ?? "";
+  const inventoryId = useActiveInventory();
 
   const { data: item, isLoading } = useInventoryItem(inventoryId, itemId);
   const { data: batches } = useBatches(inventoryId, itemId);
@@ -154,9 +149,7 @@ export function ItemDetailPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {item.category} · Target: {item.target_quantity} {item.unit}
             </p>
-            {item.notes && (
-              <p className="mt-1 text-sm text-muted-foreground">{item.notes}</p>
-            )}
+            {item.notes && <p className="mt-1 text-sm text-muted-foreground">{item.notes}</p>}
           </div>
         )}
         {!editMode && (
@@ -222,9 +215,7 @@ export function ItemDetailPage() {
       )}
 
       {(batches ?? []).length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">
-          No batches yet.
-        </p>
+        <p className="py-8 text-center text-muted-foreground">No batches yet.</p>
       ) : (
         <div className="rounded-lg border">
           {(batches ?? []).map((batch, idx) => (
@@ -237,17 +228,13 @@ export function ItemDetailPage() {
                   {batch.quantity} {item.unit}
                 </span>
                 {batch.notes && (
-                  <span className="text-xs text-muted-foreground">
-                    {batch.notes}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{batch.notes}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <ExpiryBadge expiresAt={batch.expires_at} />
                 <span className="text-xs text-muted-foreground">
-                  {batch.expires_at
-                    ? new Date(batch.expires_at).toLocaleDateString()
-                    : "No expiry"}
+                  {batch.expires_at ? new Date(batch.expires_at).toLocaleDateString() : "No expiry"}
                 </span>
               </div>
             </div>

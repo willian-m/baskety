@@ -11,6 +11,7 @@ export interface NetworkProfile {
 interface UiState {
   token: string | null;
   activeHouseholdId: string | null;
+  activeInventoryId: string;
   activeServerUrl: string | null;
   externalUrl: string | null;
   networkProfiles: NetworkProfile[];
@@ -20,6 +21,7 @@ interface UiState {
   setSession: (token: string, firstHouseholdId?: string) => void;
   clearSession: () => void;
   setActiveHousehold: (id: string) => void;
+  setActiveInventory: (id: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
   setActiveServerUrl: (url: string | null) => void;
@@ -34,6 +36,7 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       token: null,
       activeHouseholdId: null,
+      activeInventoryId: "",
       activeServerUrl: null,
       externalUrl: null,
       networkProfiles: [],
@@ -43,7 +46,8 @@ export const useUiStore = create<UiState>()(
       setSession: (token, firstHouseholdId) =>
         set({ token, activeHouseholdId: firstHouseholdId ?? null }),
       clearSession: () => set({ token: null, activeHouseholdId: null }),
-      setActiveHousehold: (id) => set({ activeHouseholdId: id }),
+      setActiveHousehold: (id) => set({ activeHouseholdId: id, activeInventoryId: "" }),
+      setActiveInventory: (id) => set({ activeInventoryId: id }),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setActiveServerUrl: (url) => set({ activeServerUrl: url }),
@@ -63,6 +67,7 @@ export const useUiStore = create<UiState>()(
       partialize: (state) => ({
         token: state.token,
         activeHouseholdId: state.activeHouseholdId,
+        activeInventoryId: state.activeInventoryId,
         externalUrl: state.externalUrl,
         networkProfiles: state.networkProfiles,
         sidebarCollapsed: state.sidebarCollapsed,

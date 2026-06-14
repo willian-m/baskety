@@ -1,6 +1,8 @@
 import { useInventories, useInventoryItems } from "@baskety/core";
 import { useEffect, useRef, useState } from "react";
 
+import { useActiveInventory } from "../../hooks/useActiveInventory.js";
+
 import { InventoryTable } from "./InventoryTable.js";
 import { SetupWizard } from "./SetupWizard.js";
 
@@ -11,8 +13,8 @@ export function InventoryPage() {
 
   const tableRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: inventories, isLoading: loadingInv, isError: invError } = useInventories();
-  const inventoryId = inventories?.[0]?.id ?? "";
+  const { isLoading: loadingInv, isError: invError } = useInventories();
+  const inventoryId = useActiveInventory();
   const { data: items, isLoading: loadingItems } = useInventoryItems(inventoryId);
 
   useEffect(() => {
