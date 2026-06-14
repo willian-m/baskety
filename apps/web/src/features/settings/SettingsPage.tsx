@@ -540,6 +540,7 @@ function OCRSection() {
   const [showAdd, setShowAdd] = useState(false);
   const [provider, setProvider] = useState<string>(OCR_PROVIDERS[0]);
   const [endpoint, setEndpoint] = useState("");
+  const [extraConfig, setExtraConfig] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [setAsDefault, setSetAsDefault] = useState(false);
 
@@ -553,11 +554,13 @@ function OCRSection() {
     await create.mutateAsync({
       provider: provider.trim(),
       endpoint_url: endpoint.trim() || null,
+      extra_config: extraConfig.trim() || null,
       api_key_encrypted: apiKey || null,
       is_default: setAsDefault,
     });
     setProvider(OCR_PROVIDERS[0]);
     setEndpoint("");
+    setExtraConfig("");
     setApiKey("");
     setSetAsDefault(false);
     setShowAdd(false);
@@ -599,6 +602,13 @@ function OCRSection() {
               placeholder="Endpoint URL (optional)"
               aria-label="Endpoint URL (optional)"
               className={`${inputCls} flex-1`}
+            />
+            <input
+              value={extraConfig}
+              onChange={(e) => setExtraConfig(e.target.value)}
+              placeholder="Extra config (JSON)"
+              aria-label="Extra config (JSON, optional)"
+              className={`${inputCls} w-48`}
             />
             <input
               type="password"
@@ -720,7 +730,7 @@ function ShareLinksSection() {
           </select>
           <input
             data-testid="share-password-input"
-            type="text"
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password (optional)"
