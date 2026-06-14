@@ -86,6 +86,13 @@ func (s *Service) CreateOCRProvider(ctx context.Context, householdID uuid.UUID, 
 	if req.Provider == "" {
 		return nil, fmt.Errorf("provider required: %w", ErrInvalidInput)
 	}
+	valid := map[string]bool{
+		"tesseract": true, "google_vision": true,
+		"aws_textract": true, "azure": true, "custom": true,
+	}
+	if !valid[req.Provider] {
+		return nil, fmt.Errorf("provider must be one of: tesseract, google_vision, aws_textract, azure, custom: %w", ErrInvalidInput)
+	}
 	h := householdID
 	return s.repo.CreateOCRProvider(ctx, &h, req.Provider, req.EndpointURL, req.APIKeyEncrypted, req.ExtraConfig, req.IsDefault)
 }
