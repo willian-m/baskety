@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -158,6 +157,7 @@ func (s *Service) CreateItem(ctx context.Context, inventoryID, householdID uuid.
 		}
 		return nil, fmt.Errorf("creating item: %w", err)
 	}
+	// TODO: wrap in a transaction so partial writes (item created, batch fails) are rolled back.
 	if _, err := s.repo.AddBatch(ctx, item.ID, req.InitialQuantity, req.InitialExpiresAt, nil); err != nil {
 		return nil, fmt.Errorf("creating initial batch: %w", err)
 	}
@@ -262,9 +262,6 @@ func (s *Service) PatchBatch(ctx context.Context, batchID, itemID, householdID u
 	}
 	batch, err := s.repo.PatchBatch(ctx, batchID, req.Quantity, req.ExpiresAt)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("batch not found: %w", ErrNotFound)
-		}
 		return nil, fmt.Errorf("patch batch: %w", err)
 	}
 	return toBatchResponse(batch), nil
