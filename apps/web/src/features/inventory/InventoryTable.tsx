@@ -4,7 +4,9 @@ import {
   useCreateItem,
   useUpdateItem,
   type InventoryItemResponse,
+  request,
 } from "@baskety/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 
@@ -22,14 +24,15 @@ const UNCATEGORIZED = "Uncategorized";
 const inputClass =
   "h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-export function InventoryTable({
-  inventoryId,
-  items,
-  newItemName,
-  onNewItemSaved,
-}: Props) {
+export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved }: Props) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+  const [addingInCategory, setAddingInCategory] = useState<string | null>(null);
+
+  // Real categories only (no Uncategorized) for autocomplete suggestions.
+  const allCategories = Array.from(
+    new Set(items.map((i) => i.category).filter((c): c is string => Boolean(c))),
+  ).sort((a, b) => a.localeCompare(b));
 
   // Group already-filtered items by category — InventoryPage owns filtering.
   const categories = Array.from(new Set(items.map((i) => i.category || UNCATEGORIZED))).sort(
@@ -53,51 +56,85 @@ export function InventoryTable({
   };
 
   return (
-    <table className="w-full border-collapse">
-      <thead>
-        <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          <th className="w-8 px-2 py-2" aria-label="Expand" />
-          <th className="px-2 py-2">Item</th>
-          <th className="w-32 px-2 py-2">Stored Qty</th>
-          <th className="w-32 px-2 py-2">Target Qty</th>
-        </tr>
-      </thead>
-      <tbody>
-        {categories.map((category) => {
-          const inCategory = items
-            .filter((i) => (i.category || UNCATEGORIZED) === category)
-            .sort((a, b) => a.name.localeCompare(b.name));
+    <>
+      <datalist id="category-suggestions">
+        {allCategories.map((cat) => (
+          <option key={cat} value={cat} />
+        ))}
+      </datalist>
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <th className="w-8 px-2 py-2" aria-label="Expand" />
+            <th className="px-2 py-2">Item</th>
+            <th className="w-32 px-2 py-2">Stored Qty</th>
+            <th className="w-32 px-2 py-2">Target Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map((category) => {
+            const inCategory = items
+              .filter((i) => (i.category || UNCATEGORIZED) === category)
+              .sort((a, b) => a.name.localeCompare(b.name));
 
-          if (inCategory.length === 0) return null;
+            if (inCategory.length === 0) return null;
 
-          return (
-            <Fragment key={category}>
-              <tr className="bg-muted/40">
-                <td colSpan={4} className="px-2 py-2">
-                  <strong className="text-sm font-semibold">{category}</strong>
-                </td>
-              </tr>
-              {inCategory.map((item) => (
-                <ItemRow
-                  key={item.id}
-                  inventoryId={inventoryId}
-                  item={item}
-                  isEditing={editingItemId === item.id}
-                  isExpanded={expandedItemIds.has(item.id)}
-                  onStartEditing={() => startEditing(item.id)}
-                  onStopEditing={() => setEditingItemId(null)}
-                  onToggleExpanded={() => toggleExpanded(item.id)}
-                />
-              ))}
-            </Fragment>
-          );
-        })}
+            return (
+              <Fragment key={category}>
+                <tr className="bg-muted/40">
+                  <td colSpan={4} className="px-2 py-2">
+                    <strong className="text-sm font-semibold">{category}</strong>
+                  </td>
+                </tr>
+                {inCategory.map((item) => (
+                  <ItemRow
+                    key={item.id}
+                    inventoryId={inventoryId}
+                    item={item}
+                    isEditing={editingItemId === item.id}
+                    isExpanded={expandedItemIds.has(item.id)}
+                    allCategories={allCategories}
+                    onStartEditing={() => startEditing(item.id)}
+                    onStopEditing={() => setEditingItemId(null)}
+                    onToggleExpanded={() => toggleExpanded(item.id)}
+                  />
+                ))}
+                {addingInCategory === category ? (
+                  <NewItemRow
+                    inventoryId={inventoryId}
+                    initialName=""
+                    initialCategory={category}
+                    allCategories={allCategories}
+                    onDone={() => setAddingInCategory(null)}
+                  />
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-1">
+                      <button
+                        type="button"
+                        onClick={() => setAddingInCategory(category)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        + Add item to {category}
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
 
-        {newItemName.trim() !== "" && (
-          <NewItemRow inventoryId={inventoryId} initialName={newItemName} onDone={onNewItemSaved} />
-        )}
-      </tbody>
-    </table>
+          {newItemName.trim() !== "" && (
+            <NewItemRow
+              inventoryId={inventoryId}
+              initialName={newItemName}
+              allCategories={allCategories}
+              onDone={onNewItemSaved}
+            />
+          )}
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -108,6 +145,7 @@ type ItemRowProps = {
   item: InventoryItemResponse;
   isEditing: boolean;
   isExpanded: boolean;
+  allCategories: string[];
   onStartEditing: () => void;
   onStopEditing: () => void;
   onToggleExpanded: () => void;
@@ -118,6 +156,7 @@ function ItemRow({
   item,
   isEditing,
   isExpanded,
+  allCategories: _allCategories,
   onStartEditing,
   onStopEditing,
   onToggleExpanded,
@@ -206,6 +245,7 @@ function ItemRow({
                   onChange={(e) => setCategory(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder="Category"
+                  list="category-suggestions"
                   className={inputClass}
                 />
                 <input
@@ -424,9 +464,7 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
                   Cancel
                 </button>
               </div>
-              {failedBatch && (
-                <p className="text-xs text-red-600">Add batch failed</p>
-              )}
+              {failedBatch && <p className="text-xs text-red-600">Add batch failed</p>}
             </td>
           </>
         ) : (
@@ -450,28 +488,52 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
 type NewItemRowProps = {
   inventoryId: string;
   initialName: string;
+  initialCategory?: string;
+  allCategories: string[];
   onDone: () => void;
 };
 
-function NewItemRow({ inventoryId, initialName, onDone }: NewItemRowProps) {
+function NewItemRow({
+  inventoryId,
+  initialName,
+  initialCategory,
+  allCategories: _allCategories,
+  onDone,
+}: NewItemRowProps) {
   const createItem = useCreateItem(inventoryId);
+  const qc = useQueryClient();
 
   const [name, setName] = useState(initialName);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(initialCategory ?? "");
   const [unit, setUnit] = useState("");
   const [target, setTarget] = useState("1");
+  const [storedQty, setStoredQty] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
   const [failed, setFailed] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return;
     setFailed(false);
     try {
-      await createItem.mutateAsync({
+      const item = await createItem.mutateAsync({
         name: name.trim(),
         category: category.trim(),
         unit: unit.trim(),
         target_quantity: parseFloat(target) || 1,
       });
+      if (item?.id && parseFloat(storedQty) > 0) {
+        await request(`/inventories/${inventoryId}/items/${item.id}/batches`, {
+          method: "POST",
+          body: JSON.stringify({
+            quantity: parseFloat(storedQty),
+            expires_at: expiryDate || null,
+            notes: null,
+          }),
+        });
+        void qc.invalidateQueries({
+          queryKey: ["inventories", inventoryId, "items", item.id, "batches"],
+        });
+      }
       onDone();
     } catch {
       setFailed(true);
@@ -513,6 +575,8 @@ function NewItemRow({ inventoryId, initialName, onDone }: NewItemRowProps) {
                 onChange={(e) => setCategory(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Category"
+                list="category-suggestions"
+                readOnly={Boolean(initialCategory)}
                 className={inputClass}
               />
               <input
@@ -526,7 +590,26 @@ function NewItemRow({ inventoryId, initialName, onDone }: NewItemRowProps) {
             </div>
           </div>
         </td>
-        <td className="px-2 py-1 text-sm text-muted-foreground">—</td>
+        <td className="px-2 py-1">
+          <div className="flex flex-col gap-1">
+            <input
+              aria-label="Initial stored quantity"
+              type="number"
+              value={storedQty}
+              onChange={(e) => setStoredQty(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="0"
+              className={inputClass}
+            />
+            <input
+              aria-label="Expiry date"
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+        </td>
         <td className="px-2 py-1">
           <div className="flex flex-col gap-1">
             <input

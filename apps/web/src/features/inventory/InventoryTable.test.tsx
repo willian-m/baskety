@@ -47,11 +47,7 @@ function makeItems() {
 
 const UNCATEGORIZED = "Uncategorized";
 
-function applyFilters(
-  items: ReturnType<typeof makeItems>,
-  search: string,
-  categoryFilter: string,
-) {
+function applyFilters(items: ReturnType<typeof makeItems>, search: string, categoryFilter: string) {
   return items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const effectiveCategory = item.category || UNCATEGORIZED;
