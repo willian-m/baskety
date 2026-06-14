@@ -33,20 +33,33 @@ function ListCard({ list, inventoryId }: ListCardProps) {
   const handleRename = async () => {
     const name = editName.trim();
     if (!name) return;
-    await renameList.mutateAsync(name);
-    setIsEditing(false);
-    setMenuOpen(false);
+    try {
+      await renameList.mutateAsync(name);
+      setIsEditing(false);
+      setMenuOpen(false);
+    } catch {
+      // mutation error is exposed via renameList.isError / renameList.error
+      setIsEditing(false);
+    }
   };
 
   const handleArchive = async () => {
-    await archiveList.mutateAsync();
-    setMenuOpen(false);
+    try {
+      await archiveList.mutateAsync();
+      setMenuOpen(false);
+    } catch {
+      setMenuOpen(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!window.confirm(`Delete "${list.name}"?`)) return;
-    await deleteList.mutateAsync(list.id);
-    setMenuOpen(false);
+    try {
+      await deleteList.mutateAsync(list.id);
+      setMenuOpen(false);
+    } catch {
+      setMenuOpen(false);
+    }
   };
 
   const statusColor: Record<string, string> = {
