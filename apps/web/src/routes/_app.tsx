@@ -1,10 +1,12 @@
 import { useHouseholds, useLogout, useUiStore } from "@baskety/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { createRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Route as RootRoute } from "./__root.js";
 
 function HouseholdSwitcher() {
+  const qc = useQueryClient();
   const { data: households } = useHouseholds();
   const activeHouseholdId = useUiStore((s) => s.activeHouseholdId);
   const setActiveHousehold = useUiStore((s) => s.setActiveHousehold);
@@ -33,6 +35,7 @@ function HouseholdSwitcher() {
               onClick={() => {
                 setActiveHousehold(h.id);
                 setActiveInventory("");
+                void qc.invalidateQueries();
                 setOpen(false);
               }}
               className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
