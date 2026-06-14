@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
@@ -31,6 +32,7 @@ type ServiceIface interface {
 	ListActiveBatches(ctx context.Context, itemID, householdID uuid.UUID) ([]*BatchResponse, error)
 	MarkBatchEmptied(ctx context.Context, batchID, householdID uuid.UUID) error
 	GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error)
+	PatchBatch(ctx context.Context, batchID, itemID, householdID uuid.UUID, req PatchBatchRequest) (*BatchResponse, error)
 }
 
 type Service struct {
@@ -150,7 +152,14 @@ func (s *Service) CreateItem(ctx context.Context, inventoryID, householdID uuid.
 	}
 	item, err := s.repo.CreateItem(ctx, inventoryID, req.Name, req.Category, req.Unit, req.TargetQuantity, req.Notes)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, fmt.Errorf("an item with this name already exists in this category: %w", ErrInvalidInput)
+		}
 		return nil, fmt.Errorf("creating item: %w", err)
+	}
+	// TODO: wrap in a transaction so partial writes (item created, batch fails) are rolled back.
+	if _, err := s.repo.AddBatch(ctx, item.ID, req.InitialQuantity, req.InitialExpiresAt, nil); err != nil {
+		return nil, fmt.Errorf("creating initial batch: %w", err)
 	}
 	return toItemResponse(item), nil
 }
@@ -242,4 +251,24 @@ func (s *Service) GetEffectiveQuantity(ctx context.Context, itemID, householdID 
 		return 0, err
 	}
 	return s.repo.GetItemQuantity(ctx, itemID)
+}
+
+func (s *Service) PatchBatch(ctx context.Context, batchID, itemID, householdID uuid.UUID, req PatchBatchRequest) (*BatchResponse, error) {
+	if req.Quantity < 0 {
+		return nil, fmt.Errorf("quantity must be >= 0: %w", ErrInvalidInput)
+	}
+	if _, err := s.assertItemScope(ctx, itemID, householdID); err != nil {
+		return nil, err
+	}
+	batch, err := s.repo.PatchBatch(ctx, batchID, req.Quantity, req.ExpiresAt)
+	if err != nil {
+		return nil, fmt.Errorf("patch batch: %w", err)
+	}
+	return toBatchResponse(batch), nil
+}
+
+// isUniqueViolation returns true when err is a PostgreSQL unique-constraint violation (code 23505).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

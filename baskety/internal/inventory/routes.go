@@ -21,4 +21,5 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Post("/{inventoryID}/items/{itemID}/batches", h.HandleAddBatch)
 	r.Get("/{inventoryID}/items/{itemID}/batches", h.HandleListActiveBatches)
 	r.Post("/{inventoryID}/items/{itemID}/batches/{batchID}/empty", h.HandleMarkBatchEmptied)
+	r.Patch("/{inventoryID}/items/{itemID}/batches/{batchID}", h.HandlePatchBatch)
 }

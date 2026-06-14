@@ -255,3 +255,18 @@ func (r *pgRepository) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error
 	}
 	return nil
 }
+
+func (r *pgRepository) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*InventoryBatch, error) {
+	row, err := r.q.PatchBatch(ctx, sqlc.PatchBatchParams{
+		ID:        shared.UUIDToPg(id),
+		Quantity:  shared.FloatToPgNumeric(quantity),
+		ExpiresAt: shared.TimePtrToPg(expiresAt),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("patch batch: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("patch batch: %w", err)
+	}
+	return r.toBatch(row), nil
+}

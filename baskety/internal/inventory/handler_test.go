@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,6 +32,7 @@ type mockService struct {
 	listActiveBatchesFn func(ctx context.Context, itemID, householdID uuid.UUID) ([]*inventory.BatchResponse, error)
 	markBatchEmptiedFn  func(ctx context.Context, batchID, householdID uuid.UUID) error
 	getEffectiveQtyFn   func(ctx context.Context, itemID, householdID uuid.UUID) (float64, error)
+	patchBatchFn        func(ctx context.Context, batchID, itemID, householdID uuid.UUID, req inventory.PatchBatchRequest) (*inventory.BatchResponse, error)
 }
 
 func (m *mockService) CreateInventory(ctx context.Context, householdID uuid.UUID, req inventory.CreateInventoryRequest) (*inventory.InventoryResponse, error) {
@@ -74,6 +76,9 @@ func (m *mockService) MarkBatchEmptied(ctx context.Context, batchID, householdID
 }
 func (m *mockService) GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error) {
 	return m.getEffectiveQtyFn(ctx, itemID, householdID)
+}
+func (m *mockService) PatchBatch(ctx context.Context, batchID, itemID, householdID uuid.UUID, req inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+	return m.patchBatchFn(ctx, batchID, itemID, householdID, req)
 }
 
 func setupRouter(svc inventory.ServiceIface, householdID uuid.UUID) *chi.Mux {
@@ -216,4 +221,87 @@ func TestHandleMarkBatchEmptied(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestHandleCreateItem_Duplicate(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	svc := &mockService{
+		createItemFn: func(_ context.Context, _, _ uuid.UUID, _ inventory.CreateItemRequest) (*inventory.ItemResponse, error) {
+			return nil, fmt.Errorf("an item with this name already exists in this category: %w", inventory.ErrInvalidInput)
+		},
+	}
+	r := setupRouter(svc, hID)
+	body, _ := json.Marshal(inventory.CreateItemRequest{Name: "Milk", TargetQuantity: 2})
+	req := httptest.NewRequest(http.MethodPost, "/"+invID.String()+"/items", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "already exists")
+}
+
+func TestHandlePatchBatch(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	itemID := uuid.New()
+	batchID := uuid.New()
+
+	t.Run("success", func(t *testing.T) {
+		svc := &mockService{
+			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, req inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+				return &inventory.BatchResponse{ID: batchID.String(), ItemID: itemID.String(), Quantity: req.Quantity}, nil
+			},
+		}
+		r := setupRouter(svc, hID)
+		body, _ := json.Marshal(inventory.PatchBatchRequest{Quantity: 5})
+		req := httptest.NewRequest(http.MethodPatch, "/"+invID.String()+"/items/"+itemID.String()+"/batches/"+batchID.String(), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.NotNil(t, resp["data"])
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		svc := &mockService{
+			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, _ inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+				return nil, fmt.Errorf("batch not found: %w", inventory.ErrNotFound)
+			},
+		}
+		r := setupRouter(svc, hID)
+		body, _ := json.Marshal(inventory.PatchBatchRequest{Quantity: 5})
+		req := httptest.NewRequest(http.MethodPatch, "/"+invID.String()+"/items/"+itemID.String()+"/batches/"+batchID.String(), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := &mockService{
+			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, _ inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+				return nil, fmt.Errorf("scope: %w", inventory.ErrForbidden)
+			},
+		}
+		r := setupRouter(svc, hID)
+		body, _ := json.Marshal(inventory.PatchBatchRequest{Quantity: 5})
+		req := httptest.NewRequest(http.MethodPatch, "/"+invID.String()+"/items/"+itemID.String()+"/batches/"+batchID.String(), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusForbidden, w.Code)
+	})
+
+	t.Run("negative quantity", func(t *testing.T) {
+		svc := &mockService{
+			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, _ inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+				return nil, fmt.Errorf("quantity must be >= 0: %w", inventory.ErrInvalidInput)
+			},
+		}
+		r := setupRouter(svc, hID)
+		body, _ := json.Marshal(inventory.PatchBatchRequest{Quantity: -1})
+		req := httptest.NewRequest(http.MethodPatch, "/"+invID.String()+"/items/"+itemID.String()+"/batches/"+batchID.String(), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
 }

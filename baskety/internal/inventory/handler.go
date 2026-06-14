@@ -312,3 +312,29 @@ func (h *Handler) HandleMarkBatchEmptied(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{"status": "emptied"}})
 }
+
+func (h *Handler) HandlePatchBatch(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	itemID, ok := parseParam(w, r, "itemID", "item ID")
+	if !ok {
+		return
+	}
+	batchID, ok := parseParam(w, r, "batchID", "batch ID")
+	if !ok {
+		return
+	}
+	var req PatchBatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	resp, err := h.svc.PatchBatch(r.Context(), batchID, itemID, hid, req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
+}

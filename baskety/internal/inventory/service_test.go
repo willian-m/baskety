@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/willian-m/baskety/internal/inventory"
@@ -28,6 +29,7 @@ type mockRepo struct {
 	getBatchFn          func(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error)
 	listActiveBatchesFn func(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error)
 	markBatchEmptiedFn  func(ctx context.Context, id uuid.UUID) error
+	patchBatchFn        func(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error)
 }
 
 func (m *mockRepo) CreateInventory(ctx context.Context, householdID uuid.UUID, name string, description *string) (*inventory.Inventory, error) {
@@ -74,6 +76,9 @@ func (m *mockRepo) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*
 }
 func (m *mockRepo) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
 	return m.markBatchEmptiedFn(ctx, id)
+}
+func (m *mockRepo) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error) {
+	return m.patchBatchFn(ctx, id, quantity, expiresAt)
 }
 
 func TestCreateInventory_Success(t *testing.T) {
@@ -180,4 +185,23 @@ func TestGetInventory_RepoNotFound(t *testing.T) {
 	svc := inventory.NewService(repo)
 	_, err := svc.GetInventory(context.Background(), uuid.New(), uuid.New())
 	assert.ErrorIs(t, err, inventory.ErrNotFound)
+}
+
+func TestCreateItem_UniqueViolation_ReturnsErrInvalidInput(t *testing.T) {
+	invID := uuid.New()
+	hID := uuid.New()
+	pgUniqueErr := &pgconn.PgError{Code: "23505"}
+	repo := &mockRepo{
+		getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+			return &inventory.Inventory{ID: id, HouseholdID: hID}, nil
+		},
+		createItemFn: func(_ context.Context, _ uuid.UUID, _, _, _ string, _ float64, _ *string) (*inventory.InventoryItem, error) {
+			return nil, pgUniqueErr
+		},
+	}
+	svc := inventory.NewService(repo)
+	_, err := svc.CreateItem(context.Background(), invID, hID, inventory.CreateItemRequest{Name: "Milk"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, inventory.ErrInvalidInput)
+	assert.Contains(t, err.Error(), "already exists")
 }
