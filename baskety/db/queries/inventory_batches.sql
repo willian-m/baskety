@@ -14,6 +14,12 @@ ORDER BY expires_at ASC NULLS LAST;
 -- name: MarkBatchEmptied :exec
 UPDATE inventory_batches SET emptied_at = NOW() WHERE id = $1;
 
+-- name: PatchBatch :one
+UPDATE inventory_batches
+SET quantity = $2, expires_at = $3
+WHERE id = $1 AND emptied_at IS NULL
+RETURNING *;
+
 -- name: ListExpiringBatches :many
 SELECT * FROM inventory_batches
 WHERE emptied_at IS NULL AND expires_at <= $1

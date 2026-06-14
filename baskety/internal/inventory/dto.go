@@ -15,11 +15,13 @@ type UpdateInventoryRequest struct {
 }
 
 type CreateItemRequest struct {
-	Name           string  `json:"name"`
-	Category       string  `json:"category"`
-	Unit           string  `json:"unit"`
-	TargetQuantity float64 `json:"target_quantity"`
-	Notes          *string `json:"notes"`
+	Name             string     `json:"name"`
+	Category         string     `json:"category"`
+	Unit             string     `json:"unit"`
+	TargetQuantity   float64    `json:"target_quantity"`
+	Notes            *string    `json:"notes"`
+	InitialQuantity  float64    `json:"initial_quantity"`
+	InitialExpiresAt *time.Time `json:"initial_expires_at"`
 }
 
 type UpdateItemRequest struct {
@@ -34,6 +36,11 @@ type AddBatchRequest struct {
 	Quantity  float64    `json:"quantity"`
 	ExpiresAt *time.Time `json:"expires_at"`
 	Notes     *string    `json:"notes"`
+}
+
+type PatchBatchRequest struct {
+	Quantity  float64    `json:"quantity"`
+	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 // --- Responses ---

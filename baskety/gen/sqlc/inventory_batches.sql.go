@@ -143,3 +143,32 @@ func (q *Queries) MarkBatchEmptied(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markBatchEmptied, id)
 	return err
 }
+
+const patchBatch = `-- name: PatchBatch :one
+UPDATE inventory_batches
+SET quantity = $2, expires_at = $3
+WHERE id = $1 AND emptied_at IS NULL
+RETURNING id, item_id, quantity, expires_at, added_at, emptied_at, notes, created_at
+`
+
+type PatchBatchParams struct {
+	ID        pgtype.UUID        `json:"id"`
+	Quantity  pgtype.Numeric     `json:"quantity"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+func (q *Queries) PatchBatch(ctx context.Context, arg PatchBatchParams) (InventoryBatch, error) {
+	row := q.db.QueryRow(ctx, patchBatch, arg.ID, arg.Quantity, arg.ExpiresAt)
+	var i InventoryBatch
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.Quantity,
+		&i.ExpiresAt,
+		&i.AddedAt,
+		&i.EmptiedAt,
+		&i.Notes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
