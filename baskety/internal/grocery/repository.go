@@ -14,6 +14,8 @@ type Repository interface {
 	ListByInventory(ctx context.Context, inventoryID uuid.UUID) ([]*GroceryList, error)
 	UpdateListStatus(ctx context.Context, id uuid.UUID, status string, completedAt *time.Time) (*GroceryList, error)
 	ArchiveList(ctx context.Context, id uuid.UUID) error
+	RenameList(ctx context.Context, id uuid.UUID, name string) (*GroceryList, error)
+	DeleteList(ctx context.Context, id uuid.UUID) error
 
 	// items
 	AddItem(ctx context.Context, listID uuid.UUID, inventoryItemID *uuid.UUID, name string, quantity float64, unit string, notes *string, sortOrder int) (*GroceryListItem, error)

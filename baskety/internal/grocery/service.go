@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +35,8 @@ type ServiceIface interface {
 	ListByInventory(ctx context.Context, inventoryID, householdID uuid.UUID) ([]*ListResponse, error)
 	CompleteList(ctx context.Context, id, householdID uuid.UUID) (*ListResponse, error)
 	ArchiveList(ctx context.Context, id, householdID uuid.UUID) error
+	RenameList(ctx context.Context, id, householdID uuid.UUID, name string) (*ListResponse, error)
+	DeleteList(ctx context.Context, id, householdID uuid.UUID) error
 
 	// item management
 	AddItem(ctx context.Context, listID, householdID uuid.UUID, req AddItemRequest) (*ItemResponse, error)
@@ -162,6 +165,27 @@ func (s *Service) ArchiveList(ctx context.Context, id, householdID uuid.UUID) er
 		return err
 	}
 	return s.repo.ArchiveList(ctx, id)
+}
+
+func (s *Service) RenameList(ctx context.Context, id, householdID uuid.UUID, name string) (*ListResponse, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("name required: %w", ErrInvalidInput)
+	}
+	if _, err := s.assertListScope(ctx, id, householdID); err != nil {
+		return nil, err
+	}
+	list, err := s.repo.RenameList(ctx, id, name)
+	if err != nil {
+		return nil, fmt.Errorf("renaming list: %w", err)
+	}
+	return toListResponse(list), nil
+}
+
+func (s *Service) DeleteList(ctx context.Context, id, householdID uuid.UUID) error {
+	if _, err := s.assertListScope(ctx, id, householdID); err != nil {
+		return err
+	}
+	return s.repo.DeleteList(ctx, id)
 }
 
 // --- item management ---

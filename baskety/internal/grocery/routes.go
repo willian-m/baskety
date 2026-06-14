@@ -15,6 +15,8 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Post("/{inventoryID}/lists/auto-generate", h.HandleAutoGenerate)
 
 	r.Get("/{inventoryID}/lists/{listID}", h.HandleGetList)
+	r.Put("/{inventoryID}/lists/{listID}", h.HandleRenameList)
+	r.Delete("/{inventoryID}/lists/{listID}", h.HandleDeleteList)
 	r.Post("/{inventoryID}/lists/{listID}/complete", h.HandleCompleteList)
 	r.Post("/{inventoryID}/lists/{listID}/archive", h.HandleArchiveList)
 

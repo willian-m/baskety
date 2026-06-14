@@ -1250,6 +1250,62 @@
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
+      },
+      "put": {
+        "summary": "Rename a grocery list",
+        "operationId": "renameGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": { "name": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Grocery list renamed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/GroceryListResponse" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete a grocery list",
+        "operationId": "deleteGroceryList",
+        "tags": ["Grocery Lists"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "inventoryID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "listID", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "Grocery list deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
       }
     },
     "/api/v1/inventories/{inventoryID}/lists/{listID}/complete": {

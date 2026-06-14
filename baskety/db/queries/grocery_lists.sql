@@ -20,3 +20,9 @@ UPDATE grocery_lists SET pinned_at = NOW() WHERE id = $1;
 
 -- name: ArchiveGroceryList :exec
 UPDATE grocery_lists SET status = 'archived', updated_at = NOW() WHERE id = $1;
+
+-- name: RenameGroceryList :one
+UPDATE grocery_lists SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING *;
+
+-- name: DeleteGroceryList :exec
+DELETE FROM grocery_lists WHERE id = $1;
