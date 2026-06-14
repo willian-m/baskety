@@ -16,6 +16,7 @@ import {
 import { useState } from "react";
 
 const LLM_PROVIDERS = ["anthropic", "openai", "ollama", "litellm", "custom"] as const;
+const OCR_PROVIDERS = ["tesseract", "google_vision", "aws_textract", "azure", "custom"] as const;
 
 // ── Shared input style ────────────────────────────────────────────────────────
 const inputCls =
@@ -39,6 +40,7 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
   });
 
   const handleSetActive = () => {
+    // api_key intentionally omitted — backend uses COALESCE to retain the existing encrypted key
     update.mutate({
       id: p.id,
       data: {
@@ -74,6 +76,7 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
           <select
             value={editForm.provider}
             onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
+            aria-label="Provider"
             className={`${inputCls} w-40`}
           >
             {LLM_PROVIDERS.map((opt) => (
@@ -86,12 +89,14 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
             value={editForm.model}
             onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
             placeholder="Model (e.g. gpt-4o)"
+            aria-label="Model"
             className={`${inputCls} w-40`}
           />
           <input
             value={editForm.endpoint_url}
             onChange={(e) => setEditForm((f) => ({ ...f, endpoint_url: e.target.value }))}
             placeholder="Endpoint URL (optional)"
+            aria-label="Endpoint URL (optional)"
             className={`${inputCls} flex-1`}
           />
           <input
@@ -99,6 +104,7 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
             value={editForm.apiKey}
             onChange={(e) => setEditForm((f) => ({ ...f, apiKey: e.target.value }))}
             placeholder={p.has_api_key ? "••••••••" : "API key (optional)"}
+            aria-label="API key"
             className={`${inputCls} w-52`}
           />
           <label className="flex items-center gap-1.5 text-sm">
@@ -107,7 +113,7 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
               checked={editForm.is_default}
               onChange={(e) => setEditForm((f) => ({ ...f, is_default: e.target.checked }))}
             />
-            Active
+            Set as active
           </label>
           <button
             type="button"
@@ -154,7 +160,9 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
             <span className="text-sm text-muted-foreground">Delete this provider?</span>
             <button
               type="button"
-              onClick={() => deleteMutation.mutate(p.id)}
+              onClick={() =>
+                deleteMutation.mutate(p.id, { onError: () => setConfirmDelete(false) })
+              }
               disabled={deleteMutation.isPending}
               className="inline-flex h-8 items-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
@@ -218,7 +226,12 @@ function LLMSection() {
   const [model, setModel] = useState("");
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [setAsDefault, setSetAsDefault] = useState((providers ?? []).length === 0);
+  const [setAsDefault, setSetAsDefault] = useState(false);
+
+  const openAddForm = () => {
+    setShowAdd(true);
+    setSetAsDefault((providers ?? []).length === 0);
+  };
 
   const handleCreate = async () => {
     if (!provider.trim() || !model.trim()) return;
@@ -233,7 +246,7 @@ function LLMSection() {
     setModel("");
     setEndpoint("");
     setApiKey("");
-    setSetAsDefault((providers ?? []).length === 0);
+    setSetAsDefault(false);
     setShowAdd(false);
   };
 
@@ -243,7 +256,7 @@ function LLMSection() {
         <h2 className="text-lg font-semibold">LLM Providers</h2>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={() => (showAdd ? setShowAdd(false) : openAddForm())}
           className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           Add provider
@@ -258,6 +271,7 @@ function LLMSection() {
               autoFocus
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
+              aria-label="Provider"
               className={`${inputCls} w-40`}
             >
               {LLM_PROVIDERS.map((opt) => (
@@ -270,12 +284,14 @@ function LLMSection() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="Model (e.g. gpt-4o)"
+              aria-label="Model"
               className={`${inputCls} w-40`}
             />
             <input
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="Endpoint URL (optional)"
+              aria-label="Endpoint URL (optional)"
               className={`${inputCls} flex-1`}
             />
             <input
@@ -283,6 +299,7 @@ function LLMSection() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="API key (optional)"
+              aria-label="API key"
               className={`${inputCls} w-52`}
             />
             <label className="flex items-center gap-1.5 text-sm">
@@ -339,6 +356,7 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
   });
 
   const handleSetActive = () => {
+    // api_key intentionally omitted — backend uses COALESCE to retain the existing encrypted key
     update.mutate({
       id: p.id,
       data: {
@@ -371,22 +389,30 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
     return (
       <div className="border-t px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <select
             value={editForm.provider}
             onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
-            placeholder="Provider (e.g. tesseract)"
+            aria-label="Provider"
             className={`${inputCls} w-44`}
-          />
+          >
+            {OCR_PROVIDERS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
           <input
             value={editForm.endpoint_url}
             onChange={(e) => setEditForm((f) => ({ ...f, endpoint_url: e.target.value }))}
             placeholder="Endpoint URL (optional)"
+            aria-label="Endpoint URL (optional)"
             className={`${inputCls} flex-1`}
           />
           <input
             value={editForm.extra_config}
             onChange={(e) => setEditForm((f) => ({ ...f, extra_config: e.target.value }))}
             placeholder="Extra config (optional)"
+            aria-label="Extra config (JSON, optional)"
             className={`${inputCls} w-52`}
           />
           <input
@@ -394,6 +420,7 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
             value={editForm.apiKey}
             onChange={(e) => setEditForm((f) => ({ ...f, apiKey: e.target.value }))}
             placeholder={p.has_api_key ? "••••••••" : "API key (optional)"}
+            aria-label="API key"
             className={`${inputCls} w-52`}
           />
           <label className="flex items-center gap-1.5 text-sm">
@@ -402,7 +429,7 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
               checked={editForm.is_default}
               onChange={(e) => setEditForm((f) => ({ ...f, is_default: e.target.checked }))}
             />
-            Active
+            Set as active
           </label>
           <button
             type="button"
@@ -449,7 +476,9 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
             <span className="text-sm text-muted-foreground">Delete this provider?</span>
             <button
               type="button"
-              onClick={() => deleteMutation.mutate(p.id)}
+              onClick={() =>
+                deleteMutation.mutate(p.id, { onError: () => setConfirmDelete(false) })
+              }
               disabled={deleteMutation.isPending}
               className="inline-flex h-8 items-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
@@ -509,10 +538,15 @@ function OCRSection() {
   const { data: providers, isLoading } = useOCRProviders();
   const create = useCreateOCRProvider();
   const [showAdd, setShowAdd] = useState(false);
-  const [provider, setProvider] = useState("");
+  const [provider, setProvider] = useState<string>(OCR_PROVIDERS[0]);
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [setAsDefault, setSetAsDefault] = useState((providers ?? []).length === 0);
+  const [setAsDefault, setSetAsDefault] = useState(false);
+
+  const openAddForm = () => {
+    setShowAdd(true);
+    setSetAsDefault((providers ?? []).length === 0);
+  };
 
   const handleCreate = async () => {
     if (!provider.trim()) return;
@@ -522,10 +556,10 @@ function OCRSection() {
       api_key_encrypted: apiKey || null,
       is_default: setAsDefault,
     });
-    setProvider("");
+    setProvider(OCR_PROVIDERS[0]);
     setEndpoint("");
     setApiKey("");
-    setSetAsDefault((providers ?? []).length === 0);
+    setSetAsDefault(false);
     setShowAdd(false);
   };
 
@@ -535,7 +569,7 @@ function OCRSection() {
         <h2 className="text-lg font-semibold">OCR Providers</h2>
         <button
           type="button"
-          onClick={() => setShowAdd((v) => !v)}
+          onClick={() => (showAdd ? setShowAdd(false) : openAddForm())}
           className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           Add provider
@@ -546,17 +580,24 @@ function OCRSection() {
         <div className="mb-4 rounded-lg border p-4">
           <h3 className="mb-3 font-medium">New OCR provider</h3>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <select
               autoFocus
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              placeholder="Provider (e.g. tesseract)"
+              aria-label="Provider"
               className={`${inputCls} w-44`}
-            />
+            >
+              {OCR_PROVIDERS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
             <input
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="Endpoint URL (optional)"
+              aria-label="Endpoint URL (optional)"
               className={`${inputCls} flex-1`}
             />
             <input
@@ -564,6 +605,7 @@ function OCRSection() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="API key (optional)"
+              aria-label="API key"
               className={`${inputCls} w-52`}
             />
             <label className="flex items-center gap-1.5 text-sm">
@@ -666,6 +708,7 @@ function ShareLinksSection() {
             data-testid="share-inventory-select"
             value={selectedInventoryId}
             onChange={(e) => setSelectedInventoryId(e.target.value)}
+            aria-label="Inventory"
             className={`${inputCls} w-52`}
           >
             <option value="">Select inventory…</option>
@@ -681,6 +724,7 @@ function ShareLinksSection() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password (optional)"
+            aria-label="Password (optional)"
             className={`${inputCls} w-48`}
           />
           <button
@@ -699,6 +743,7 @@ function ShareLinksSection() {
               data-testid="share-link-url"
               readOnly
               value={shareUrl}
+              aria-label="Share link URL"
               className={`${inputCls} flex-1 bg-muted`}
               onClick={(e) => (e.target as HTMLInputElement).select()}
             />
