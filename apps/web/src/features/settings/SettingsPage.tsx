@@ -3,21 +3,137 @@ import {
   useCreateLLMProvider,
   useCreateOCRProvider,
   useCreateShareLink,
+  useDeleteLLMProvider,
+  useDeleteOCRProvider,
   useHouseholds,
   useInventories,
   useLLMProviders,
   useOCRProviders,
   useUiStore,
+  useUpdateLLMProvider,
+  useUpdateOCRProvider,
 } from "@baskety/core";
 import { useState } from "react";
+
+const LLM_PROVIDERS = ["anthropic", "openai", "ollama", "litellm", "custom"] as const;
 
 // ── Shared input style ────────────────────────────────────────────────────────
 const inputCls =
   "flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+const secondaryBtnCls =
+  "inline-flex h-8 items-center rounded-md border border-input px-3 text-xs font-medium hover:bg-muted disabled:opacity-50";
 
 // ── LLM Provider section ──────────────────────────────────────────────────────
 
 function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
+  const update = useUpdateLLMProvider();
+  const deleteMutation = useDeleteLLMProvider();
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editForm, setEditForm] = useState({
+    provider: p.provider,
+    model: p.model,
+    endpoint_url: p.endpoint_url ?? "",
+    apiKey: "",
+    is_default: p.is_default,
+  });
+
+  const handleSetActive = () => {
+    update.mutate({
+      id: p.id,
+      data: {
+        provider: p.provider,
+        model: p.model,
+        endpoint_url: p.endpoint_url,
+        is_default: true,
+      },
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.provider.trim() || !editForm.model.trim()) return;
+    update.mutate(
+      {
+        id: p.id,
+        data: {
+          provider: editForm.provider,
+          model: editForm.model.trim(),
+          endpoint_url: editForm.endpoint_url.trim() || null,
+          api_key: editForm.apiKey || null,
+          is_default: editForm.is_default,
+        },
+      },
+      { onSuccess: () => setEditing(false) },
+    );
+  };
+
+  if (editing) {
+    return (
+      <div className="border-t px-4 py-3">
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={editForm.provider}
+            onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
+            className={`${inputCls} w-40`}
+          >
+            {LLM_PROVIDERS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          <input
+            value={editForm.model}
+            onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
+            placeholder="Model (e.g. gpt-4o)"
+            className={`${inputCls} w-40`}
+          />
+          <input
+            value={editForm.endpoint_url}
+            onChange={(e) => setEditForm((f) => ({ ...f, endpoint_url: e.target.value }))}
+            placeholder="Endpoint URL (optional)"
+            className={`${inputCls} flex-1`}
+          />
+          <input
+            type="password"
+            value={editForm.apiKey}
+            onChange={(e) => setEditForm((f) => ({ ...f, apiKey: e.target.value }))}
+            placeholder={p.has_api_key ? "••••••••" : "API key (optional)"}
+            className={`${inputCls} w-52`}
+          />
+          <label className="flex items-center gap-1.5 text-sm">
+            <input
+              type="checkbox"
+              checked={editForm.is_default}
+              onChange={(e) => setEditForm((f) => ({ ...f, is_default: e.target.checked }))}
+            />
+            Active
+          </label>
+          <button
+            type="button"
+            onClick={handleSaveEdit}
+            disabled={!editForm.provider.trim() || !editForm.model.trim() || update.isPending}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {update.isPending ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm hover:bg-muted"
+          >
+            Cancel
+          </button>
+        </div>
+        {update.isError && (
+          <p className="mt-2 text-sm text-destructive">
+            {(update.error as Error).message ?? "Failed to update provider."}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-between border-t px-4 py-3">
       <div className="flex flex-col gap-0.5">
@@ -25,12 +141,70 @@ function LLMProviderRow({ p }: { p: LLMProviderResponse }) {
           {p.provider} / {p.model}
           {p.is_default && (
             <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-              default
+              active
             </span>
           )}
         </span>
         {p.endpoint_url && <span className="text-xs text-muted-foreground">{p.endpoint_url}</span>}
         {p.has_api_key && <span className="text-xs text-muted-foreground">API key configured</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        {confirmDelete ? (
+          <>
+            <span className="text-sm text-muted-foreground">Delete this provider?</span>
+            <button
+              type="button"
+              onClick={() => deleteMutation.mutate(p.id)}
+              disabled={deleteMutation.isPending}
+              className="inline-flex h-8 items-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Confirm"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className={secondaryBtnCls}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            {!p.is_default && (
+              <button
+                type="button"
+                onClick={handleSetActive}
+                disabled={update.isPending}
+                className={secondaryBtnCls}
+              >
+                Set as active
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditForm({
+                  provider: p.provider,
+                  model: p.model,
+                  endpoint_url: p.endpoint_url ?? "",
+                  apiKey: "",
+                  is_default: p.is_default,
+                });
+                setEditing(true);
+              }}
+              className={secondaryBtnCls}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className={secondaryBtnCls}
+            >
+              Delete
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -40,10 +214,11 @@ function LLMSection() {
   const { data: providers, isLoading } = useLLMProviders();
   const create = useCreateLLMProvider();
   const [showAdd, setShowAdd] = useState(false);
-  const [provider, setProvider] = useState("");
+  const [provider, setProvider] = useState<string>(LLM_PROVIDERS[0]);
   const [model, setModel] = useState("");
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [setAsDefault, setSetAsDefault] = useState((providers ?? []).length === 0);
 
   const handleCreate = async () => {
     if (!provider.trim() || !model.trim()) return;
@@ -52,12 +227,13 @@ function LLMSection() {
       model: model.trim(),
       endpoint_url: endpoint.trim() || null,
       api_key_encrypted: apiKey || null,
-      is_default: false,
+      is_default: setAsDefault,
     });
-    setProvider("");
+    setProvider(LLM_PROVIDERS[0]);
     setModel("");
     setEndpoint("");
     setApiKey("");
+    setSetAsDefault((providers ?? []).length === 0);
     setShowAdd(false);
   };
 
@@ -77,14 +253,19 @@ function LLMSection() {
       {showAdd && (
         <div className="mb-4 rounded-lg border p-4">
           <h3 className="mb-3 font-medium">New LLM provider</h3>
-          <div className="flex flex-wrap gap-2">
-            <input
+          <div className="flex flex-wrap items-center gap-2">
+            <select
               autoFocus
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              placeholder="Provider (e.g. openai)"
               className={`${inputCls} w-40`}
-            />
+            >
+              {LLM_PROVIDERS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
             <input
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -104,6 +285,14 @@ function LLMSection() {
               placeholder="API key (optional)"
               className={`${inputCls} w-52`}
             />
+            <label className="flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={setAsDefault}
+                onChange={(e) => setSetAsDefault(e.target.checked)}
+              />
+              Set as active provider
+            </label>
             <button
               type="button"
               onClick={() => void handleCreate()}
@@ -137,6 +326,109 @@ function LLMSection() {
 // ── OCR Provider section ──────────────────────────────────────────────────────
 
 function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
+  const update = useUpdateOCRProvider();
+  const deleteMutation = useDeleteOCRProvider();
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editForm, setEditForm] = useState({
+    provider: p.provider,
+    endpoint_url: p.endpoint_url ?? "",
+    apiKey: "",
+    extra_config: p.extra_config ?? "",
+    is_default: p.is_default,
+  });
+
+  const handleSetActive = () => {
+    update.mutate({
+      id: p.id,
+      data: {
+        provider: p.provider,
+        endpoint_url: p.endpoint_url,
+        extra_config: p.extra_config,
+        is_default: true,
+      },
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.provider.trim()) return;
+    update.mutate(
+      {
+        id: p.id,
+        data: {
+          provider: editForm.provider.trim(),
+          endpoint_url: editForm.endpoint_url.trim() || null,
+          api_key: editForm.apiKey || null,
+          extra_config: editForm.extra_config.trim() || null,
+          is_default: editForm.is_default,
+        },
+      },
+      { onSuccess: () => setEditing(false) },
+    );
+  };
+
+  if (editing) {
+    return (
+      <div className="border-t px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={editForm.provider}
+            onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
+            placeholder="Provider (e.g. tesseract)"
+            className={`${inputCls} w-44`}
+          />
+          <input
+            value={editForm.endpoint_url}
+            onChange={(e) => setEditForm((f) => ({ ...f, endpoint_url: e.target.value }))}
+            placeholder="Endpoint URL (optional)"
+            className={`${inputCls} flex-1`}
+          />
+          <input
+            value={editForm.extra_config}
+            onChange={(e) => setEditForm((f) => ({ ...f, extra_config: e.target.value }))}
+            placeholder="Extra config (optional)"
+            className={`${inputCls} w-52`}
+          />
+          <input
+            type="password"
+            value={editForm.apiKey}
+            onChange={(e) => setEditForm((f) => ({ ...f, apiKey: e.target.value }))}
+            placeholder={p.has_api_key ? "••••••••" : "API key (optional)"}
+            className={`${inputCls} w-52`}
+          />
+          <label className="flex items-center gap-1.5 text-sm">
+            <input
+              type="checkbox"
+              checked={editForm.is_default}
+              onChange={(e) => setEditForm((f) => ({ ...f, is_default: e.target.checked }))}
+            />
+            Active
+          </label>
+          <button
+            type="button"
+            onClick={handleSaveEdit}
+            disabled={!editForm.provider.trim() || update.isPending}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {update.isPending ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm hover:bg-muted"
+          >
+            Cancel
+          </button>
+        </div>
+        {update.isError && (
+          <p className="mt-2 text-sm text-destructive">
+            {(update.error as Error).message ?? "Failed to update provider."}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-between border-t px-4 py-3">
       <div className="flex flex-col gap-0.5">
@@ -144,12 +436,70 @@ function OCRProviderRow({ p }: { p: OCRProviderResponse }) {
           {p.provider}
           {p.is_default && (
             <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-              default
+              active
             </span>
           )}
         </span>
         {p.endpoint_url && <span className="text-xs text-muted-foreground">{p.endpoint_url}</span>}
         {p.has_api_key && <span className="text-xs text-muted-foreground">API key configured</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        {confirmDelete ? (
+          <>
+            <span className="text-sm text-muted-foreground">Delete this provider?</span>
+            <button
+              type="button"
+              onClick={() => deleteMutation.mutate(p.id)}
+              disabled={deleteMutation.isPending}
+              className="inline-flex h-8 items-center rounded-md bg-destructive px-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Confirm"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className={secondaryBtnCls}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            {!p.is_default && (
+              <button
+                type="button"
+                onClick={handleSetActive}
+                disabled={update.isPending}
+                className={secondaryBtnCls}
+              >
+                Set as active
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditForm({
+                  provider: p.provider,
+                  endpoint_url: p.endpoint_url ?? "",
+                  apiKey: "",
+                  extra_config: p.extra_config ?? "",
+                  is_default: p.is_default,
+                });
+                setEditing(true);
+              }}
+              className={secondaryBtnCls}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className={secondaryBtnCls}
+            >
+              Delete
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -162,6 +512,7 @@ function OCRSection() {
   const [provider, setProvider] = useState("");
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [setAsDefault, setSetAsDefault] = useState((providers ?? []).length === 0);
 
   const handleCreate = async () => {
     if (!provider.trim()) return;
@@ -169,11 +520,12 @@ function OCRSection() {
       provider: provider.trim(),
       endpoint_url: endpoint.trim() || null,
       api_key_encrypted: apiKey || null,
-      is_default: false,
+      is_default: setAsDefault,
     });
     setProvider("");
     setEndpoint("");
     setApiKey("");
+    setSetAsDefault((providers ?? []).length === 0);
     setShowAdd(false);
   };
 
@@ -193,7 +545,7 @@ function OCRSection() {
       {showAdd && (
         <div className="mb-4 rounded-lg border p-4">
           <h3 className="mb-3 font-medium">New OCR provider</h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               autoFocus
               value={provider}
@@ -214,6 +566,14 @@ function OCRSection() {
               placeholder="API key (optional)"
               className={`${inputCls} w-52`}
             />
+            <label className="flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={setAsDefault}
+                onChange={(e) => setSetAsDefault(e.target.checked)}
+              />
+              Set as active provider
+            </label>
             <button
               type="button"
               onClick={() => void handleCreate()}
