@@ -265,7 +265,7 @@ func (r *pgRepository) UpdateLLMProvider(ctx context.Context, id uuid.UUID, hous
 	if err != nil {
 		return nil, fmt.Errorf("update llm provider: begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // no-op after Commit; pgx.ErrTxClosed is expected and ignored
 
 	qtx := r.q.WithTx(tx)
 	if err := qtx.UnsetDefaultLLMProviders(ctx, uuidPtrToPg(householdID)); err != nil {
@@ -285,11 +285,15 @@ func (r *pgRepository) UpdateLLMProvider(ctx context.Context, id uuid.UUID, hous
 }
 
 func (r *pgRepository) DeleteLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
-	if err := r.q.DeleteLLMProvider(ctx, sqlc.DeleteLLMProviderParams{
+	n, err := r.q.DeleteLLMProvider(ctx, sqlc.DeleteLLMProviderParams{
 		ID:          uuidToPg(id),
 		HouseholdID: uuidPtrToPg(householdID),
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("delete llm provider: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("delete llm provider: %w", ErrNotFound)
 	}
 	return nil
 }
@@ -320,7 +324,7 @@ func (r *pgRepository) UpdateOCRProvider(ctx context.Context, id uuid.UUID, hous
 	if err != nil {
 		return nil, fmt.Errorf("update ocr provider: begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // no-op after Commit; pgx.ErrTxClosed is expected and ignored
 
 	qtx := r.q.WithTx(tx)
 	if err := qtx.UnsetDefaultOCRProviders(ctx, uuidPtrToPg(householdID)); err != nil {
@@ -340,11 +344,15 @@ func (r *pgRepository) UpdateOCRProvider(ctx context.Context, id uuid.UUID, hous
 }
 
 func (r *pgRepository) DeleteOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
-	if err := r.q.DeleteOCRProvider(ctx, sqlc.DeleteOCRProviderParams{
+	n, err := r.q.DeleteOCRProvider(ctx, sqlc.DeleteOCRProviderParams{
 		ID:          uuidToPg(id),
 		HouseholdID: uuidPtrToPg(householdID),
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("delete ocr provider: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("delete ocr provider: %w", ErrNotFound)
 	}
 	return nil
 }

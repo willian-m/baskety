@@ -89,7 +89,7 @@ func (q *Queries) CreateOCRProviderConfig(ctx context.Context, arg CreateOCRProv
 	return i, err
 }
 
-const deleteLLMProvider = `-- name: DeleteLLMProvider :exec
+const deleteLLMProvider = `-- name: DeleteLLMProvider :execrows
 DELETE FROM llm_provider_configs
 WHERE id = $1
   AND (household_id = $2 OR ($2::uuid IS NULL AND household_id IS NULL))
@@ -100,12 +100,15 @@ type DeleteLLMProviderParams struct {
 	HouseholdID pgtype.UUID `json:"household_id"`
 }
 
-func (q *Queries) DeleteLLMProvider(ctx context.Context, arg DeleteLLMProviderParams) error {
-	_, err := q.db.Exec(ctx, deleteLLMProvider, arg.ID, arg.HouseholdID)
-	return err
+func (q *Queries) DeleteLLMProvider(ctx context.Context, arg DeleteLLMProviderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteLLMProvider, arg.ID, arg.HouseholdID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const deleteOCRProvider = `-- name: DeleteOCRProvider :exec
+const deleteOCRProvider = `-- name: DeleteOCRProvider :execrows
 DELETE FROM ocr_provider_configs
 WHERE id = $1
   AND (household_id = $2 OR ($2::uuid IS NULL AND household_id IS NULL))
@@ -116,9 +119,12 @@ type DeleteOCRProviderParams struct {
 	HouseholdID pgtype.UUID `json:"household_id"`
 }
 
-func (q *Queries) DeleteOCRProvider(ctx context.Context, arg DeleteOCRProviderParams) error {
-	_, err := q.db.Exec(ctx, deleteOCRProvider, arg.ID, arg.HouseholdID)
-	return err
+func (q *Queries) DeleteOCRProvider(ctx context.Context, arg DeleteOCRProviderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOCRProvider, arg.ID, arg.HouseholdID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getDefaultLLMProvider = `-- name: GetDefaultLLMProvider :one
@@ -313,46 +319,6 @@ func (q *Queries) UpdateLLMProvider(ctx context.Context, arg UpdateLLMProviderPa
 	return i, err
 }
 
-const updateLLMProviderConfig = `-- name: UpdateLLMProviderConfig :one
-UPDATE llm_provider_configs
-SET provider = $2, model = $3, endpoint_url = $4, api_key_encrypted = $5, is_default = $6, updated_at = NOW()
-WHERE id = $1
-RETURNING id, household_id, provider, model, endpoint_url, api_key_encrypted, is_default, created_at, updated_at
-`
-
-type UpdateLLMProviderConfigParams struct {
-	ID              pgtype.UUID `json:"id"`
-	Provider        string      `json:"provider"`
-	Model           string      `json:"model"`
-	EndpointUrl     *string     `json:"endpoint_url"`
-	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
-	IsDefault       bool        `json:"is_default"`
-}
-
-func (q *Queries) UpdateLLMProviderConfig(ctx context.Context, arg UpdateLLMProviderConfigParams) (LlmProviderConfig, error) {
-	row := q.db.QueryRow(ctx, updateLLMProviderConfig,
-		arg.ID,
-		arg.Provider,
-		arg.Model,
-		arg.EndpointUrl,
-		arg.ApiKeyEncrypted,
-		arg.IsDefault,
-	)
-	var i LlmProviderConfig
-	err := row.Scan(
-		&i.ID,
-		&i.HouseholdID,
-		&i.Provider,
-		&i.Model,
-		&i.EndpointUrl,
-		&i.ApiKeyEncrypted,
-		&i.IsDefault,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const updateOCRProvider = `-- name: UpdateOCRProvider :one
 UPDATE ocr_provider_configs
 SET provider          = $1,
@@ -385,46 +351,6 @@ func (q *Queries) UpdateOCRProvider(ctx context.Context, arg UpdateOCRProviderPa
 		arg.IsDefault,
 		arg.ID,
 		arg.HouseholdID,
-	)
-	var i OcrProviderConfig
-	err := row.Scan(
-		&i.ID,
-		&i.HouseholdID,
-		&i.Provider,
-		&i.EndpointUrl,
-		&i.ApiKeyEncrypted,
-		&i.ExtraConfig,
-		&i.IsDefault,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateOCRProviderConfig = `-- name: UpdateOCRProviderConfig :one
-UPDATE ocr_provider_configs
-SET provider = $2, endpoint_url = $3, api_key_encrypted = $4, extra_config = $5, is_default = $6, updated_at = NOW()
-WHERE id = $1
-RETURNING id, household_id, provider, endpoint_url, api_key_encrypted, extra_config, is_default, created_at, updated_at
-`
-
-type UpdateOCRProviderConfigParams struct {
-	ID              pgtype.UUID `json:"id"`
-	Provider        string      `json:"provider"`
-	EndpointUrl     *string     `json:"endpoint_url"`
-	ApiKeyEncrypted *string     `json:"api_key_encrypted"`
-	ExtraConfig     []byte      `json:"extra_config"`
-	IsDefault       bool        `json:"is_default"`
-}
-
-func (q *Queries) UpdateOCRProviderConfig(ctx context.Context, arg UpdateOCRProviderConfigParams) (OcrProviderConfig, error) {
-	row := q.db.QueryRow(ctx, updateOCRProviderConfig,
-		arg.ID,
-		arg.Provider,
-		arg.EndpointUrl,
-		arg.ApiKeyEncrypted,
-		arg.ExtraConfig,
-		arg.IsDefault,
 	)
 	var i OcrProviderConfig
 	err := row.Scan(

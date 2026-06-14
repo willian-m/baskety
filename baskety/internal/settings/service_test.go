@@ -2,6 +2,7 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -79,7 +80,7 @@ func (m *mockRepo) DeleteLLMProvider(ctx context.Context, id uuid.UUID, househol
 			return nil
 		}
 	}
-	return nil
+	return ErrNotFound
 }
 func (m *mockRepo) GetDefaultLLMProvider(ctx context.Context, householdID uuid.UUID) (*LLMProviderConfig, error) {
 	return nil, ErrNotFound
@@ -119,7 +120,7 @@ func (m *mockRepo) DeleteOCRProvider(ctx context.Context, id uuid.UUID, househol
 			return nil
 		}
 	}
-	return nil
+	return ErrNotFound
 }
 func (m *mockRepo) GetDefaultOCRProvider(ctx context.Context, householdID uuid.UUID) (*OCRProviderConfig, error) {
 	return nil, ErrNotFound
@@ -252,6 +253,15 @@ func TestDeleteLLMProvider(t *testing.T) {
 	}
 }
 
+func TestDeleteLLMProviderNotFound(t *testing.T) {
+	svc := NewService(newMockRepo())
+	hid := uuid.New()
+	err := svc.DeleteLLMProvider(context.Background(), hid, uuid.New())
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
 func TestUpdateOCRProviderValidation(t *testing.T) {
 	svc := NewService(newMockRepo())
 	if _, err := svc.UpdateOCRProvider(context.Background(), uuid.New(), uuid.New(), UpdateOCRProviderRequest{}); err == nil {
@@ -269,5 +279,14 @@ func TestDeleteOCRProvider(t *testing.T) {
 	}
 	if len(repo.ocr) != 0 {
 		t.Fatalf("expected ocr provider deleted")
+	}
+}
+
+func TestDeleteOCRProviderNotFound(t *testing.T) {
+	svc := NewService(newMockRepo())
+	hid := uuid.New()
+	err := svc.DeleteOCRProvider(context.Background(), hid, uuid.New())
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }

@@ -232,6 +232,201 @@ func TestHandleCreateLLMProvider(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 }
 
+func TestHandleUpdateLLMProvider(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	id := uuid.New()
+	svc := &mockService{
+		updateLLMProviderFn: func(_ context.Context, _, gotID uuid.UUID, req settings.UpdateLLMProviderRequest) (*settings.LLMProviderConfig, error) {
+			assert.Equal(t, id, gotID)
+			return &settings.LLMProviderConfig{ID: gotID, Provider: req.Provider, Model: req.Model, IsDefault: req.IsDefault, CreatedAt: time.Now(), UpdatedAt: time.Now()}, nil
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateLLMProviderRequest{Provider: "openai", Model: "gpt-4o", IsDefault: true})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/llm/"+id.String(), bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	data := resp["data"].(map[string]any)
+	assert.Equal(t, "openai", data["provider"])
+	assert.Equal(t, "gpt-4o", data["model"])
+}
+
+func TestHandleUpdateLLMProvider_InvalidUUID(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateLLMProviderRequest{Provider: "openai", Model: "gpt-4o"})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/llm/not-a-uuid", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleUpdateLLMProvider_BadJSON(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodPatch, "/providers/llm/"+uuid.New().String(), bytes.NewReader([]byte("{not json")))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleUpdateLLMProvider_NotFound(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{
+		updateLLMProviderFn: func(_ context.Context, _, _ uuid.UUID, _ settings.UpdateLLMProviderRequest) (*settings.LLMProviderConfig, error) {
+			return nil, settings.ErrNotFound
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateLLMProviderRequest{Provider: "openai", Model: "gpt-4o"})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/llm/"+uuid.New().String(), bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestHandleDeleteLLMProvider(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	id := uuid.New()
+	svc := &mockService{
+		deleteLLMProviderFn: func(_ context.Context, _, gotID uuid.UUID) error {
+			assert.Equal(t, id, gotID)
+			return nil
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/llm/"+id.String(), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestHandleDeleteLLMProvider_InvalidUUID(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/llm/not-a-uuid", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleDeleteLLMProvider_NotFound(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{
+		deleteLLMProviderFn: func(_ context.Context, _, _ uuid.UUID) error {
+			return settings.ErrNotFound
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/llm/"+uuid.New().String(), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestHandleUpdateOCRProvider(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	id := uuid.New()
+	svc := &mockService{
+		updateOCRProviderFn: func(_ context.Context, _, gotID uuid.UUID, req settings.UpdateOCRProviderRequest) (*settings.OCRProviderConfig, error) {
+			assert.Equal(t, id, gotID)
+			return &settings.OCRProviderConfig{ID: gotID, Provider: req.Provider, IsDefault: req.IsDefault, CreatedAt: time.Now(), UpdatedAt: time.Now()}, nil
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateOCRProviderRequest{Provider: "easyocr", IsDefault: true})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/ocr/"+id.String(), bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	data := resp["data"].(map[string]any)
+	assert.Equal(t, "easyocr", data["provider"])
+}
+
+func TestHandleUpdateOCRProvider_InvalidUUID(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateOCRProviderRequest{Provider: "easyocr"})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/ocr/not-a-uuid", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleUpdateOCRProvider_BadJSON(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodPatch, "/providers/ocr/"+uuid.New().String(), bytes.NewReader([]byte("{not json")))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleUpdateOCRProvider_NotFound(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{
+		updateOCRProviderFn: func(_ context.Context, _, _ uuid.UUID, _ settings.UpdateOCRProviderRequest) (*settings.OCRProviderConfig, error) {
+			return nil, settings.ErrNotFound
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	body, _ := json.Marshal(settings.UpdateOCRProviderRequest{Provider: "easyocr"})
+	req := httptest.NewRequest(http.MethodPatch, "/providers/ocr/"+uuid.New().String(), bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestHandleDeleteOCRProvider(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	id := uuid.New()
+	svc := &mockService{
+		deleteOCRProviderFn: func(_ context.Context, _, gotID uuid.UUID) error {
+			assert.Equal(t, id, gotID)
+			return nil
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/ocr/"+id.String(), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestHandleDeleteOCRProvider_InvalidUUID(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/ocr/not-a-uuid", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestHandleDeleteOCRProvider_NotFound(t *testing.T) {
+	hID, uID := uuid.New(), uuid.New()
+	svc := &mockService{
+		deleteOCRProviderFn: func(_ context.Context, _, _ uuid.UUID) error {
+			return settings.ErrNotFound
+		},
+	}
+	r := setupRouter(svc, hID, uID)
+	req := httptest.NewRequest(http.MethodDelete, "/providers/ocr/"+uuid.New().String(), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
 func TestHandleListOCRProviders(t *testing.T) {
 	hID, uID := uuid.New(), uuid.New()
 	svc := &mockService{
