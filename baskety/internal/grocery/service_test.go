@@ -362,6 +362,101 @@ func TestAutoGenerate_WrongHousehold(t *testing.T) {
 	assert.Equal(t, 0, createCalled)
 }
 
+func TestRenameList(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	listID := uuid.New()
+
+	t.Run("empty name after trim returns ErrInvalidInput without calling repo", func(t *testing.T) {
+		renameCalled := false
+		repo := &mockRepo{
+			renameListFn: func(_ context.Context, _ uuid.UUID, _ string) (*grocery.GroceryList, error) {
+				renameCalled = true
+				return nil, nil
+			},
+		}
+		svc := grocery.NewService(repo, okInventory(hID))
+		_, err := svc.RenameList(context.Background(), listID, hID, "   ")
+		assert.ErrorIs(t, err, grocery.ErrInvalidInput)
+		assert.False(t, renameCalled)
+	})
+
+	t.Run("repo error is propagated", func(t *testing.T) {
+		repo := &mockRepo{
+			getListFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryList, error) {
+				return &grocery.GroceryList{ID: id, InventoryID: invID}, nil
+			},
+			renameListFn: func(_ context.Context, _ uuid.UUID, _ string) (*grocery.GroceryList, error) {
+				return nil, grocery.ErrNotFound
+			},
+		}
+		svc := grocery.NewService(repo, okInventory(hID))
+		_, err := svc.RenameList(context.Background(), listID, hID, "New Name")
+		assert.ErrorIs(t, err, grocery.ErrNotFound)
+	})
+
+	t.Run("success path returns ListResponse", func(t *testing.T) {
+		repo := &mockRepo{
+			getListFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryList, error) {
+				return &grocery.GroceryList{ID: id, InventoryID: invID}, nil
+			},
+			renameListFn: func(_ context.Context, id uuid.UUID, name string) (*grocery.GroceryList, error) {
+				return &grocery.GroceryList{ID: id, InventoryID: invID, Name: name, Status: "active"}, nil
+			},
+		}
+		svc := grocery.NewService(repo, okInventory(hID))
+		resp, err := svc.RenameList(context.Background(), listID, hID, "Renamed List")
+		require.NoError(t, err)
+		assert.Equal(t, "Renamed List", resp.Name)
+	})
+}
+
+func TestDeleteList(t *testing.T) {
+	hID := uuid.New()
+	invID := uuid.New()
+	listID := uuid.New()
+
+	t.Run("wrong household prevents repo.DeleteList from being called", func(t *testing.T) {
+		deleteCalled := false
+		repo := &mockRepo{
+			getListFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryList, error) {
+				return &grocery.GroceryList{ID: id, InventoryID: invID}, nil
+			},
+			deleteListFn: func(_ context.Context, _ uuid.UUID) error {
+				deleteCalled = true
+				return nil
+			},
+		}
+		inv := &mockInventory{
+			getInventoryFn: func(_ context.Context, _, _ uuid.UUID) (*inventory.InventoryResponse, error) {
+				return nil, inventory.ErrNotFound
+			},
+		}
+		svc := grocery.NewService(repo, inv)
+		err := svc.DeleteList(context.Background(), listID, hID)
+		assert.ErrorIs(t, err, grocery.ErrNotFound)
+		assert.False(t, deleteCalled)
+	})
+
+	t.Run("success path calls repo.DeleteList", func(t *testing.T) {
+		deleteCalled := false
+		repo := &mockRepo{
+			getListFn: func(_ context.Context, id uuid.UUID) (*grocery.GroceryList, error) {
+				return &grocery.GroceryList{ID: id, InventoryID: invID}, nil
+			},
+			deleteListFn: func(_ context.Context, id uuid.UUID) error {
+				deleteCalled = true
+				assert.Equal(t, listID, id)
+				return nil
+			},
+		}
+		svc := grocery.NewService(repo, okInventory(hID))
+		err := svc.DeleteList(context.Background(), listID, hID)
+		require.NoError(t, err)
+		assert.True(t, deleteCalled)
+	})
+}
+
 func TestAssertItemScope_CrossListRejection(t *testing.T) {
 	hID := uuid.New()
 	invID := uuid.New()
