@@ -11,6 +11,10 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Put("/user/{key}", h.HandleUpsertUserSetting)
 	r.Get("/providers/llm", h.HandleListLLMProviders)
 	r.Post("/providers/llm", h.HandleCreateLLMProvider)
+	r.Patch("/providers/llm/{id}", h.HandleUpdateLLMProvider)
+	r.Delete("/providers/llm/{id}", h.HandleDeleteLLMProvider)
 	r.Get("/providers/ocr", h.HandleListOCRProviders)
 	r.Post("/providers/ocr", h.HandleCreateOCRProvider)
+	r.Patch("/providers/ocr/{id}", h.HandleUpdateOCRProvider)
+	r.Delete("/providers/ocr/{id}", h.HandleDeleteOCRProvider)
 }

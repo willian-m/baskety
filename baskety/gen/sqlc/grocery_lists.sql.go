@@ -50,6 +50,15 @@ func (q *Queries) CreateGroceryList(ctx context.Context, arg CreateGroceryListPa
 	return i, err
 }
 
+const deleteGroceryList = `-- name: DeleteGroceryList :exec
+DELETE FROM grocery_lists WHERE id = $1
+`
+
+func (q *Queries) DeleteGroceryList(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteGroceryList, id)
+	return err
+}
+
 const getGroceryListByID = `-- name: GetGroceryListByID :one
 SELECT id, inventory_id, name, status, created_by_user_id, completed_at, pinned_at, expires_at, created_at, updated_at FROM grocery_lists WHERE id = $1
 `
@@ -116,6 +125,33 @@ func (q *Queries) PinGroceryList(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const renameGroceryList = `-- name: RenameGroceryList :one
+UPDATE grocery_lists SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING id, inventory_id, name, status, created_by_user_id, completed_at, pinned_at, expires_at, created_at, updated_at
+`
+
+type RenameGroceryListParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Name string      `json:"name"`
+}
+
+func (q *Queries) RenameGroceryList(ctx context.Context, arg RenameGroceryListParams) (GroceryList, error) {
+	row := q.db.QueryRow(ctx, renameGroceryList, arg.ID, arg.Name)
+	var i GroceryList
+	err := row.Scan(
+		&i.ID,
+		&i.InventoryID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedByUserID,
+		&i.CompletedAt,
+		&i.PinnedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateGroceryListStatus = `-- name: UpdateGroceryListStatus :one
 UPDATE grocery_lists
 SET status = $2, completed_at = $3, updated_at = NOW()
@@ -145,40 +181,4 @@ func (q *Queries) UpdateGroceryListStatus(ctx context.Context, arg UpdateGrocery
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const renameGroceryList = `-- name: RenameGroceryList :one
-UPDATE grocery_lists SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING id, inventory_id, name, status, created_by_user_id, completed_at, pinned_at, expires_at, created_at, updated_at
-`
-
-type RenameGroceryListParams struct {
-	ID   pgtype.UUID `json:"id"`
-	Name string      `json:"name"`
-}
-
-func (q *Queries) RenameGroceryList(ctx context.Context, arg RenameGroceryListParams) (GroceryList, error) {
-	row := q.db.QueryRow(ctx, renameGroceryList, arg.ID, arg.Name)
-	var i GroceryList
-	err := row.Scan(
-		&i.ID,
-		&i.InventoryID,
-		&i.Name,
-		&i.Status,
-		&i.CreatedByUserID,
-		&i.CompletedAt,
-		&i.PinnedAt,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const deleteGroceryList = `-- name: DeleteGroceryList :exec
-DELETE FROM grocery_lists WHERE id = $1
-`
-
-func (q *Queries) DeleteGroceryList(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteGroceryList, id)
-	return err
 }

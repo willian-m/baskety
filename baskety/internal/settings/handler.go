@@ -165,6 +165,46 @@ func (h *Handler) HandleCreateLLMProvider(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusCreated, map[string]any{"data": toLLMProviderResponse(p)})
 }
 
+func (h *Handler) HandleUpdateLLMProvider(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider id"})
+		return
+	}
+	var req UpdateLLMProviderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	p, err := h.svc.UpdateLLMProvider(r.Context(), hid, id, req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": toLLMProviderResponse(p)})
+}
+
+func (h *Handler) HandleDeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider id"})
+		return
+	}
+	if err := h.svc.DeleteLLMProvider(r.Context(), hid, id); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- OCR providers ---
 
 func (h *Handler) HandleListOCRProviders(w http.ResponseWriter, r *http.Request) {
@@ -200,6 +240,46 @@ func (h *Handler) HandleCreateOCRProvider(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"data": toOCRProviderResponse(p)})
+}
+
+func (h *Handler) HandleUpdateOCRProvider(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider id"})
+		return
+	}
+	var req UpdateOCRProviderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	p, err := h.svc.UpdateOCRProvider(r.Context(), hid, id, req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": toOCRProviderResponse(p)})
+}
+
+func (h *Handler) HandleDeleteOCRProvider(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider id"})
+		return
+	}
+	if err := h.svc.DeleteOCRProvider(r.Context(), hid, id); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- mappers (omit secrets) ---

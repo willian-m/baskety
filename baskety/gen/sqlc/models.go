@@ -8,6 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type BackgroundJob struct {
+	ID          int64              `json:"id"`
+	Kind        string             `json:"kind"`
+	Args        []byte             `json:"args"`
+	State       string             `json:"state"`
+	Attempt     int16              `json:"attempt"`
+	MaxAttempts int16              `json:"max_attempts"`
+	LastError   *string            `json:"last_error"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	FinalizedAt pgtype.Timestamptz `json:"finalized_at"`
+}
+
 type CatalogEntry struct {
 	ID               pgtype.UUID        `json:"id"`
 	Name             string             `json:"name"`

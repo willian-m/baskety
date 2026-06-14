@@ -15,11 +15,12 @@ import (
 var ErrNotFound = errors.New("not found")
 
 type pgRepository struct {
-	q *sqlc.Queries
+	pool *pgxpool.Pool
+	q    *sqlc.Queries
 }
 
 func NewPgRepository(pool *pgxpool.Pool) Repository {
-	return &pgRepository{q: sqlc.New(pool)}
+	return &pgRepository{pool: pool, q: sqlc.New(pool)}
 }
 
 func uuidToPg(id uuid.UUID) pgtype.UUID {
@@ -236,4 +237,122 @@ func (r *pgRepository) ListOCRProviders(ctx context.Context, householdID uuid.UU
 		out[i] = toOCRProvider(row)
 	}
 	return out, nil
+}
+
+func (r *pgRepository) UpdateLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateLLMProviderRequest) (*LLMProviderConfig, error) {
+	params := sqlc.UpdateLLMProviderParams{
+		ID:              uuidToPg(id),
+		HouseholdID:     uuidPtrToPg(householdID),
+		Provider:        req.Provider,
+		Model:           req.Model,
+		EndpointUrl:     req.EndpointURL,
+		ApiKeyEncrypted: req.APIKey,
+		IsDefault:       req.IsDefault,
+	}
+
+	if !req.IsDefault {
+		row, err := r.q.UpdateLLMProvider(ctx, params)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, fmt.Errorf("update llm provider: %w", ErrNotFound)
+			}
+			return nil, fmt.Errorf("update llm provider: %w", err)
+		}
+		return toLLMProvider(row), nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("update llm provider: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) // no-op after Commit; pgx.ErrTxClosed is expected and ignored
+
+	qtx := r.q.WithTx(tx)
+	if err := qtx.UnsetDefaultLLMProviders(ctx, uuidPtrToPg(householdID)); err != nil {
+		return nil, fmt.Errorf("update llm provider: unset defaults: %w", err)
+	}
+	row, err := qtx.UpdateLLMProvider(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("update llm provider: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("update llm provider: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("update llm provider: commit tx: %w", err)
+	}
+	return toLLMProvider(row), nil
+}
+
+func (r *pgRepository) DeleteLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
+	n, err := r.q.DeleteLLMProvider(ctx, sqlc.DeleteLLMProviderParams{
+		ID:          uuidToPg(id),
+		HouseholdID: uuidPtrToPg(householdID),
+	})
+	if err != nil {
+		return fmt.Errorf("delete llm provider: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("delete llm provider: %w", ErrNotFound)
+	}
+	return nil
+}
+
+func (r *pgRepository) UpdateOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateOCRProviderRequest) (*OCRProviderConfig, error) {
+	params := sqlc.UpdateOCRProviderParams{
+		ID:              uuidToPg(id),
+		HouseholdID:     uuidPtrToPg(householdID),
+		Provider:        req.Provider,
+		EndpointUrl:     req.EndpointURL,
+		ApiKeyEncrypted: req.APIKey,
+		ExtraConfig:     strPtrToBytes(req.ExtraConfig),
+		IsDefault:       req.IsDefault,
+	}
+
+	if !req.IsDefault {
+		row, err := r.q.UpdateOCRProvider(ctx, params)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, fmt.Errorf("update ocr provider: %w", ErrNotFound)
+			}
+			return nil, fmt.Errorf("update ocr provider: %w", err)
+		}
+		return toOCRProvider(row), nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("update ocr provider: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) // no-op after Commit; pgx.ErrTxClosed is expected and ignored
+
+	qtx := r.q.WithTx(tx)
+	if err := qtx.UnsetDefaultOCRProviders(ctx, uuidPtrToPg(householdID)); err != nil {
+		return nil, fmt.Errorf("update ocr provider: unset defaults: %w", err)
+	}
+	row, err := qtx.UpdateOCRProvider(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("update ocr provider: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("update ocr provider: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("update ocr provider: commit tx: %w", err)
+	}
+	return toOCRProvider(row), nil
+}
+
+func (r *pgRepository) DeleteOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
+	n, err := r.q.DeleteOCRProvider(ctx, sqlc.DeleteOCRProviderParams{
+		ID:          uuidToPg(id),
+		HouseholdID: uuidPtrToPg(householdID),
+	})
+	if err != nil {
+		return fmt.Errorf("delete ocr provider: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("delete ocr provider: %w", ErrNotFound)
+	}
+	return nil
 }
