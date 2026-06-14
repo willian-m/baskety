@@ -1,9 +1,166 @@
-import { useAutoGenerateList, useCreateList, useGroceryLists, useInventories } from "@baskety/core";
-import { Link, useNavigate } from "@tanstack/react-router";
+import {
+  useArchiveList,
+  useAutoGenerateList,
+  useCreateList,
+  useDeleteList,
+  useGroceryLists,
+  useInventories,
+  useRenameList,
+} from "@baskety/core";
+import type { GroceryListResponse } from "@baskety/core";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 import { SetupWizard } from "../inventory/SetupWizard.js";
+
+// ── ListCard ──────────────────────────────────────────────────────────────────
+
+type ListCardProps = {
+  list: GroceryListResponse;
+  inventoryId: string;
+};
+
+function ListCard({ list, inventoryId }: ListCardProps) {
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(list.name);
+
+  const renameList = useRenameList(inventoryId, list.id);
+  const archiveList = useArchiveList(inventoryId, list.id);
+  const deleteList = useDeleteList(inventoryId);
+
+  const handleRename = async () => {
+    const name = editName.trim();
+    if (!name) return;
+    try {
+      await renameList.mutateAsync(name);
+      setIsEditing(false);
+      setMenuOpen(false);
+    } catch {
+      // mutation error is exposed via renameList.isError / renameList.error
+      setIsEditing(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    try {
+      await archiveList.mutateAsync();
+      setMenuOpen(false);
+    } catch {
+      setMenuOpen(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete "${list.name}"?`)) return;
+    try {
+      await deleteList.mutateAsync(list.id);
+      setMenuOpen(false);
+    } catch {
+      setMenuOpen(false);
+    }
+  };
+
+  const statusColor: Record<string, string> = {
+    active: "bg-green-100 text-green-700",
+    completed: "bg-blue-100 text-blue-700",
+    archived: "bg-muted text-muted-foreground",
+  };
+
+  return (
+    <div className="relative border-t first:border-t-0">
+      <div
+        className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-muted/50"
+        onClick={() => void navigate({ to: "/grocery/$listId", params: { listId: list.id } })}
+      >
+        <div className="flex flex-col gap-0.5">
+          {isEditing ? (
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleRename();
+                if (e.key === "Escape") {
+                  setIsEditing(false);
+                  setEditName(list.name);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-7 rounded border border-input bg-background px-2 py-0.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{list.name}</span>
+              {list.pinned_at && <span className="text-xs text-muted-foreground">📌</span>}
+            </div>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {new Date(list.created_at).toLocaleDateString()}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor[list.status] ?? ""}`}
+          >
+            {list.status}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="List options"
+          >
+            ⋯
+          </button>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <div className="absolute right-2 top-10 z-10 w-36 rounded-md border bg-background shadow-md">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+              setMenuOpen(false);
+            }}
+            className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleArchive();
+            }}
+            className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+          >
+            Archive
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleDelete();
+            }}
+            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-muted"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GroceryPage ───────────────────────────────────────────────────────────────
 
 export function GroceryPage() {
   const [newListName, setNewListName] = useState("");
@@ -48,17 +205,13 @@ export function GroceryPage() {
     setShowCreate(false);
   };
 
-  const sorted = [...(lists ?? [])].sort((a, b) => {
-    if (a.pinned_at && !b.pinned_at) return -1;
-    if (!a.pinned_at && b.pinned_at) return 1;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  const statusColor: Record<string, string> = {
-    active: "bg-green-100 text-green-700",
-    completed: "bg-blue-100 text-blue-700",
-    archived: "bg-muted text-muted-foreground",
-  };
+  const sorted = [...(lists ?? [])]
+    .filter((l) => l.status !== "archived")
+    .sort((a, b) => {
+      if (a.pinned_at && !b.pinned_at) return -1;
+      if (!a.pinned_at && b.pinned_at) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   return (
     <div className="p-6">
@@ -113,28 +266,8 @@ export function GroceryPage() {
         </p>
       ) : (
         <div className="rounded-lg border">
-          {sorted.map((list, idx) => (
-            <Link
-              key={list.id}
-              to="/grocery/$listId"
-              params={{ listId: list.id }}
-              className={`flex items-center justify-between px-4 py-3 hover:bg-muted/50 ${idx !== 0 ? "border-t" : ""}`}
-            >
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{list.name}</span>
-                  {list.pinned_at && <span className="text-xs text-muted-foreground">📌</span>}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(list.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor[list.status] ?? ""}`}
-              >
-                {list.status}
-              </span>
-            </Link>
+          {sorted.map((list) => (
+            <ListCard key={list.id} list={list} inventoryId={inventoryId} />
           ))}
         </div>
       )}

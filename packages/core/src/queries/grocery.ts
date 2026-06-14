@@ -142,3 +142,43 @@ export function useAutoGenerateList(inventoryId: string) {
     },
   });
 }
+
+export function useRenameList(inventoryId: string, listId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      request<GroceryListResponse>(`/inventories/${inventoryId}/lists/${listId}`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "lists"] });
+    },
+  });
+}
+
+export function useDeleteList(inventoryId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (listId: string) =>
+      request<void>(`/inventories/${inventoryId}/lists/${listId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "lists"] });
+    },
+  });
+}
+
+export function useArchiveList(inventoryId: string, listId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      request<void>(`/inventories/${inventoryId}/lists/${listId}/archive`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "lists"] });
+    },
+  });
+}
