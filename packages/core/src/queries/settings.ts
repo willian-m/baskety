@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { request } from "../api/client.js";
-import type { LLMProviderResponse, OCRProviderResponse, SettingResponse } from "../api/types.js";
+import type {
+  LLMProviderResponse,
+  OCRProviderResponse,
+  SettingResponse,
+  UpdateLLMProviderRequest,
+  UpdateOCRProviderRequest,
+} from "../api/types.js";
 
 // ── Request shapes ────────────────────────────────────────────────────────────
 
@@ -64,6 +70,31 @@ export function useCreateLLMProvider() {
   });
 }
 
+export function useUpdateLLMProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateLLMProviderRequest }) =>
+      request<LLMProviderResponse>(`/settings/providers/llm/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["llm-providers"] });
+    },
+  });
+}
+
+export function useDeleteLLMProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<void>(`/settings/providers/llm/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["llm-providers"] });
+    },
+  });
+}
+
 // ── OCR providers ─────────────────────────────────────────────────────────────
 
 export function useOCRProviders() {
@@ -81,6 +112,31 @@ export function useCreateOCRProvider() {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["ocr-providers"] });
+    },
+  });
+}
+
+export function useUpdateOCRProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateOCRProviderRequest }) =>
+      request<OCRProviderResponse>(`/settings/providers/ocr/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["ocr-providers"] });
+    },
+  });
+}
+
+export function useDeleteOCRProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<void>(`/settings/providers/ocr/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["ocr-providers"] });
     },

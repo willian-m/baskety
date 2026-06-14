@@ -204,6 +204,20 @@ export interface OCRProviderResponse {
   created_at: string;
   updated_at: string;
 }
+export interface UpdateLLMProviderRequest {
+  provider: string;
+  model: string;
+  endpoint_url?: string | null;
+  api_key?: string | null;
+  is_default: boolean;
+}
+export interface UpdateOCRProviderRequest {
+  provider: string;
+  endpoint_url?: string | null;
+  api_key?: string | null;
+  extra_config?: string | null;
+  is_default: boolean;
+}
 
 // Share
 export interface ShareInventoryResponse {
