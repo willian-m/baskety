@@ -1,7 +1,53 @@
-import { useLogout, useUiStore } from "@baskety/core";
+import { useHouseholds, useLogout, useUiStore } from "@baskety/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { createRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { Route as RootRoute } from "./__root.js";
+
+function HouseholdSwitcher() {
+  const qc = useQueryClient();
+  const { data: households } = useHouseholds();
+  const activeHouseholdId = useUiStore((s) => s.activeHouseholdId);
+  const setActiveHousehold = useUiStore((s) => s.setActiveHousehold);
+  const setActiveInventory = useUiStore((s) => s.setActiveInventory);
+  const [open, setOpen] = useState(false);
+
+  const current = households?.find((h) => h.id === activeHouseholdId) ?? households?.[0];
+
+  if (!current) return null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-sm font-medium text-muted-foreground hover:text-foreground"
+      >
+        {current.name} ▾
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-10 mt-1 w-48 rounded-md border bg-background shadow-md">
+          {households?.map((h) => (
+            <button
+              key={h.id}
+              type="button"
+              onClick={() => {
+                setActiveHousehold(h.id);
+                setActiveInventory("");
+                void qc.invalidateQueries();
+                setOpen(false);
+              }}
+              className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
+            >
+              {h.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AppLayout() {
   const logout = useLogout();
@@ -56,15 +102,18 @@ function AppLayout() {
             </Link>
           </div>
         </div>
-        <button
-          type="button"
-          data-testid="logout-button"
-          onClick={() => void handleLogout()}
-          disabled={logout.isPending}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          {logout.isPending ? "Logging out…" : "Logout"}
-        </button>
+        <div className="flex items-center gap-4">
+          <HouseholdSwitcher />
+          <button
+            type="button"
+            data-testid="logout-button"
+            onClick={() => void handleLogout()}
+            disabled={logout.isPending}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            {logout.isPending ? "Logging out…" : "Logout"}
+          </button>
+        </div>
       </nav>
       <Outlet />
     </div>

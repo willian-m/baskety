@@ -3,11 +3,12 @@ import {
   useCompleteList,
   useGroceryItems,
   useGroceryList,
-  useInventories,
   useUpdateListItem,
 } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
+
+import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
 type ItemStatus = "pending" | "bought" | "skipped";
 
@@ -23,8 +24,7 @@ export function GroceryListPage() {
   const { listId } = useParams({ from: "/_app/grocery/$listId" });
   const navigate = useNavigate();
 
-  const { data: inventories } = useInventories();
-  const inventoryId = inventories?.[0]?.id ?? "";
+  const inventoryId = useActiveInventory();
 
   const { data: list, isLoading: loadingList } = useGroceryList(inventoryId, listId);
   const { data: items, isLoading: loadingItems } = useGroceryItems(inventoryId, listId);

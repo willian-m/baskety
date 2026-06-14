@@ -2,14 +2,15 @@ import { useAutoGenerateList, useCreateList, useGroceryLists, useInventories } f
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 import { SetupWizard } from "../inventory/SetupWizard.js";
 
 export function GroceryPage() {
   const [newListName, setNewListName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
-  const { data: inventories, isLoading: loadingInv, isError: invError } = useInventories();
-  const inventoryId = inventories?.[0]?.id ?? "";
+  const { isLoading: loadingInv, isError: invError } = useInventories();
+  const inventoryId = useActiveInventory();
   const { data: lists, isLoading: loadingLists } = useGroceryLists(inventoryId);
   const createList = useCreateList(inventoryId);
   const autoGenerate = useAutoGenerateList(inventoryId);
