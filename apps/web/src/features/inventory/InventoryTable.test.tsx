@@ -238,6 +238,132 @@ describe("InventoryTable", () => {
     expect(addBatch.mock.calls[0]![0]).toMatchObject({ quantity: 3 });
   });
 
+  describe("20.3 — Category datalist", () => {
+    it("renders a <datalist id='category-suggestions'> element", async () => {
+      renderTable();
+      await screen.findByText("Rice");
+      const datalist = document.getElementById("category-suggestions");
+      expect(datalist).toBeInTheDocument();
+      expect(datalist!.tagName.toLowerCase()).toBe("datalist");
+    });
+
+    it("populates the datalist with real category values, not 'Uncategorized'", async () => {
+      renderTable();
+      await screen.findByText("Rice");
+      const datalist = document.getElementById("category-suggestions")!;
+      const options = Array.from(datalist.querySelectorAll("option")).map((o) => o.value);
+      expect(options).toContain("Dairy");
+      expect(options).toContain("Non perishable");
+      expect(options).not.toContain("Uncategorized");
+    });
+
+    it("category input in edit mode has list='category-suggestions'", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await user.click(await screen.findByText("Rice"));
+      const categoryInput = await screen.findByLabelText("Category");
+      expect(categoryInput).toHaveAttribute("list", "category-suggestions");
+    });
+  });
+
+  describe("20.4 — Initial stored quantity", () => {
+    it("NewItemRow renders 'Initial stored quantity' and 'Expiry date' inputs", async () => {
+      renderTable({ newItemName: "Oats" });
+      expect(await screen.findByLabelText("Initial stored quantity")).toBeInTheDocument();
+      expect(screen.getByLabelText("Expiry date")).toBeInTheDocument();
+    });
+
+    it("saving a new item with storedQty > 0 calls the batch POST endpoint", async () => {
+      const user = userEvent.setup();
+      const batchPost = vi.fn();
+      server.use(
+        http.post(`${BASE}/inventories/:id/items`, () =>
+          HttpResponse.json({ data: inventoryItemFixture({ id: "new-item-id", name: "Oats" }) }),
+        ),
+        http.post(`${BASE}/inventories/:invId/items/:itemId/batches`, async ({ request }) => {
+          batchPost(await request.json());
+          return HttpResponse.json({ data: batchFixture() });
+        }),
+      );
+
+      const onSaved = vi.fn();
+      renderTable({ newItemName: "Oats", onNewItemSaved: onSaved });
+
+      const qtyInput = await screen.findByLabelText("Initial stored quantity");
+      await user.type(qtyInput, "3");
+
+      const newRow = screen.getByTestId("new-item-row");
+      await user.click(within(newRow).getByRole("button", { name: "Save" }));
+
+      await waitFor(() => {
+        expect(batchPost).toHaveBeenCalledTimes(1);
+      });
+      expect(batchPost.mock.calls[0]![0]).toMatchObject({ quantity: 3 });
+    });
+
+    it("saving a new item with storedQty = 0 does NOT call the batch POST endpoint", async () => {
+      const user = userEvent.setup();
+      const batchPost = vi.fn();
+      server.use(
+        http.post(`${BASE}/inventories/:id/items`, () =>
+          HttpResponse.json({ data: inventoryItemFixture({ id: "new-item-id", name: "Oats" }) }),
+        ),
+        http.post(`${BASE}/inventories/:invId/items/:itemId/batches`, async ({ request }) => {
+          batchPost(await request.json());
+          return HttpResponse.json({ data: batchFixture() });
+        }),
+      );
+
+      const onSaved = vi.fn();
+      renderTable({ newItemName: "Oats", onNewItemSaved: onSaved });
+
+      // Leave storedQty empty (defaults to "")
+      const newRow = await screen.findByTestId("new-item-row");
+      await user.click(within(newRow).getByRole("button", { name: "Save" }));
+
+      await waitFor(() => {
+        expect(onSaved).toHaveBeenCalledTimes(1);
+      });
+      expect(batchPost).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("20.5 — Per-category add button", () => {
+    it("renders a '+ Add item to [Category]' button for each category", async () => {
+      renderTable();
+      expect(
+        await screen.findByRole("button", { name: "+ Add item to Non perishable" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Add item to Dairy" })).toBeInTheDocument();
+    });
+
+    it("clicking the button opens an inline NewItemRow with the category pre-filled", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      const addBtn = await screen.findByRole("button", { name: "+ Add item to Dairy" });
+      await user.click(addBtn);
+
+      const newRow = screen.getByTestId("new-item-row-Dairy");
+      expect(newRow).toBeInTheDocument();
+
+      const categoryInput = within(newRow).getByLabelText("New item category");
+      expect(categoryInput).toHaveValue("Dairy");
+    });
+
+    it("the pre-filled category input is read-only", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      const addBtn = await screen.findByRole("button", { name: "+ Add item to Non perishable" });
+      await user.click(addBtn);
+
+      const newRow = screen.getByTestId("new-item-row-Non perishable");
+      const categoryInput = within(newRow).getByLabelText("New item category");
+      expect(categoryInput).toHaveAttribute("readonly");
+    });
+  });
+
   it("search-to-add: typing an unmatched name then 'Add this item' shows a pre-filled row and saving calls useCreateItem", async () => {
     const user = userEvent.setup();
     const create = vi.fn();

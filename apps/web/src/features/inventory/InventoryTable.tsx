@@ -106,6 +106,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
                     initialCategory={category}
                     allCategories={allCategories}
                     onDone={() => setAddingInCategory(null)}
+                    data-testid={`new-item-row-${category}`}
                   />
                 ) : (
                   <tr>
@@ -156,7 +157,7 @@ function ItemRow({
   item,
   isEditing,
   isExpanded,
-  allCategories: _allCategories,
+  allCategories: _allCategories, // suggestions come from shared <datalist> — prop kept for API completeness
   onStartEditing,
   onStopEditing,
   onToggleExpanded,
@@ -491,14 +492,16 @@ type NewItemRowProps = {
   initialCategory?: string;
   allCategories: string[];
   onDone: () => void;
+  "data-testid"?: string;
 };
 
 function NewItemRow({
   inventoryId,
   initialName,
   initialCategory,
-  allCategories: _allCategories,
+  allCategories: _allCategories, // suggestions come from shared <datalist> — prop kept for API completeness
   onDone,
+  "data-testid": testId = "new-item-row",
 }: NewItemRowProps) {
   const createItem = useCreateItem(inventoryId);
   const qc = useQueryClient();
@@ -533,6 +536,7 @@ function NewItemRow({
         void qc.invalidateQueries({
           queryKey: ["inventories", inventoryId, "items", item.id, "batches"],
         });
+        void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
       }
       onDone();
     } catch {
@@ -554,7 +558,7 @@ function NewItemRow({
     <>
       <tr
         className={`border-b bg-primary/5 ${createItem.isPending ? "pointer-events-none opacity-50" : ""}`}
-        data-testid="new-item-row"
+        data-testid={testId}
       >
         <td className="px-2 py-1" />
         <td className="px-2 py-1">
