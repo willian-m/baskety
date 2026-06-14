@@ -25,8 +25,12 @@ type mockService struct {
 	upsertUserSettingFn      func(ctx context.Context, userID uuid.UUID, key, value string) error
 	listLLMProvidersFn       func(ctx context.Context, householdID uuid.UUID) ([]*settings.LLMProviderConfig, error)
 	createLLMProviderFn      func(ctx context.Context, householdID uuid.UUID, req settings.CreateLLMProviderRequest) (*settings.LLMProviderConfig, error)
+	updateLLMProviderFn      func(ctx context.Context, householdID, id uuid.UUID, req settings.UpdateLLMProviderRequest) (*settings.LLMProviderConfig, error)
+	deleteLLMProviderFn      func(ctx context.Context, householdID, id uuid.UUID) error
 	listOCRProvidersFn       func(ctx context.Context, householdID uuid.UUID) ([]*settings.OCRProviderConfig, error)
 	createOCRProviderFn      func(ctx context.Context, householdID uuid.UUID, req settings.CreateOCRProviderRequest) (*settings.OCRProviderConfig, error)
+	updateOCRProviderFn      func(ctx context.Context, householdID, id uuid.UUID, req settings.UpdateOCRProviderRequest) (*settings.OCRProviderConfig, error)
+	deleteOCRProviderFn      func(ctx context.Context, householdID, id uuid.UUID) error
 }
 
 func (m *mockService) GetHouseholdSetting(ctx context.Context, householdID uuid.UUID, key string) (*settings.HouseholdSetting, error) {
@@ -47,11 +51,23 @@ func (m *mockService) ListLLMProviders(ctx context.Context, householdID uuid.UUI
 func (m *mockService) CreateLLMProvider(ctx context.Context, householdID uuid.UUID, req settings.CreateLLMProviderRequest) (*settings.LLMProviderConfig, error) {
 	return m.createLLMProviderFn(ctx, householdID, req)
 }
+func (m *mockService) UpdateLLMProvider(ctx context.Context, householdID, id uuid.UUID, req settings.UpdateLLMProviderRequest) (*settings.LLMProviderConfig, error) {
+	return m.updateLLMProviderFn(ctx, householdID, id, req)
+}
+func (m *mockService) DeleteLLMProvider(ctx context.Context, householdID, id uuid.UUID) error {
+	return m.deleteLLMProviderFn(ctx, householdID, id)
+}
 func (m *mockService) ListOCRProviders(ctx context.Context, householdID uuid.UUID) ([]*settings.OCRProviderConfig, error) {
 	return m.listOCRProvidersFn(ctx, householdID)
 }
 func (m *mockService) CreateOCRProvider(ctx context.Context, householdID uuid.UUID, req settings.CreateOCRProviderRequest) (*settings.OCRProviderConfig, error) {
 	return m.createOCRProviderFn(ctx, householdID, req)
+}
+func (m *mockService) UpdateOCRProvider(ctx context.Context, householdID, id uuid.UUID, req settings.UpdateOCRProviderRequest) (*settings.OCRProviderConfig, error) {
+	return m.updateOCRProviderFn(ctx, householdID, id, req)
+}
+func (m *mockService) DeleteOCRProvider(ctx context.Context, householdID, id uuid.UUID) error {
+	return m.deleteOCRProviderFn(ctx, householdID, id)
 }
 
 func setupRouter(svc settings.ServiceIface, householdID, userID uuid.UUID) *chi.Mux {

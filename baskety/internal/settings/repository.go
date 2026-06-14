@@ -16,9 +16,13 @@ type Repository interface {
 
 	// provider configs
 	CreateLLMProvider(ctx context.Context, householdID *uuid.UUID, provider, model string, endpointURL, apiKeyEncrypted *string, isDefault bool) (*LLMProviderConfig, error)
+	UpdateLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateLLMProviderRequest) (*LLMProviderConfig, error)
+	DeleteLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error
 	GetDefaultLLMProvider(ctx context.Context, householdID uuid.UUID) (*LLMProviderConfig, error)
 	ListLLMProviders(ctx context.Context, householdID uuid.UUID) ([]*LLMProviderConfig, error)
 	CreateOCRProvider(ctx context.Context, householdID *uuid.UUID, provider string, endpointURL, apiKeyEncrypted *string, extraConfig *string, isDefault bool) (*OCRProviderConfig, error)
+	UpdateOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateOCRProviderRequest) (*OCRProviderConfig, error)
+	DeleteOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error
 	GetDefaultOCRProvider(ctx context.Context, householdID uuid.UUID) (*OCRProviderConfig, error)
 	ListOCRProviders(ctx context.Context, householdID uuid.UUID) ([]*OCRProviderConfig, error)
 }

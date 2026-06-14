@@ -21,8 +21,12 @@ type ServiceIface interface {
 	UpsertUserSetting(ctx context.Context, userID uuid.UUID, key, value string) error
 	ListLLMProviders(ctx context.Context, householdID uuid.UUID) ([]*LLMProviderConfig, error)
 	CreateLLMProvider(ctx context.Context, householdID uuid.UUID, req CreateLLMProviderRequest) (*LLMProviderConfig, error)
+	UpdateLLMProvider(ctx context.Context, householdID, id uuid.UUID, req UpdateLLMProviderRequest) (*LLMProviderConfig, error)
+	DeleteLLMProvider(ctx context.Context, householdID, id uuid.UUID) error
 	ListOCRProviders(ctx context.Context, householdID uuid.UUID) ([]*OCRProviderConfig, error)
 	CreateOCRProvider(ctx context.Context, householdID uuid.UUID, req CreateOCRProviderRequest) (*OCRProviderConfig, error)
+	UpdateOCRProvider(ctx context.Context, householdID, id uuid.UUID, req UpdateOCRProviderRequest) (*OCRProviderConfig, error)
+	DeleteOCRProvider(ctx context.Context, householdID, id uuid.UUID) error
 }
 
 type Service struct {
@@ -78,6 +82,22 @@ func (s *Service) CreateLLMProvider(ctx context.Context, householdID uuid.UUID, 
 	return s.repo.CreateLLMProvider(ctx, &h, req.Provider, req.Model, req.EndpointURL, req.APIKeyEncrypted, req.IsDefault)
 }
 
+func (s *Service) UpdateLLMProvider(ctx context.Context, householdID, id uuid.UUID, req UpdateLLMProviderRequest) (*LLMProviderConfig, error) {
+	if req.Provider == "" {
+		return nil, fmt.Errorf("provider required: %w", ErrInvalidInput)
+	}
+	if req.Model == "" {
+		return nil, fmt.Errorf("model required: %w", ErrInvalidInput)
+	}
+	h := householdID
+	return s.repo.UpdateLLMProvider(ctx, id, &h, req)
+}
+
+func (s *Service) DeleteLLMProvider(ctx context.Context, householdID, id uuid.UUID) error {
+	h := householdID
+	return s.repo.DeleteLLMProvider(ctx, id, &h)
+}
+
 func (s *Service) ListOCRProviders(ctx context.Context, householdID uuid.UUID) ([]*OCRProviderConfig, error) {
 	return s.repo.ListOCRProviders(ctx, householdID)
 }
@@ -88,4 +108,17 @@ func (s *Service) CreateOCRProvider(ctx context.Context, householdID uuid.UUID, 
 	}
 	h := householdID
 	return s.repo.CreateOCRProvider(ctx, &h, req.Provider, req.EndpointURL, req.APIKeyEncrypted, req.ExtraConfig, req.IsDefault)
+}
+
+func (s *Service) UpdateOCRProvider(ctx context.Context, householdID, id uuid.UUID, req UpdateOCRProviderRequest) (*OCRProviderConfig, error) {
+	if req.Provider == "" {
+		return nil, fmt.Errorf("provider required: %w", ErrInvalidInput)
+	}
+	h := householdID
+	return s.repo.UpdateOCRProvider(ctx, id, &h, req)
+}
+
+func (s *Service) DeleteOCRProvider(ctx context.Context, householdID, id uuid.UUID) error {
+	h := householdID
+	return s.repo.DeleteOCRProvider(ctx, id, &h)
 }

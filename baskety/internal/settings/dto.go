@@ -24,6 +24,22 @@ type CreateOCRProviderRequest struct {
 	IsDefault       bool    `json:"is_default"`
 }
 
+type UpdateLLMProviderRequest struct {
+	Provider    string  `json:"provider"`
+	Model       string  `json:"model"`
+	EndpointURL *string `json:"endpoint_url"`
+	APIKey      *string `json:"api_key"`
+	IsDefault   bool    `json:"is_default"`
+}
+
+type UpdateOCRProviderRequest struct {
+	Provider    string  `json:"provider"`
+	EndpointURL *string `json:"endpoint_url"`
+	APIKey      *string `json:"api_key"`
+	ExtraConfig *string `json:"extra_config"`
+	IsDefault   bool    `json:"is_default"`
+}
+
 // --- Responses ---
 
 type SettingResponse struct {

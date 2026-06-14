@@ -52,6 +52,35 @@ func (m *mockRepo) CreateLLMProvider(ctx context.Context, householdID *uuid.UUID
 	m.llm = append(m.llm, p)
 	return p, nil
 }
+func (m *mockRepo) UpdateLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateLLMProviderRequest) (*LLMProviderConfig, error) {
+	for _, p := range m.llm {
+		if p.ID == id {
+			if req.IsDefault {
+				for _, other := range m.llm {
+					other.IsDefault = false
+				}
+			}
+			p.Provider = req.Provider
+			p.Model = req.Model
+			p.EndpointURL = req.EndpointURL
+			if req.APIKey != nil {
+				p.APIKeyEncrypted = req.APIKey
+			}
+			p.IsDefault = req.IsDefault
+			return p, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+func (m *mockRepo) DeleteLLMProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
+	for i, p := range m.llm {
+		if p.ID == id {
+			m.llm = append(m.llm[:i], m.llm[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
 func (m *mockRepo) GetDefaultLLMProvider(ctx context.Context, householdID uuid.UUID) (*LLMProviderConfig, error) {
 	return nil, ErrNotFound
 }
@@ -62,6 +91,35 @@ func (m *mockRepo) CreateOCRProvider(ctx context.Context, householdID *uuid.UUID
 	p := &OCRProviderConfig{ID: uuid.New(), HouseholdID: householdID, Provider: provider, IsDefault: isDefault}
 	m.ocr = append(m.ocr, p)
 	return p, nil
+}
+func (m *mockRepo) UpdateOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID, req UpdateOCRProviderRequest) (*OCRProviderConfig, error) {
+	for _, p := range m.ocr {
+		if p.ID == id {
+			if req.IsDefault {
+				for _, other := range m.ocr {
+					other.IsDefault = false
+				}
+			}
+			p.Provider = req.Provider
+			p.EndpointURL = req.EndpointURL
+			if req.APIKey != nil {
+				p.APIKeyEncrypted = req.APIKey
+			}
+			p.ExtraConfig = req.ExtraConfig
+			p.IsDefault = req.IsDefault
+			return p, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+func (m *mockRepo) DeleteOCRProvider(ctx context.Context, id uuid.UUID, householdID *uuid.UUID) error {
+	for i, p := range m.ocr {
+		if p.ID == id {
+			m.ocr = append(m.ocr[:i], m.ocr[i+1:]...)
+			return nil
+		}
+	}
+	return nil
 }
 func (m *mockRepo) GetDefaultOCRProvider(ctx context.Context, householdID uuid.UUID) (*OCRProviderConfig, error) {
 	return nil, ErrNotFound
@@ -131,5 +189,85 @@ func TestCreateOCRProvider(t *testing.T) {
 	}
 	if len(repo.ocr) != 1 {
 		t.Fatalf("expected 1 ocr provider created")
+	}
+}
+
+func TestUpdateLLMProviderValidation(t *testing.T) {
+	svc := NewService(newMockRepo())
+	hid := uuid.New()
+	if _, err := svc.UpdateLLMProvider(context.Background(), hid, uuid.New(), UpdateLLMProviderRequest{Model: "x"}); err == nil {
+		t.Fatal("expected error for missing provider")
+	}
+	if _, err := svc.UpdateLLMProvider(context.Background(), hid, uuid.New(), UpdateLLMProviderRequest{Provider: "ollama"}); err == nil {
+		t.Fatal("expected error for missing model")
+	}
+}
+
+func TestUpdateLLMProviderUnsetsOtherDefaults(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	hid := uuid.New()
+	first, _ := svc.CreateLLMProvider(context.Background(), hid, CreateLLMProviderRequest{Provider: "ollama", Model: "a", IsDefault: true})
+	second, _ := svc.CreateLLMProvider(context.Background(), hid, CreateLLMProviderRequest{Provider: "openai", Model: "b"})
+
+	updated, err := svc.UpdateLLMProvider(context.Background(), hid, second.ID, UpdateLLMProviderRequest{Provider: "openai", Model: "b", IsDefault: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !updated.IsDefault {
+		t.Fatal("expected updated provider to be default")
+	}
+	if first.IsDefault {
+		t.Fatal("expected previous default to be unset")
+	}
+}
+
+func TestUpdateLLMProviderRetainsAPIKeyWhenNil(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	hid := uuid.New()
+	existing := "secret"
+	p, _ := svc.CreateLLMProvider(context.Background(), hid, CreateLLMProviderRequest{Provider: "openai", Model: "b"})
+	p.APIKeyEncrypted = &existing
+
+	updated, err := svc.UpdateLLMProvider(context.Background(), hid, p.ID, UpdateLLMProviderRequest{Provider: "openai", Model: "c", APIKey: nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.APIKeyEncrypted == nil || *updated.APIKeyEncrypted != existing {
+		t.Fatal("expected api key to be retained when nil")
+	}
+}
+
+func TestDeleteLLMProvider(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	hid := uuid.New()
+	p, _ := svc.CreateLLMProvider(context.Background(), hid, CreateLLMProviderRequest{Provider: "ollama", Model: "a"})
+	if err := svc.DeleteLLMProvider(context.Background(), hid, p.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.llm) != 0 {
+		t.Fatalf("expected provider deleted")
+	}
+}
+
+func TestUpdateOCRProviderValidation(t *testing.T) {
+	svc := NewService(newMockRepo())
+	if _, err := svc.UpdateOCRProvider(context.Background(), uuid.New(), uuid.New(), UpdateOCRProviderRequest{}); err == nil {
+		t.Fatal("expected error for missing provider")
+	}
+}
+
+func TestDeleteOCRProvider(t *testing.T) {
+	repo := newMockRepo()
+	svc := NewService(repo)
+	hid := uuid.New()
+	p, _ := svc.CreateOCRProvider(context.Background(), hid, CreateOCRProviderRequest{Provider: "tesseract"})
+	if err := svc.DeleteOCRProvider(context.Background(), hid, p.ID); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.ocr) != 0 {
+		t.Fatalf("expected ocr provider deleted")
 	}
 }

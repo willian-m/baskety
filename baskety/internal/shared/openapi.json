@@ -473,6 +473,28 @@
           "extra_config": { "type": ["string", "null"] },
           "is_default": { "type": "boolean" }
         }
+      },
+      "UpdateLLMProviderRequest": {
+        "type": "object",
+        "required": ["provider", "model", "is_default"],
+        "properties": {
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "api_key": { "type": ["string", "null"], "description": "New API key. Omit or send null to retain the existing key." },
+          "is_default": { "type": "boolean" }
+        }
+      },
+      "UpdateOCRProviderRequest": {
+        "type": "object",
+        "required": ["provider", "is_default"],
+        "properties": {
+          "provider": { "type": "string" },
+          "endpoint_url": { "type": ["string", "null"] },
+          "api_key": { "type": ["string", "null"], "description": "New API key. Omit or send null to retain the existing key." },
+          "extra_config": { "type": ["string", "null"] },
+          "is_default": { "type": "boolean" }
+        }
       }
     }
   },
@@ -2035,6 +2057,57 @@
         }
       }
     },
+    "/api/v1/settings/providers/llm/{id}": {
+      "patch": {
+        "summary": "Update an LLM provider",
+        "operationId": "updateLLMProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateLLMProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "LLM provider updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/LLMProviderResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete an LLM provider",
+        "operationId": "deleteLLMProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "LLM provider deleted" },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/api/v1/settings/providers/ocr": {
       "get": {
         "summary": "List OCR providers",
@@ -2087,6 +2160,57 @@
               }
             }
           },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/providers/ocr/{id}": {
+      "patch": {
+        "summary": "Update an OCR provider",
+        "operationId": "updateOCRProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateOCRProviderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OCR provider updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "data": { "$ref": "#/components/schemas/OCRProviderResponse" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete an OCR provider",
+        "operationId": "deleteOCRProvider",
+        "tags": ["Settings"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "X-Household-ID", "in": "header", "required": false, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "204": { "description": "OCR provider deleted" },
           "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
