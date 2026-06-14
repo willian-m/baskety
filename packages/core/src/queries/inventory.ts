@@ -16,6 +16,8 @@ interface CreateItemRequest {
   unit: string;
   target_quantity: number;
   notes?: string | null;
+  initial_quantity?: number;
+  initial_expires_at?: string | null;
 }
 
 interface UpdateItemRequest {
@@ -184,6 +186,31 @@ export function useAddBatch(inventoryId: string, itemId: string) {
       });
       void qc.invalidateQueries({
         queryKey: ["inventories", inventoryId, "items"],
+      });
+    },
+  });
+}
+
+export function usePatchBatch(inventoryId: string, itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      batchId,
+      quantity,
+      expires_at,
+    }: {
+      batchId: string;
+      quantity: number;
+      expires_at: string | null;
+    }) =>
+      request<BatchResponse>(`/inventories/${inventoryId}/items/${itemId}/batches/${batchId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ quantity, expires_at }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      void qc.invalidateQueries({
+        queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
       });
     },
   });
