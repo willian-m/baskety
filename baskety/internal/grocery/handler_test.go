@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,6 +24,8 @@ type mockService struct {
 	listByInventoryFn  func(ctx context.Context, inventoryID, householdID uuid.UUID) ([]*grocery.ListResponse, error)
 	completeListFn     func(ctx context.Context, id, householdID uuid.UUID) (*grocery.ListResponse, error)
 	archiveListFn      func(ctx context.Context, id, householdID uuid.UUID) error
+	renameListFn       func(ctx context.Context, id, householdID uuid.UUID, name string) (*grocery.ListResponse, error)
+	deleteListFn       func(ctx context.Context, id, householdID uuid.UUID) error
 	addItemFn          func(ctx context.Context, listID, householdID uuid.UUID, req grocery.AddItemRequest) (*grocery.ItemResponse, error)
 	getItemFn          func(ctx context.Context, itemID, listID, householdID uuid.UUID) (*grocery.ItemResponse, error)
 	listItemsFn        func(ctx context.Context, listID, householdID uuid.UUID) ([]*grocery.ItemResponse, error)
@@ -46,6 +49,12 @@ func (m *mockService) CompleteList(ctx context.Context, id, householdID uuid.UUI
 }
 func (m *mockService) ArchiveList(ctx context.Context, id, householdID uuid.UUID) error {
 	return m.archiveListFn(ctx, id, householdID)
+}
+func (m *mockService) RenameList(ctx context.Context, id, householdID uuid.UUID, name string) (*grocery.ListResponse, error) {
+	return m.renameListFn(ctx, id, householdID, name)
+}
+func (m *mockService) DeleteList(ctx context.Context, id, householdID uuid.UUID) error {
+	return m.deleteListFn(ctx, id, householdID)
 }
 func (m *mockService) AddItem(ctx context.Context, listID, householdID uuid.UUID, req grocery.AddItemRequest) (*grocery.ItemResponse, error) {
 	return m.addItemFn(ctx, listID, householdID, req)
@@ -170,4 +179,104 @@ func TestHandleGetList_NotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestHandleRenameList(t *testing.T) {
+	hID, uID, invID, listID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	tests := []struct {
+		name       string
+		svcFn      func(_ context.Context, _, _ uuid.UUID, name string) (*grocery.ListResponse, error)
+		body       any
+		wantStatus int
+	}{
+		{
+			name: "success",
+			svcFn: func(_ context.Context, _, _ uuid.UUID, name string) (*grocery.ListResponse, error) {
+				return &grocery.ListResponse{ID: listID.String(), Name: name, Status: "active"}, nil
+			},
+			body:       grocery.RenameListRequest{Name: "Renamed"},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name: "not found",
+			svcFn: func(_ context.Context, _, _ uuid.UUID, _ string) (*grocery.ListResponse, error) {
+				return nil, grocery.ErrNotFound
+			},
+			body:       grocery.RenameListRequest{Name: "Renamed"},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "forbidden",
+			svcFn: func(_ context.Context, _, _ uuid.UUID, _ string) (*grocery.ListResponse, error) {
+				return nil, grocery.ErrForbidden
+			},
+			body:       grocery.RenameListRequest{Name: "Renamed"},
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "empty name",
+			svcFn: func(_ context.Context, _, _ uuid.UUID, _ string) (*grocery.ListResponse, error) {
+				return nil, fmt.Errorf("name required: %w", grocery.ErrInvalidInput)
+			},
+			body:       grocery.RenameListRequest{Name: ""},
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &mockService{renameListFn: tc.svcFn}
+			r := setupRouter(svc, hID, uID)
+			body, _ := json.Marshal(tc.body)
+			req := httptest.NewRequest(http.MethodPut, "/"+invID.String()+"/lists/"+listID.String(), bytes.NewReader(body))
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			assert.Equal(t, tc.wantStatus, w.Code)
+			if tc.wantStatus == http.StatusOK {
+				var resp map[string]any
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				assert.NotNil(t, resp["data"])
+			}
+		})
+	}
+}
+
+func TestHandleDeleteList(t *testing.T) {
+	hID, uID, invID, listID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	tests := []struct {
+		name       string
+		svcFn      func(_ context.Context, _, _ uuid.UUID) error
+		wantStatus int
+	}{
+		{
+			name: "success",
+			svcFn: func(_ context.Context, _, _ uuid.UUID) error {
+				return nil
+			},
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name: "not found",
+			svcFn: func(_ context.Context, _, _ uuid.UUID) error {
+				return grocery.ErrNotFound
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "forbidden",
+			svcFn: func(_ context.Context, _, _ uuid.UUID) error {
+				return grocery.ErrForbidden
+			},
+			wantStatus: http.StatusForbidden,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &mockService{deleteListFn: tc.svcFn}
+			r := setupRouter(svc, hID, uID)
+			req := httptest.NewRequest(http.MethodDelete, "/"+invID.String()+"/lists/"+listID.String(), nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			assert.Equal(t, tc.wantStatus, w.Code)
+		})
+	}
 }

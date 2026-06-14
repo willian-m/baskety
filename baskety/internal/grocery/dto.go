@@ -33,6 +33,10 @@ type AutoGenerateRequest struct {
 	ExpiryThresholdDays int `json:"expiry_threshold_days"` // default 7 if 0
 }
 
+type RenameListRequest struct {
+	Name string `json:"name"`
+}
+
 // --- Responses ---
 
 type ListResponse struct {

@@ -20,6 +20,8 @@ type mockRepo struct {
 	listByInventoryFn  func(ctx context.Context, inventoryID uuid.UUID) ([]*grocery.GroceryList, error)
 	updateListStatusFn func(ctx context.Context, id uuid.UUID, status string, completedAt *time.Time) (*grocery.GroceryList, error)
 	archiveListFn      func(ctx context.Context, id uuid.UUID) error
+	renameListFn       func(ctx context.Context, id uuid.UUID, name string) (*grocery.GroceryList, error)
+	deleteListFn       func(ctx context.Context, id uuid.UUID) error
 	addItemFn          func(ctx context.Context, listID uuid.UUID, invItemID *uuid.UUID, name string, qty float64, unit string, notes *string, sortOrder int) (*grocery.GroceryListItem, error)
 	getItemFn          func(ctx context.Context, id uuid.UUID) (*grocery.GroceryListItem, error)
 	listItemsFn        func(ctx context.Context, listID uuid.UUID) ([]*grocery.GroceryListItem, error)
@@ -42,6 +44,12 @@ func (m *mockRepo) UpdateListStatus(ctx context.Context, id uuid.UUID, status st
 }
 func (m *mockRepo) ArchiveList(ctx context.Context, id uuid.UUID) error {
 	return m.archiveListFn(ctx, id)
+}
+func (m *mockRepo) RenameList(ctx context.Context, id uuid.UUID, name string) (*grocery.GroceryList, error) {
+	return m.renameListFn(ctx, id, name)
+}
+func (m *mockRepo) DeleteList(ctx context.Context, id uuid.UUID) error {
+	return m.deleteListFn(ctx, id)
 }
 func (m *mockRepo) AddItem(ctx context.Context, listID uuid.UUID, invItemID *uuid.UUID, name string, qty float64, unit string, notes *string, sortOrder int) (*grocery.GroceryListItem, error) {
 	return m.addItemFn(ctx, listID, invItemID, name, qty, unit, notes, sortOrder)

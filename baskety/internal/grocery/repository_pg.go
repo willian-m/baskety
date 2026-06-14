@@ -97,6 +97,27 @@ func (r *pgRepository) ArchiveList(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (r *pgRepository) RenameList(ctx context.Context, id uuid.UUID, name string) (*GroceryList, error) {
+	row, err := r.q.RenameGroceryList(ctx, sqlc.RenameGroceryListParams{
+		ID:   shared.UUIDToPg(id),
+		Name: name,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("rename list: %w", ErrNotFound)
+		}
+		return nil, fmt.Errorf("rename list: %w", err)
+	}
+	return r.toList(row), nil
+}
+
+func (r *pgRepository) DeleteList(ctx context.Context, id uuid.UUID) error {
+	if err := r.q.DeleteGroceryList(ctx, shared.UUIDToPg(id)); err != nil {
+		return fmt.Errorf("delete list: %w", err)
+	}
+	return nil
+}
+
 // --- items ---
 
 func (r *pgRepository) toItem(row sqlc.GroceryListItem) *GroceryListItem {

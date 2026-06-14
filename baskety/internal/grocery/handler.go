@@ -160,6 +160,44 @@ func (h *Handler) HandleArchiveList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{"status": "archived"}})
 }
 
+func (h *Handler) HandleRenameList(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	listID, ok := parseParam(w, r, "listID", "list ID")
+	if !ok {
+		return
+	}
+	var req RenameListRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	resp, err := h.svc.RenameList(r.Context(), listID, hid, req.Name)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
+}
+
+func (h *Handler) HandleDeleteList(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	listID, ok := parseParam(w, r, "listID", "list ID")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteList(r.Context(), listID, hid); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) HandleAutoGenerate(w http.ResponseWriter, r *http.Request) {
 	hid, ok := householdFromCtx(w, r)
 	if !ok {
