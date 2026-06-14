@@ -273,13 +273,17 @@ describe("InventoryTable", () => {
       expect(screen.getByLabelText("Expiry date")).toBeInTheDocument();
     });
 
-    it("saving a new item with storedQty > 0 calls the batch POST endpoint", async () => {
+    it("saving a new item with storedQty > 0 sends initial_quantity and initial_expires_at in the item POST body (no separate batch POST)", async () => {
       const user = userEvent.setup();
+      const itemPost = vi.fn();
       const batchPost = vi.fn();
       server.use(
-        http.post(`${BASE}/inventories/:id/items`, () =>
-          HttpResponse.json({ data: inventoryItemFixture({ id: "new-item-id", name: "Oats" }) }),
-        ),
+        http.post(`${BASE}/inventories/:id/items`, async ({ request }) => {
+          itemPost(await request.json());
+          return HttpResponse.json({
+            data: inventoryItemFixture({ id: "new-item-id", name: "Oats" }),
+          });
+        }),
         http.post(`${BASE}/inventories/:invId/items/:itemId/batches`, async ({ request }) => {
           batchPost(await request.json());
           return HttpResponse.json({ data: batchFixture() });
@@ -296,9 +300,15 @@ describe("InventoryTable", () => {
       await user.click(within(newRow).getByRole("button", { name: "Save" }));
 
       await waitFor(() => {
-        expect(batchPost).toHaveBeenCalledTimes(1);
+        expect(onSaved).toHaveBeenCalledTimes(1);
       });
-      expect(batchPost.mock.calls[0]![0]).toMatchObject({ quantity: 3 });
+
+      // initial_quantity and initial_expires_at go on the item POST body
+      expect(itemPost).toHaveBeenCalledTimes(1);
+      expect(itemPost.mock.calls[0]![0]).toMatchObject({ initial_quantity: 3 });
+
+      // No separate batch POST is called
+      expect(batchPost).not.toHaveBeenCalled();
     });
 
     it("saving a new item with storedQty = 0 does NOT call the batch POST endpoint", async () => {
@@ -362,6 +372,135 @@ describe("InventoryTable", () => {
       const categoryInput = within(newRow).getByLabelText("New item category");
       expect(categoryInput).toHaveAttribute("readonly");
     });
+  });
+
+  it('shows a "+" button on every item regardless of batch_count', async () => {
+    renderTable();
+    // All items render — Rice and Beans have batch_count 1, Milk has batch_count 2.
+    await screen.findByText("Rice");
+    const addBatchBtns = screen.getAllByRole("button", { name: "Add a new batch" });
+    // Three items → three "+" buttons
+    expect(addBatchBtns).toHaveLength(3);
+  });
+
+  it("right-clicking an item selects it and shows the delete button", async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await screen.findByText("Rice");
+
+    // Right-click Rice row
+    const riceRow = screen.getByTestId("item-row-item-rice");
+    await user.pointer({ target: riceRow, keys: "[MouseRight]" });
+
+    expect(await screen.findByRole("button", { name: /Delete 1 item/ })).toBeInTheDocument();
+
+    // Right-click Beans row to select a second item
+    const beansRow = screen.getByTestId("item-row-item-beans");
+    await user.pointer({ target: beansRow, keys: "[MouseRight]" });
+
+    expect(await screen.findByRole("button", { name: /Delete 2 items/ })).toBeInTheDocument();
+  });
+
+  it("shows confirmation modal and deletes selected items on confirm", async () => {
+    const user = userEvent.setup();
+    const deleteHandler = vi.fn();
+    server.use(
+      http.delete(`${BASE}/inventories/:invId/items/:itemId`, ({ params }) => {
+        deleteHandler(params.itemId);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderTable();
+
+    await screen.findByText("Rice");
+
+    // Right-click Rice to select it
+    const riceRow = screen.getByTestId("item-row-item-rice");
+    await user.pointer({ target: riceRow, keys: "[MouseRight]" });
+
+    // Click the delete button to open the modal
+    await user.click(await screen.findByRole("button", { name: /Delete 1 item/ }));
+
+    // Modal appears with irreversible warning
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/irreversible/i)).toBeInTheDocument();
+
+    // Click the confirm Delete button inside the modal
+    const modal = screen.getByRole("dialog");
+    await user.click(within(modal).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(deleteHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(deleteHandler).toHaveBeenCalledWith("item-rice");
+  });
+
+  it("shows editable stored qty and expiry in edit mode for single-batch items", async () => {
+    const user = userEvent.setup();
+    const patchBatch = vi.fn();
+    server.use(
+      http.get(`${BASE}/inventories/:invId/items/:itemId/batches`, () =>
+        HttpResponse.json({
+          data: [batchFixture({ id: "batch-1", quantity: 2, expires_at: "2030-06-14T00:00:00Z" })],
+        }),
+      ),
+      http.put(`${BASE}/inventories/:invId/items/:itemId`, () =>
+        HttpResponse.json({ data: inventoryItemFixture({ id: "item-rice", name: "Rice" }) }),
+      ),
+      http.patch(
+        `${BASE}/inventories/:invId/items/:itemId/batches/:batchId`,
+        async ({ request }) => {
+          patchBatch(await request.json());
+          return HttpResponse.json({ data: batchFixture({ id: "batch-1" }) });
+        },
+      ),
+    );
+
+    // Render with Rice (batch_count: 1)
+    renderTable({
+      items: [
+        inventoryItemFixture({
+          id: "item-rice",
+          name: "Rice",
+          category: "Non perishable",
+          unit: "kg",
+          stored_quantity: 2,
+          target_quantity: 5,
+          batch_count: 1,
+        }),
+      ],
+    });
+
+    // Click Rice row to enter edit mode
+    await user.click(await screen.findByText("Rice"));
+
+    // Stored quantity input should appear
+    const storedQtyInput = await screen.findByLabelText("Stored quantity");
+    expect(storedQtyInput).toBeInTheDocument();
+
+    // Expiry date input should appear
+    const expiryInput = screen.getByLabelText("Expiry date");
+    expect(expiryInput).toBeInTheDocument();
+
+    // Wait for the seeded value from batches (seeded as YYYY-MM-DD)
+    await waitFor(() => {
+      expect(storedQtyInput).toHaveValue(2);
+    });
+
+    // Change the stored quantity
+    await user.clear(storedQtyInput);
+    await user.type(storedQtyInput, "5");
+
+    // Click save
+    const editRow = screen.getByTestId("item-row-item-rice");
+    await user.click(within(editRow).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(patchBatch).toHaveBeenCalledTimes(1);
+    });
+    expect(patchBatch.mock.calls[0]![0]).toMatchObject({ quantity: 5 });
   });
 
   it("search-to-add: typing an unmatched name then 'Add this item' shows a pre-filled row and saving calls useCreateItem", async () => {

@@ -2,13 +2,13 @@ import {
   useAddBatch,
   useBatches,
   useCreateItem,
+  useDeleteItem,
+  usePatchBatch,
   useUpdateItem,
   type InventoryItemResponse,
-  request,
 } from "@baskety/core";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { ExpiryBadge } from "./ExpiryBadge.js";
 
@@ -28,6 +28,11 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [addingInCategory, setAddingInCategory] = useState<string | null>(null);
+  const [addingBatchItemId, setAddingBatchItemId] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteItem = useDeleteItem(inventoryId);
 
   // Real categories only (no Uncategorized) for autocomplete suggestions.
   const allCategories = Array.from(
@@ -55,6 +60,30 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
     setEditingItemId(itemId);
   };
 
+  function toggleSelect(itemId: string) {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  async function handleConfirmDelete() {
+    const ids = [...selectedItemIds];
+    const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      setDeleteError(`${failed} item${failed !== 1 ? "s" : ""} could not be deleted.`);
+      setSelectedItemIds(new Set(ids.filter((_, i) => results[i]!.status === "rejected")));
+      setShowDeleteModal(false);
+    } else {
+      setDeleteError(null);
+      setSelectedItemIds(new Set());
+      setShowDeleteModal(false);
+    }
+  }
+
   return (
     <>
       <datalist id="category-suggestions">
@@ -66,7 +95,22 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
         <thead>
           <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <th className="w-8 px-2 py-2" aria-label="Expand" />
-            <th className="px-2 py-2">Item</th>
+            <th className="px-2 py-2">
+              {selectedItemIds.size > 0 ? (
+                <>
+                  {deleteError && <p className="mb-1 text-xs text-red-600">{deleteError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  >
+                    Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}
+                  </button>
+                </>
+              ) : (
+                "Item"
+              )}
+            </th>
             <th className="w-32 px-2 py-2">Stored Qty</th>
             <th className="w-32 px-2 py-2">Target Qty</th>
           </tr>
@@ -93,10 +137,22 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
                     item={item}
                     isEditing={editingItemId === item.id}
                     isExpanded={expandedItemIds.has(item.id)}
+                    isSelected={selectedItemIds.has(item.id)}
                     allCategories={allCategories}
+                    initiallyAdding={addingBatchItemId === item.id}
                     onStartEditing={() => startEditing(item.id)}
                     onStopEditing={() => setEditingItemId(null)}
                     onToggleExpanded={() => toggleExpanded(item.id)}
+                    onSelect={toggleSelect}
+                    onStartAddBatch={() => {
+                      setExpandedItemIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(item.id);
+                        return next;
+                      });
+                      setAddingBatchItemId(item.id);
+                    }}
+                    onAddingBatchDone={() => setAddingBatchItemId(null)}
                   />
                 ))}
                 {addingInCategory === category ? (
@@ -135,6 +191,46 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
           )}
         </tbody>
       </table>
+
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowDeleteModal(false);
+          }}
+          tabIndex={-1}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-xl"
+          >
+            <h2 id="delete-modal-title" className="text-lg font-semibold">
+              Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This will permanently remove the selected items and all their batches. This action is
+              irreversible.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                autoFocus
+                className="rounded px-4 py-2 text-sm"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => void handleConfirmDelete()}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -146,10 +242,15 @@ type ItemRowProps = {
   item: InventoryItemResponse;
   isEditing: boolean;
   isExpanded: boolean;
+  isSelected: boolean;
   allCategories: string[];
+  initiallyAdding: boolean;
   onStartEditing: () => void;
   onStopEditing: () => void;
   onToggleExpanded: () => void;
+  onSelect: (itemId: string) => void;
+  onStartAddBatch: () => void;
+  onAddingBatchDone: () => void;
 };
 
 function ItemRow({
@@ -157,18 +258,42 @@ function ItemRow({
   item,
   isEditing,
   isExpanded,
+  isSelected,
   allCategories: _allCategories, // suggestions come from shared <datalist> — prop kept for API completeness
+  initiallyAdding,
   onStartEditing,
   onStopEditing,
   onToggleExpanded,
+  onSelect,
+  onStartAddBatch,
+  onAddingBatchDone,
 }: ItemRowProps) {
   const updateItem = useUpdateItem(inventoryId, item.id);
+  const { data: batchesData } = useBatches(inventoryId, item.id, isEditing);
+  const patchBatch = usePatchBatch(inventoryId, item.id);
 
   const [name, setName] = useState(item.name);
   const [target, setTarget] = useState(String(item.target_quantity));
   const [unit, setUnit] = useState(item.unit);
   const [category, setCategory] = useState(item.category);
   const [failed, setFailed] = useState(false);
+  const [batchQty, setBatchQty] = useState("");
+  const [batchExpiry, setBatchExpiry] = useState("");
+  const seededForEdit = useRef(false);
+
+  // Seed batch fields when entering edit mode with a single batch.
+  // Guard with a ref so background refetches don't overwrite typed values.
+  useEffect(() => {
+    if (!isEditing) {
+      seededForEdit.current = false;
+      return;
+    }
+    if (batchesData?.[0] && !seededForEdit.current) {
+      setBatchQty(String(batchesData[0].quantity));
+      setBatchExpiry(batchesData[0].expires_at ? batchesData[0].expires_at.slice(0, 10) : "");
+      seededForEdit.current = true;
+    }
+  }, [isEditing, batchesData]);
 
   // When entering edit mode, seed the local form from the latest item values.
   const beginEdit = () => {
@@ -187,13 +312,24 @@ function ItemRow({
     const savedUnit = unit.trim();
     const savedTarget = target;
     try {
-      await updateItem.mutateAsync({
-        name: savedName,
-        category: savedCategory,
-        unit: savedUnit,
-        target_quantity: parseFloat(savedTarget) || 0,
-        notes: item.notes ?? null,
-      });
+      await Promise.all([
+        updateItem.mutateAsync({
+          name: savedName,
+          category: savedCategory,
+          unit: savedUnit,
+          target_quantity: parseFloat(savedTarget) || 0,
+          notes: item.notes ?? null,
+        }),
+        ...(item.batch_count === 1 && batchesData?.[0]
+          ? [
+              patchBatch.mutateAsync({
+                batchId: batchesData[0].id,
+                quantity: parseFloat(batchQty) || 0,
+                expires_at: batchExpiry ? `${batchExpiry}T00:00:00Z` : null,
+              }),
+            ]
+          : []),
+      ]);
       setName(savedName);
       setCategory(savedCategory);
       setUnit(savedUnit);
@@ -220,12 +356,14 @@ function ItemRow({
   };
 
   const canDisclose = item.batch_count > 1;
+  const isPending = updateItem.isPending || patchBatch.isPending;
+  const isSaveDisabled = isPending || (isEditing && item.batch_count === 1 && !batchesData?.[0]);
 
   if (isEditing) {
     return (
       <>
         <tr
-          className={`border-b ${updateItem.isPending ? "pointer-events-none opacity-50" : ""}`}
+          className={`border-b ${isPending ? "pointer-events-none opacity-50" : ""}`}
           data-testid={`item-row-${item.id}`}
         >
           <td className="px-2 py-1" />
@@ -260,8 +398,30 @@ function ItemRow({
               </div>
             </div>
           </td>
-          <td className="px-2 py-1 text-sm text-muted-foreground">
-            {item.stored_quantity} {item.unit}
+          <td className="px-2 py-1">
+            {item.batch_count === 1 ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  aria-label="Stored quantity"
+                  type="number"
+                  value={batchQty}
+                  onChange={(e) => setBatchQty(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  className={inputClass}
+                />
+                <input
+                  aria-label="Expiry date"
+                  type="date"
+                  value={batchExpiry}
+                  onChange={(e) => setBatchExpiry(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {item.stored_quantity} {item.unit}
+              </span>
+            )}
           </td>
           <td className="px-2 py-1">
             <div className="flex flex-col gap-1">
@@ -277,7 +437,7 @@ function ItemRow({
                 <button
                   type="button"
                   onClick={() => void save()}
-                  disabled={updateItem.isPending}
+                  disabled={isSaveDisabled}
                   className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   Save
@@ -308,24 +468,42 @@ function ItemRow({
   return (
     <>
       <tr
-        className="cursor-pointer border-b hover:bg-muted/30"
+        className={`cursor-pointer border-b hover:bg-muted/30 ${isSelected ? "bg-blue-50 ring-1 ring-blue-300" : ""}`}
         data-testid={`item-row-${item.id}`}
         onClick={beginEdit}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onSelect(item.id);
+        }}
       >
         <td className="px-2 py-2">
-          {canDisclose && (
+          <span className="inline-flex items-center gap-1">
             <button
               type="button"
-              aria-label={isExpanded ? "Collapse batches" : "Expand batches"}
+              aria-label="Add a new batch"
+              title="Add a new batch"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleExpanded();
+                onStartAddBatch();
               }}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
-              {isExpanded ? "▼" : "▶"}
+              +
             </button>
-          )}
+            {canDisclose && (
+              <button
+                type="button"
+                aria-label={isExpanded ? "Collapse batches" : "Expand batches"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpanded();
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {isExpanded ? "▼" : "▶"}
+              </button>
+            )}
+          </span>
         </td>
         <td className="px-2 py-2">
           <span className="font-medium">{item.name}</span>
@@ -337,7 +515,15 @@ function ItemRow({
           {item.target_quantity} {item.unit}
         </td>
       </tr>
-      {isExpanded && <BatchRows inventoryId={inventoryId} item={item} enabled={isExpanded} />}
+      {isExpanded && (
+        <BatchRows
+          inventoryId={inventoryId}
+          item={item}
+          enabled={isExpanded}
+          initiallyAdding={initiallyAdding}
+          onAddingDone={onAddingBatchDone}
+        />
+      )}
     </>
   );
 }
@@ -348,9 +534,11 @@ type BatchRowsProps = {
   inventoryId: string;
   item: InventoryItemResponse;
   enabled: boolean;
+  initiallyAdding: boolean;
+  onAddingDone: () => void;
 };
 
-function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
+function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }: BatchRowsProps) {
   const { data: batches, isLoading } = useBatches(inventoryId, item.id, enabled);
   const addBatch = useAddBatch(inventoryId, item.id);
 
@@ -360,21 +548,34 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
   const [notes, setNotes] = useState("");
   const [failedBatch, setFailedBatch] = useState(false);
 
+  // Open add form automatically when triggered via "+" button.
+  useEffect(() => {
+    if (initiallyAdding) {
+      setAdding(true);
+    }
+  }, [initiallyAdding]);
+
   const saveBatch = async () => {
     setFailedBatch(false);
     try {
       await addBatch.mutateAsync({
         quantity: parseFloat(qty) || 0,
-        expires_at: expiry || null,
+        expires_at: expiry ? `${expiry}T00:00:00Z` : null,
         notes: notes || null,
       });
       setQty("");
       setExpiry("");
       setNotes("");
       setAdding(false);
+      onAddingDone();
     } catch {
       setFailedBatch(true);
     }
+  };
+
+  const cancelAdding = () => {
+    setAdding(false);
+    onAddingDone();
   };
 
   if (isLoading) {
@@ -459,7 +660,7 @@ function BatchRows({ inventoryId, item, enabled }: BatchRowsProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAdding(false)}
+                  onClick={cancelAdding}
                   className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium hover:bg-muted"
                 >
                   Cancel
@@ -504,7 +705,6 @@ function NewItemRow({
   "data-testid": testId = "new-item-row",
 }: NewItemRowProps) {
   const createItem = useCreateItem(inventoryId);
-  const qc = useQueryClient();
 
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState(initialCategory ?? "");
@@ -513,33 +713,28 @@ function NewItemRow({
   const [storedQty, setStoredQty] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [failed, setFailed] = useState(false);
+  const [failedMessage, setFailedMessage] = useState("Save failed");
 
   const save = async () => {
     if (!name.trim()) return;
     setFailed(false);
     try {
-      const item = await createItem.mutateAsync({
+      await createItem.mutateAsync({
         name: name.trim(),
         category: category.trim(),
         unit: unit.trim(),
         target_quantity: parseFloat(target) || 1,
+        initial_quantity: parseFloat(storedQty) || 0,
+        initial_expires_at: expiryDate ? `${expiryDate}T00:00:00Z` : null,
       });
-      if (item?.id && parseFloat(storedQty) > 0) {
-        await request(`/inventories/${inventoryId}/items/${item.id}/batches`, {
-          method: "POST",
-          body: JSON.stringify({
-            quantity: parseFloat(storedQty),
-            expires_at: expiryDate || null,
-            notes: null,
-          }),
-        });
-        void qc.invalidateQueries({
-          queryKey: ["inventories", inventoryId, "items", item.id, "batches"],
-        });
-        void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
-      }
       onDone();
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("already exists in this category")) {
+        setFailedMessage("An item with this name already exists in this category");
+      } else {
+        setFailedMessage("Save failed");
+      }
       setFailed(true);
     }
   };
@@ -648,7 +843,7 @@ function NewItemRow({
         <tr>
           <td />
           <td colSpan={3} className="px-2 pb-2">
-            <p className="text-xs text-red-600">Save failed</p>
+            <p className="text-xs text-red-600">{failedMessage}</p>
           </td>
         </tr>
       )}
