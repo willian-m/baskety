@@ -8,7 +8,7 @@ import {
   type InventoryItemResponse,
 } from "@baskety/core";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { ExpiryBadge } from "./ExpiryBadge.js";
 
@@ -31,6 +31,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
   const [addingBatchItemId, setAddingBatchItemId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteItem = useDeleteItem(inventoryId);
 
   // Real categories only (no Uncategorized) for autocomplete suggestions.
@@ -69,9 +70,18 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
   }
 
   async function handleConfirmDelete() {
-    await Promise.allSettled([...selectedItemIds].map((id) => deleteItem.mutateAsync(id)));
-    setSelectedItemIds(new Set());
-    setShowDeleteModal(false);
+    const ids = [...selectedItemIds];
+    const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      setDeleteError(`${failed} item${failed !== 1 ? "s" : ""} could not be deleted.`);
+      setSelectedItemIds(new Set(ids.filter((_, i) => results[i]!.status === "rejected")));
+      setShowDeleteModal(false);
+    } else {
+      setDeleteError(null);
+      setSelectedItemIds(new Set());
+      setShowDeleteModal(false);
+    }
   }
 
   return (
@@ -87,13 +97,16 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
             <th className="w-8 px-2 py-2" aria-label="Expand" />
             <th className="px-2 py-2">
               {selectedItemIds.size > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteModal(true)}
-                  className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
-                >
-                  Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}
-                </button>
+                <>
+                  {deleteError && <p className="mb-1 text-xs text-red-600">{deleteError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                  >
+                    Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}
+                  </button>
+                </>
               ) : (
                 "Item"
               )}
@@ -180,9 +193,20 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
       </table>
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-xl">
-            <h2 className="text-lg font-semibold">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowDeleteModal(false);
+          }}
+          tabIndex={-1}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-xl"
+          >
+            <h2 id="delete-modal-title" className="text-lg font-semibold">
               Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}?
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -191,6 +215,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
+                autoFocus
                 className="rounded px-4 py-2 text-sm"
                 onClick={() => setShowDeleteModal(false)}
               >
@@ -254,12 +279,19 @@ function ItemRow({
   const [failed, setFailed] = useState(false);
   const [batchQty, setBatchQty] = useState("");
   const [batchExpiry, setBatchExpiry] = useState("");
+  const seededForEdit = useRef(false);
 
   // Seed batch fields when entering edit mode with a single batch.
+  // Guard with a ref so background refetches don't overwrite typed values.
   useEffect(() => {
-    if (isEditing && batchesData?.[0]) {
+    if (!isEditing) {
+      seededForEdit.current = false;
+      return;
+    }
+    if (batchesData?.[0] && !seededForEdit.current) {
       setBatchQty(String(batchesData[0].quantity));
-      setBatchExpiry(batchesData[0].expires_at ?? "");
+      setBatchExpiry(batchesData[0].expires_at ? batchesData[0].expires_at.slice(0, 10) : "");
+      seededForEdit.current = true;
     }
   }, [isEditing, batchesData]);
 
@@ -293,7 +325,7 @@ function ItemRow({
               patchBatch.mutateAsync({
                 batchId: batchesData[0].id,
                 quantity: parseFloat(batchQty) || 0,
-                expires_at: batchExpiry || null,
+                expires_at: batchExpiry ? `${batchExpiry}T00:00:00Z` : null,
               }),
             ]
           : []),
@@ -325,6 +357,7 @@ function ItemRow({
 
   const canDisclose = item.batch_count > 1;
   const isPending = updateItem.isPending || patchBatch.isPending;
+  const isSaveDisabled = isPending || (isEditing && item.batch_count === 1 && !batchesData?.[0]);
 
   if (isEditing) {
     return (
@@ -404,7 +437,7 @@ function ItemRow({
                 <button
                   type="button"
                   onClick={() => void save()}
-                  disabled={isPending}
+                  disabled={isSaveDisabled}
                   className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   Save
@@ -527,7 +560,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
     try {
       await addBatch.mutateAsync({
         quantity: parseFloat(qty) || 0,
-        expires_at: expiry || null,
+        expires_at: expiry ? `${expiry}T00:00:00Z` : null,
         notes: notes || null,
       });
       setQty("");
@@ -692,7 +725,7 @@ function NewItemRow({
         unit: unit.trim(),
         target_quantity: parseFloat(target) || 1,
         initial_quantity: parseFloat(storedQty) || 0,
-        initial_expires_at: expiryDate || null,
+        initial_expires_at: expiryDate ? `${expiryDate}T00:00:00Z` : null,
       });
       onDone();
     } catch (err) {
