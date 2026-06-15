@@ -1,5 +1,16 @@
+import {
+  useAddBatch,
+  useBatches,
+  useDeleteItem,
+  useInventories,
+  useInventoryItem,
+  usePatchBatch,
+  useUpdateItem,
+} from "@baskety/core";
+import type { BatchResponse, InventoryItemResponse } from "@baskety/core";
+import { Button, Card, ExpiryBadge, Spinner, TextInput } from "@baskety/ui";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -12,16 +23,6 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  useAddBatch,
-  useBatches,
-  useDeleteItem,
-  useInventories,
-  useInventoryItem,
-  useUpdateItem,
-} from "@baskety/core";
-import type { BatchResponse, InventoryItemResponse } from "@baskety/core";
-import { Button, Card, ExpiryBadge, Spinner, TextInput } from "@baskety/ui";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -34,37 +35,45 @@ function formatDate(iso: string | null): string {
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function BatchRow({ batch, unit }: { batch: BatchResponse; unit: string }) {
+function BatchRow({
+  batch,
+  unit,
+  onEdit,
+}: {
+  batch: BatchResponse;
+  unit: string;
+  onEdit?: () => void;
+}) {
   return (
     <Card padding={12}>
       <View style={styles.batchHeader}>
         <Text style={styles.batchQty}>
           {batch.quantity} {unit}
         </Text>
-        <ExpiryBadge expiresAt={batch.expires_at} />
+        <View style={styles.batchHeaderRight}>
+          <ExpiryBadge expiresAt={batch.expires_at} />
+          {onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              style={styles.batchEditBtn}
+              accessibilityLabel="Edit batch"
+              accessibilityRole="button"
+            >
+              <Text style={styles.batchEditIcon}>✏️</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
-      <Text style={styles.batchMeta}>
-        Added: {formatDate(batch.added_at)}
-      </Text>
+      <Text style={styles.batchMeta}>Added: {formatDate(batch.added_at)}</Text>
       {batch.expires_at ? (
-        <Text style={styles.batchMeta}>
-          Expires: {formatDate(batch.expires_at)}
-        </Text>
+        <Text style={styles.batchMeta}>Expires: {formatDate(batch.expires_at)}</Text>
       ) : null}
-      {batch.notes ? (
-        <Text style={styles.batchNotes}>{batch.notes}</Text>
-      ) : null}
+      {batch.notes ? <Text style={styles.batchNotes}>{batch.notes}</Text> : null}
     </Card>
   );
 }
 
-function AddBatchForm({
-  inventoryId,
-  itemId,
-}: {
-  inventoryId: string;
-  itemId: string;
-}) {
+function AddBatchForm({ inventoryId, itemId }: { inventoryId: string; itemId: string }) {
   const [quantity, setQuantity] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -129,12 +138,96 @@ function AddBatchForm({
           placeholder="e.g. organic brand"
         />
       </View>
-      <Button
-        label="Add Batch"
-        onPress={handleSubmit}
-        loading={addBatch.isPending}
-      />
+      <Button label="Add Batch" onPress={handleSubmit} loading={addBatch.isPending} />
     </Card>
+  );
+}
+
+function EditBatchModal({
+  batch,
+  inventoryId,
+  itemId,
+  onClose,
+}: {
+  batch: BatchResponse;
+  inventoryId: string;
+  itemId: string;
+  onClose: () => void;
+}) {
+  const [quantity, setQuantity] = useState(String(batch.quantity));
+  const [expiresAt, setExpiresAt] = useState(batch.expires_at ?? "");
+  const [notes, setNotes] = useState(batch.notes ?? "");
+  const patchBatch = usePatchBatch(inventoryId, itemId);
+
+  const handleSave = useCallback(async () => {
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      Alert.alert("Invalid quantity", "Please enter a positive number.");
+      return;
+    }
+    const trimmedExpiry = expiresAt.trim();
+    if (trimmedExpiry && !ISO_DATE_RE.test(trimmedExpiry)) {
+      Alert.alert("Invalid date", "Use YYYY-MM-DD format, e.g. 2026-12-31.");
+      return;
+    }
+    try {
+      await patchBatch.mutateAsync({
+        batchId: batch.id,
+        quantity: qty,
+        expires_at: trimmedExpiry || null,
+        notes: notes.trim() || null,
+      });
+      onClose();
+    } catch {
+      Alert.alert("Error", "Failed to update batch.");
+    }
+  }, [quantity, expiresAt, notes, patchBatch, onClose, batch.id]);
+
+  // Modal is always visible when mounted; mount/unmount is controlled by the parent via key prop
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalSheet}
+        >
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Edit Batch</Text>
+          <ScrollView contentContainerStyle={styles.modalBody}>
+            <View style={styles.formField}>
+              <TextInput
+                label="Quantity"
+                value={quantity}
+                onChange={setQuantity}
+                keyboardType="numeric"
+                placeholder="e.g. 2"
+              />
+            </View>
+            <View style={styles.formField}>
+              <TextInput
+                label="Expiry date (ISO, optional)"
+                value={expiresAt}
+                onChange={setExpiresAt}
+                placeholder="e.g. 2026-12-31"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.formField}>
+              <TextInput
+                label="Notes (optional)"
+                value={notes}
+                onChange={setNotes}
+                placeholder="e.g. organic brand"
+              />
+            </View>
+            <Button label="Save" onPress={handleSave} loading={patchBatch.isPending} />
+            <View style={styles.formField}>
+              <Button label="Cancel" variant="secondary" onPress={onClose} />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -156,7 +249,7 @@ function EditItemModal({
   const [notes, setNotes] = useState(item.notes ?? "");
   const updateItem = useUpdateItem(inventoryId, item.id);
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     if (!name.trim() || !category.trim() || !unit.trim()) {
       Alert.alert("Required fields", "Name, category, and unit cannot be blank.");
       return;
@@ -181,15 +274,10 @@ function EditItemModal({
         },
       },
     );
-  }
+  }, [name, category, unit, targetQty, notes, updateItem, onClose]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -199,12 +287,7 @@ function EditItemModal({
           <Text style={styles.modalTitle}>Edit Item</Text>
           <ScrollView contentContainerStyle={styles.modalBody}>
             <View style={styles.formField}>
-              <TextInput
-                label="Name"
-                value={name}
-                onChange={setName}
-                autoCapitalize="words"
-              />
+              <TextInput label="Name" value={name} onChange={setName} autoCapitalize="words" />
             </View>
             <View style={styles.formField}>
               <TextInput
@@ -215,12 +298,7 @@ function EditItemModal({
               />
             </View>
             <View style={styles.formField}>
-              <TextInput
-                label="Unit"
-                value={unit}
-                onChange={setUnit}
-                autoCapitalize="none"
-              />
+              <TextInput label="Unit" value={unit} onChange={setUnit} autoCapitalize="none" />
             </View>
             <View style={styles.formField}>
               <TextInput
@@ -231,17 +309,9 @@ function EditItemModal({
               />
             </View>
             <View style={styles.formField}>
-              <TextInput
-                label="Notes (optional)"
-                value={notes}
-                onChange={setNotes}
-              />
+              <TextInput label="Notes (optional)" value={notes} onChange={setNotes} />
             </View>
-            <Button
-              label="Save"
-              onPress={handleSave}
-              loading={updateItem.isPending}
-            />
+            <Button label="Save" onPress={handleSave} loading={updateItem.isPending} />
             <View style={styles.formField}>
               <Button label="Cancel" variant="secondary" onPress={onClose} />
             </View>
@@ -252,23 +322,37 @@ function EditItemModal({
   );
 }
 
-function ItemDetailContent({
-  inventoryId,
-  itemId,
-}: {
-  inventoryId: string;
-  itemId: string;
-}) {
-  const { data: item, isLoading: itemLoading } = useInventoryItem(
-    inventoryId,
-    itemId,
-  );
-  const { data: batches, isLoading: batchesLoading } = useBatches(
-    inventoryId,
-    itemId,
-  );
+const BatchSeparator = () => <View style={styles.separator} />;
+
+function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemId: string }) {
+  const { data: item, isLoading: itemLoading } = useInventoryItem(inventoryId, itemId);
+  const { data: batches, isLoading: batchesLoading } = useBatches(inventoryId, itemId);
   const deleteItem = useDeleteItem(inventoryId);
   const [editVisible, setEditVisible] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<BatchResponse | null>(null);
+
+  function handleDelete() {
+    Alert.alert("Delete item", `Are you sure you want to delete "${item!.name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteItem.mutate(item!.id, {
+            onSuccess: () => router.back(),
+            onError: () => Alert.alert("Error", "Failed to delete item."),
+          });
+        },
+      },
+    ]);
+  }
+
+  const renderBatchItem = useCallback(
+    ({ item: batch }: { item: BatchResponse }) => (
+      <BatchRow batch={batch} unit={item?.unit ?? ""} onEdit={() => setEditingBatch(batch)} />
+    ),
+    [item?.unit],
+  );
 
   if (itemLoading || batchesLoading) {
     return (
@@ -286,40 +370,27 @@ function ItemDetailContent({
     );
   }
 
-  function handleDelete() {
-    Alert.alert(
-      "Delete item",
-      `Are you sure you want to delete "${item!.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteItem.mutate(item!.id, {
-              onSuccess: () => router.back(),
-              onError: () => Alert.alert("Error", "Failed to delete item."),
-            });
-          },
-        },
-      ],
-    );
-  }
-
   const activeBatches = (batches ?? []).filter((b) => b.emptied_at === null);
 
   return (
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={styles.detailContent}
-    >
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
+    <ScrollView style={styles.flex} contentContainerStyle={styles.detailContent}>
+      <Pressable
+        onPress={() => router.back()}
+        style={styles.backBtn}
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
+      >
         <Text style={styles.backBtnLabel}>← Back</Text>
       </Pressable>
       <Card>
         <View style={styles.detailHeader}>
           <Text style={styles.itemName}>{item.name}</Text>
-          <Pressable onPress={() => setEditVisible(true)} style={styles.editBtn}>
+          <Pressable
+            onPress={() => setEditVisible(true)}
+            style={styles.editBtn}
+            accessibilityLabel="Edit item"
+            accessibilityRole="button"
+          >
             <Text style={styles.editBtnLabel}>Edit</Text>
           </Pressable>
         </View>
@@ -327,14 +398,10 @@ function ItemDetailContent({
         <Text style={styles.itemMeta}>
           Target: {item.target_quantity} {item.unit}
         </Text>
-        {item.notes ? (
-          <Text style={styles.itemNotes}>{item.notes}</Text>
-        ) : null}
+        {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
       </Card>
 
-      <Text style={styles.sectionTitle}>
-        Batches ({activeBatches.length})
-      </Text>
+      <Text style={styles.sectionTitle}>Batches ({activeBatches.length})</Text>
 
       {activeBatches.length === 0 ? (
         <Text style={styles.emptyText}>No active batches.</Text>
@@ -342,8 +409,8 @@ function ItemDetailContent({
         <FlatList
           data={activeBatches}
           keyExtractor={(b) => b.id}
-          renderItem={({ item: batch }) => <BatchRow batch={batch} unit={item.unit} />}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={renderBatchItem}
+          ItemSeparatorComponent={BatchSeparator}
           scrollEnabled={false}
         />
       )}
@@ -367,6 +434,16 @@ function ItemDetailContent({
           item={item}
           inventoryId={inventoryId}
           onClose={() => setEditVisible(false)}
+        />
+      ) : null}
+
+      {editingBatch !== null ? (
+        <EditBatchModal
+          key={editingBatch.id}
+          batch={editingBatch}
+          inventoryId={inventoryId}
+          itemId={itemId}
+          onClose={() => setEditingBatch(null)}
         />
       ) : null}
     </ScrollView>
@@ -448,6 +525,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
+  batchHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  batchEditBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  batchEditIcon: { fontSize: 16 },
   batchQty: { fontSize: 15, fontWeight: "600", color: "#111827" },
   batchMeta: { fontSize: 13, color: "#6b7280" },
   batchNotes: {
