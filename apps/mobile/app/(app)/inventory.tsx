@@ -46,7 +46,12 @@ function CategoryChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+    >
       <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text>
     </Pressable>
   );
@@ -253,16 +258,27 @@ function BatchSheetModal({
   const [editVisible, setEditVisible] = useState(false);
 
   const isLoading = itemLoading || batchesLoading;
-  const activeBatches = (batches ?? []).filter((b) => b.emptied_at === null);
+  const activeBatches = (batches ?? []).filter((b) => !b.emptied_at);
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        />
         <View style={styles.modalSheet}>
           <View style={styles.sheetTopRow}>
             <View style={styles.modalHandle} />
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              hitSlop={8}
+              accessibilityLabel="Close"
+              accessibilityRole="button"
+            >
               <Text style={styles.closeBtnLabel}>✕</Text>
             </Pressable>
           </View>
@@ -308,6 +324,7 @@ function BatchSheetModal({
 
               {editVisible ? (
                 <EditItemModal
+                  key={item.id}
                   visible={editVisible}
                   item={item}
                   inventoryId={inventoryId}
@@ -341,7 +358,7 @@ function ItemRow({
   onSaveEdit,
   onCancelEdit,
 }: ItemRowProps) {
-  const swipeableRef = useRef<Swipeable>(null);
+  const swipeableRef = useRef<InstanceType<typeof Swipeable>>(null);
   const updateItem = useUpdateItem(inventoryId, item.id);
 
   const [name, setName] = useState(item.name);
@@ -364,12 +381,17 @@ function ItemRow({
 
   const handleSave = async () => {
     setSaveError(null);
+    const qty = parseFloat(targetQty);
+    if (isNaN(qty) || qty <= 0) {
+      setSaveError("Target quantity must be a positive number.");
+      return;
+    }
     try {
       await updateItem.mutateAsync({
         name,
         category,
         unit,
-        target_quantity: parseFloat(targetQty) || 0,
+        target_quantity: qty,
       });
       onSaveEdit();
     } catch {
@@ -393,6 +415,7 @@ function ItemRow({
             onChangeText={setName}
             placeholder="Name"
             placeholderTextColor="#9ca3af"
+            accessibilityLabel="Name"
           />
           <RNTextInput
             style={styles.editInput}
@@ -400,6 +423,7 @@ function ItemRow({
             onChangeText={setCategory}
             placeholder="Category"
             placeholderTextColor="#9ca3af"
+            accessibilityLabel="Category"
           />
           <RNTextInput
             style={styles.editInput}
@@ -407,6 +431,7 @@ function ItemRow({
             onChangeText={setUnit}
             placeholder="Unit"
             placeholderTextColor="#9ca3af"
+            accessibilityLabel="Unit"
           />
           <RNTextInput
             style={styles.editInput}
@@ -415,6 +440,7 @@ function ItemRow({
             placeholder="Target quantity"
             placeholderTextColor="#9ca3af"
             keyboardType="numeric"
+            accessibilityLabel="Target quantity"
           />
           <View style={styles.editActions}>
             <Pressable
@@ -439,6 +465,8 @@ function ItemRow({
       <Pressable
         onPress={() => onOpen(item.id)}
         style={({ pressed }) => [pressed && styles.pressed]}
+        accessibilityLabel={item.name}
+        accessibilityHint="Opens batch details"
       >
         <Card>
           <View style={styles.itemHeader}>
@@ -571,6 +599,7 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
 
       {creatingItem ? (
         <EditItemModal
+          key="create"
           visible={creatingItem}
           inventoryId={inventoryId}
           initialName={search || undefined}
