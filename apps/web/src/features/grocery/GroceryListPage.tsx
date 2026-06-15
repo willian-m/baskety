@@ -46,6 +46,7 @@ export function GroceryListPage() {
   const [renameText, setRenameText] = useState("");
 
   const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<Element | null>(null);
 
   useEffect(() => {
     setRenameText(list?.name ?? "");
@@ -68,6 +69,7 @@ export function GroceryListPage() {
     siblings.forEach((s) => s.setAttribute("aria-hidden", "true"));
 
     const focusable = Array.from(el.querySelectorAll<HTMLElement>("input, button"));
+    triggerRef.current = document.activeElement;
     focusable[0]?.focus();
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -90,6 +92,7 @@ export function GroceryListPage() {
     return () => {
       siblings.forEach((s) => s.removeAttribute("aria-hidden"));
       document.removeEventListener("keydown", handleKey);
+      (triggerRef.current as HTMLElement | null)?.focus();
     };
   }, [renameDialogOpen, handleRenameCancel]);
 
@@ -134,10 +137,10 @@ export function GroceryListPage() {
   const handleComplete = async () => {
     try {
       await completeList.mutateAsync();
+      void navigate({ to: "/grocery" });
     } catch {
-      // individual errors surfaced via TanStack Query error state
+      // error surfaced via completeList.isError
     }
-    void navigate({ to: "/grocery" });
   };
 
   const toggleChecked = (id: string) => {
