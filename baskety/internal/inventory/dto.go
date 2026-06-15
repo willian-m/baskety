@@ -41,6 +41,7 @@ type AddBatchRequest struct {
 type PatchBatchRequest struct {
 	Quantity  float64    `json:"quantity"`
 	ExpiresAt *time.Time `json:"expires_at"`
+	Notes     *string    `json:"notes"`
 }
 
 // --- Responses ---

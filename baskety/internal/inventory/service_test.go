@@ -29,7 +29,7 @@ type mockRepo struct {
 	getBatchFn          func(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error)
 	listActiveBatchesFn func(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error)
 	markBatchEmptiedFn  func(ctx context.Context, id uuid.UUID) error
-	patchBatchFn        func(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error)
+	patchBatchFn        func(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error)
 }
 
 func (m *mockRepo) CreateInventory(ctx context.Context, householdID uuid.UUID, name string, description *string) (*inventory.Inventory, error) {
@@ -77,8 +77,8 @@ func (m *mockRepo) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*
 func (m *mockRepo) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
 	return m.markBatchEmptiedFn(ctx, id)
 }
-func (m *mockRepo) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error) {
-	return m.patchBatchFn(ctx, id, quantity, expiresAt)
+func (m *mockRepo) PatchBatch(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error) {
+	return m.patchBatchFn(ctx, id, itemID, quantity, expiresAt, notes)
 }
 
 func TestCreateInventory_Success(t *testing.T) {
@@ -204,4 +204,67 @@ func TestCreateItem_UniqueViolation_ReturnsErrInvalidInput(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, inventory.ErrInvalidInput)
 	assert.Contains(t, err.Error(), "already exists")
+}
+
+func TestPatchBatch(t *testing.T) {
+	batchID := uuid.New()
+	itemID := uuid.New()
+	invID := uuid.New()
+	hID := uuid.New()
+
+	baseRepo := func(patchFn func(ctx context.Context, id, iID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error)) *mockRepo {
+		return &mockRepo{
+			getItemFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+				return &inventory.InventoryItem{ID: id, InventoryID: invID}, nil
+			},
+			getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+				return &inventory.Inventory{ID: id, HouseholdID: hID}, nil
+			},
+			patchBatchFn: patchFn,
+		}
+	}
+
+	t.Run("success with non-nil notes", func(t *testing.T) {
+		note := "handle with care"
+		var capturedNotes *string
+		repo := baseRepo(func(_ context.Context, id, iID uuid.UUID, quantity float64, _ *time.Time, notes *string) (*inventory.InventoryBatch, error) {
+			assert.Equal(t, batchID, id)
+			assert.Equal(t, itemID, iID)
+			capturedNotes = notes
+			return &inventory.InventoryBatch{ID: id, ItemID: itemID, Quantity: quantity, Notes: notes}, nil
+		})
+		svc := inventory.NewService(repo)
+		req := inventory.PatchBatchRequest{Quantity: 3, Notes: &note}
+		resp, err := svc.PatchBatch(context.Background(), batchID, itemID, hID, req)
+		require.NoError(t, err)
+		require.NotNil(t, capturedNotes)
+		assert.Equal(t, "handle with care", *capturedNotes)
+		assert.Equal(t, 3.0, resp.Quantity)
+	})
+
+	t.Run("success with nil notes", func(t *testing.T) {
+		var capturedNotes *string
+		notesSet := false
+		repo := baseRepo(func(_ context.Context, _, _ uuid.UUID, quantity float64, _ *time.Time, notes *string) (*inventory.InventoryBatch, error) {
+			capturedNotes = notes
+			notesSet = true
+			return &inventory.InventoryBatch{Quantity: quantity, Notes: notes}, nil
+		})
+		svc := inventory.NewService(repo)
+		req := inventory.PatchBatchRequest{Quantity: 2, Notes: nil}
+		resp, err := svc.PatchBatch(context.Background(), batchID, itemID, hID, req)
+		require.NoError(t, err)
+		assert.True(t, notesSet)
+		assert.Nil(t, capturedNotes)
+		assert.Equal(t, 2.0, resp.Quantity)
+	})
+
+	t.Run("repo not found propagates", func(t *testing.T) {
+		repo := baseRepo(func(_ context.Context, _, _ uuid.UUID, _ float64, _ *time.Time, _ *string) (*inventory.InventoryBatch, error) {
+			return nil, fmt.Errorf("batch: %w", inventory.ErrNotFound)
+		})
+		svc := inventory.NewService(repo)
+		_, err := svc.PatchBatch(context.Background(), batchID, itemID, hID, inventory.PatchBatchRequest{Quantity: 1})
+		assert.ErrorIs(t, err, inventory.ErrNotFound)
+	})
 }
