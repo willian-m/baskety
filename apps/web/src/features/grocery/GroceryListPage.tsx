@@ -8,7 +8,7 @@ import {
   useUpdateListItem,
 } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
@@ -45,9 +45,43 @@ export function GroceryListPage() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameText, setRenameText] = useState("");
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setRenameText(list?.name ?? "");
   }, [list?.name]);
+
+  const handleRenameCancel = useCallback(() => {
+    setRenameText(list?.name ?? "");
+    setRenameDialogOpen(false);
+  }, [list?.name]);
+
+  useEffect(() => {
+    if (!renameDialogOpen) return;
+    const el = dialogRef.current;
+    if (!el) return;
+    const focusable = Array.from(el.querySelectorAll<HTMLElement>("input, button"));
+    focusable[0]?.focus();
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleRenameCancel();
+        return;
+      }
+      if (e.key === "Tab") {
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [renameDialogOpen, handleRenameCancel]);
 
   if (loadingList || loadingItems || !inventoryId) {
     return (
@@ -129,11 +163,6 @@ export function GroceryListPage() {
     } catch {
       // ignore
     }
-    setRenameDialogOpen(false);
-  };
-
-  const handleRenameCancel = () => {
-    setRenameText(list?.name ?? "");
     setRenameDialogOpen(false);
   };
 
@@ -256,6 +285,8 @@ export function GroceryListPage() {
               {group.map((item, idx) => (
                 <div
                   key={item.id}
+                  role="group"
+                  aria-label={item.name}
                   className={`flex items-center gap-3 px-4 py-3 ${idx !== 0 ? "border-t" : ""}`}
                 >
                   <input
@@ -297,23 +328,28 @@ export function GroceryListPage() {
       )}
 
       {renameDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={handleRenameCancel}
+        >
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="rename-dialog-title"
             className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
           >
             <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
               Rename list
             </h2>
             <input
               autoFocus
+              aria-label="List name"
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleRenameConfirm();
-                if (e.key === "Escape") handleRenameCancel();
               }}
               placeholder="List name"
               className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

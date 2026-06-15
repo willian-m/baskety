@@ -162,6 +162,40 @@ export default function GroceryListDetailScreen() {
     setSelectedIds([]);
   }, []);
 
+  const handleToggle = useCallback(
+    async (item: GroceryItemResponse) => {
+      const next = item.status === "bought" ? "pending" : "bought";
+      try {
+        await updateItem.mutateAsync({ itemId: item.id, status: next });
+      } catch {
+        // ignore
+      }
+    },
+    [updateItem],
+  );
+
+  const handleSwipeRight = useCallback(
+    async (item: GroceryItemResponse) => {
+      try {
+        await updateItem.mutateAsync({ itemId: item.id, status: "bought" });
+      } catch {
+        // ignore
+      }
+    },
+    [updateItem],
+  );
+
+  const handleSwipeLeft = useCallback(
+    async (item: GroceryItemResponse) => {
+      try {
+        await updateItem.mutateAsync({ itemId: item.id, status: "skipped" });
+      } catch {
+        // ignore
+      }
+    },
+    [updateItem],
+  );
+
   function startSelect(id: string) {
     setSelectMode(true);
     setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -233,31 +267,6 @@ export default function GroceryListDetailScreen() {
   const allItems = items ?? [];
   const filtered = activeTab === "all" ? allItems : allItems.filter((i) => i.status === activeTab);
 
-  async function handleToggle(item: GroceryItemResponse) {
-    const next = item.status === "bought" ? "pending" : "bought";
-    try {
-      await updateItem.mutateAsync({ itemId: item.id, status: next });
-    } catch {
-      // ignore
-    }
-  }
-
-  async function handleSwipeRight(item: GroceryItemResponse) {
-    try {
-      await updateItem.mutateAsync({ itemId: item.id, status: "bought" });
-    } catch {
-      // ignore
-    }
-  }
-
-  async function handleSwipeLeft(item: GroceryItemResponse) {
-    try {
-      await updateItem.mutateAsync({ itemId: item.id, status: "skipped" });
-    } catch {
-      // ignore
-    }
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.tabs}>
@@ -303,6 +312,8 @@ export default function GroceryListDetailScreen() {
           <TouchableOpacity
             style={[styles.deleteBtn, selectedIds.length === 0 && styles.deleteBtnDisabled]}
             disabled={selectedIds.length === 0 || isDeleting}
+            accessibilityLabel="Delete selected items"
+            accessibilityState={{ disabled: selectedIds.length === 0 || isDeleting }}
             onPress={() => void handleDeleteSelected()}
           >
             <Text style={styles.deleteBtnText}>
@@ -329,6 +340,7 @@ export default function GroceryListDetailScreen() {
               value={renameText}
               onChangeText={setRenameText}
               placeholder="List name"
+              accessibilityLabel="List name"
               autoFocus
               returnKeyType="done"
               onSubmitEditing={() => void handleConfirmRename()}
