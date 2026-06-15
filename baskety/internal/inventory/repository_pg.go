@@ -256,9 +256,10 @@ func (r *pgRepository) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error
 	return nil
 }
 
-func (r *pgRepository) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error) {
+func (r *pgRepository) PatchBatch(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error) {
 	row, err := r.q.PatchBatch(ctx, sqlc.PatchBatchParams{
 		ID:        shared.UUIDToPg(id),
+		ItemID:    shared.UUIDToPg(itemID),
 		Quantity:  shared.FloatToPgNumeric(quantity),
 		ExpiresAt: shared.TimePtrToPg(expiresAt),
 		Notes:     notes,

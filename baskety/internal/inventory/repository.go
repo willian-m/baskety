@@ -28,5 +28,5 @@ type Repository interface {
 	GetBatch(ctx context.Context, id uuid.UUID) (*InventoryBatch, error)
 	ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*InventoryBatch, error)
 	MarkBatchEmptied(ctx context.Context, id uuid.UUID) error
-	PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error)
+	PatchBatch(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error)
 }
