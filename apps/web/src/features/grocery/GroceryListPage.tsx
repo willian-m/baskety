@@ -165,7 +165,7 @@ export function GroceryListPage() {
     setDeleteError(null);
     try {
       const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
-      const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+      const failedIds = ids.filter((_, i) => results[i]?.status === "rejected");
       setCheckedIds(failedIds);
       if (failedIds.length > 0) {
         setDeleteError("Failed to delete some items. Please try again.");
