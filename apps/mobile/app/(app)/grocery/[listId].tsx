@@ -1,23 +1,27 @@
 import {
+  useDeleteListItem,
   useGroceryItems,
   useGroceryList,
   useInventories,
+  useRenameList,
   useUpdateListItem,
 } from "@baskety/core";
+import type { GroceryItemResponse } from "@baskety/core";
 import { Badge, Spinner } from "@baskety/ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Modal,
   PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
-
-import type { GroceryItemResponse } from "@baskety/core";
 
 type FilterTab = "all" | "pending" | "bought" | "skipped";
 
@@ -37,12 +41,25 @@ function statusVariant(status: string): "default" | "success" | "warning" | "inf
 
 interface SwipeableItemProps {
   item: GroceryItemResponse;
+  selectMode: boolean;
+  selected: boolean;
   onToggle: () => void;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
+  onLongPress: () => void;
+  onSelectToggle: () => void;
 }
 
-function SwipeableItem({ item, onToggle, onSwipeLeft, onSwipeRight }: SwipeableItemProps) {
+function SwipeableItem({
+  item,
+  selectMode,
+  selected,
+  onToggle,
+  onSwipeLeft,
+  onSwipeRight,
+  onLongPress,
+  onSelectToggle,
+}: SwipeableItemProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const THRESHOLD = 60;
 
@@ -67,25 +84,41 @@ function SwipeableItem({ item, onToggle, onSwipeLeft, onSwipeRight }: SwipeableI
     }),
   ).current;
 
+  const rowContent = (
+    <View style={[styles.itemRow, selectMode && selected && styles.itemRowSelected]}>
+      {selectMode && <Text style={styles.checkbox}>{selected ? "☑" : "☐"}</Text>}
+      <View style={styles.itemMain}>
+        <Text
+          style={[
+            styles.itemName,
+            item.status === "bought" && styles.itemNameBought,
+            item.status === "skipped" && styles.itemNameSkipped,
+          ]}
+        >
+          {item.name}
+        </Text>
+        <Text style={styles.itemQty}>
+          {item.quantity} {item.unit}
+        </Text>
+      </View>
+      <Badge label={item.status} variant={statusVariant(item.status)} />
+    </View>
+  );
+
+  // In select mode, disable swipe gestures so taps reliably toggle selection.
+  if (selectMode) {
+    return (
+      <TouchableOpacity onPress={onSelectToggle} onLongPress={onLongPress}>
+        {rowContent}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-      <Pressable style={styles.itemRow} onPress={onToggle}>
-        <View style={styles.itemMain}>
-          <Text
-            style={[
-              styles.itemName,
-              item.status === "bought" && styles.itemNameBought,
-              item.status === "skipped" && styles.itemNameSkipped,
-            ]}
-          >
-            {item.name}
-          </Text>
-          <Text style={styles.itemQty}>
-            {item.quantity} {item.unit}
-          </Text>
-        </View>
-        <Badge label={item.status} variant={statusVariant(item.status)} />
-      </Pressable>
+      <TouchableOpacity onPress={onToggle} onLongPress={onLongPress}>
+        {rowContent}
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -100,22 +133,85 @@ export default function GroceryListDetailScreen() {
   const { data: list, isLoading: listLoading } = useGroceryList(inventoryId, listId ?? "");
   const { data: items, isLoading: itemsLoading } = useGroceryItems(inventoryId, listId ?? "");
   const updateItem = useUpdateListItem(inventoryId, listId ?? "");
+  const renameList = useRenameList(inventoryId, listId ?? "");
+  const deleteItem = useDeleteListItem(inventoryId, listId ?? "");
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+
+  // Rename modal state
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameText, setRenameText] = useState(list?.name ?? "");
+
+  // Multi-select state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Keep the rename text input in sync when the list loads/changes.
+  useEffect(() => {
+    setRenameText(list?.name ?? "");
+  }, [list?.name]);
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds([]);
+  }
+
+  function startSelect(id: string) {
+    setSelectMode(true);
+    setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function handleConfirmRename() {
+    const name = renameText.trim();
+    if (!name) {
+      setRenameVisible(false);
+      return;
+    }
+    try {
+      await renameList.mutateAsync(name);
+    } catch {
+      // ignore
+    }
+    setRenameVisible(false);
+  }
+
+  async function handleDeleteSelected() {
+    const ids = [...selectedIds];
+    try {
+      await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
+    } catch {
+      // ignore
+    }
+    exitSelectMode();
+  }
 
   useEffect(() => {
     navigation.setOptions({
       title: list?.name ?? "List",
-      headerRight: () => (
-        <Pressable
-          onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
-          style={styles.headerBtn}
-        >
-          <Text style={styles.headerBtnText}>Start Trip</Text>
-        </Pressable>
-      ),
+      headerRight: () =>
+        selectMode ? (
+          <Pressable onPress={exitSelectMode} style={styles.headerBtn}>
+            <Text style={styles.headerBtnText}>Cancel</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setRenameVisible(true)} style={styles.headerIconBtn}>
+              <Text style={styles.headerIcon}>✏️</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
+              style={styles.headerBtn}
+            >
+              <Text style={styles.headerBtnText}>Start Trip</Text>
+            </Pressable>
+          </View>
+        ),
     });
-  }, [list?.name, listId, navigation]);
+  }, [list?.name, listId, navigation, selectMode]);
 
   if (invLoading || listLoading || itemsLoading) {
     return (
@@ -126,8 +222,7 @@ export default function GroceryListDetailScreen() {
   }
 
   const allItems = items ?? [];
-  const filtered =
-    activeTab === "all" ? allItems : allItems.filter((i) => i.status === activeTab);
+  const filtered = activeTab === "all" ? allItems : allItems.filter((i) => i.status === activeTab);
 
   async function handleToggle(item: GroceryItemResponse) {
     const next = item.status === "bought" ? "pending" : "bought";
@@ -180,13 +275,74 @@ export default function GroceryListDetailScreen() {
             <SwipeableItem
               key={item.id}
               item={item}
+              selectMode={selectMode}
+              selected={selectedIds.includes(item.id)}
               onToggle={() => handleToggle(item)}
               onSwipeRight={() => handleSwipeRight(item)}
               onSwipeLeft={() => handleSwipeLeft(item)}
+              onLongPress={() => startSelect(item.id)}
+              onSelectToggle={() => toggleSelected(item.id)}
             />
           ))}
         </ScrollView>
       )}
+
+      {selectMode && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.deleteBtn, selectedIds.length === 0 && styles.deleteBtnDisabled]}
+            disabled={selectedIds.length === 0 || deleteItem.isPending}
+            onPress={() => void handleDeleteSelected()}
+          >
+            <Text style={styles.deleteBtnText}>
+              {deleteItem.isPending ? "Deleting…" : `Delete selected (${selectedIds.length})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <Modal
+        visible={renameVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRenameVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Rename list</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="List name"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => void handleConfirmRename()}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                onPress={() => setRenameVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  styles.modalConfirmBtn,
+                  (!renameText.trim() || renameList.isPending) && styles.modalConfirmDisabled,
+                ]}
+                disabled={!renameText.trim() || renameList.isPending}
+                onPress={() => void handleConfirmRename()}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {renameList.isPending ? "Saving…" : "Confirm"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -227,7 +383,62 @@ const styles = StyleSheet.create({
   itemNameBought: { textDecorationLine: "line-through", color: "#9ca3af" },
   itemNameSkipped: { color: "#9ca3af" },
   itemQty: { fontSize: 13, color: "#6b7280" },
+  itemRowSelected: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
+  checkbox: { fontSize: 20, marginRight: 12, color: "#2563eb" },
   emptyText: { fontSize: 15, color: "#6b7280" },
+  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerIconBtn: { marginRight: 12, paddingHorizontal: 4 },
+  headerIcon: { fontSize: 18 },
   headerBtn: { marginRight: 8 },
   headerBtnText: { fontSize: 15, fontWeight: "600", color: "#2563eb" },
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 28,
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  deleteBtn: {
+    backgroundColor: "#dc2626",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  deleteBtnDisabled: { backgroundColor: "#fca5a5" },
+  deleteBtnText: { color: "#ffffff", fontSize: 15, fontWeight: "600" },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 16 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 20,
+  },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 12 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 },
+  modalCancelBtn: { backgroundColor: "#f3f4f6" },
+  modalCancelText: { fontSize: 15, fontWeight: "600", color: "#374151" },
+  modalConfirmBtn: { backgroundColor: "#2563eb" },
+  modalConfirmDisabled: { backgroundColor: "#93c5fd" },
+  modalConfirmText: { fontSize: 15, fontWeight: "600", color: "#ffffff" },
 });

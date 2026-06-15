@@ -1,6 +1,7 @@
 import {
   useAddListItem,
   useCompleteList,
+  useDeleteListItem,
   useGroceryItems,
   useGroceryList,
   useUpdateListItem,
@@ -31,11 +32,13 @@ export function GroceryListPage() {
   const updateItem = useUpdateListItem(inventoryId, listId);
   const addItem = useAddListItem(inventoryId, listId);
   const completeList = useCompleteList(inventoryId, listId);
+  const deleteItem = useDeleteListItem(inventoryId, listId);
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [newUnit, setNewUnit] = useState("pcs");
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
 
   if (loadingList || loadingItems || !inventoryId) {
     return (
@@ -76,6 +79,16 @@ export function GroceryListPage() {
     void navigate({ to: "/grocery" });
   };
 
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleDeleteSelected = async () => {
+    const ids = [...checkedIds];
+    await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
+    setCheckedIds([]);
+  };
+
   const grouped = STATUS_ORDER.reduce<Record<ItemStatus, typeof items>>(
     (acc, status) => {
       acc[status] = (items ?? []).filter((i) => i.status === status);
@@ -102,6 +115,17 @@ export function GroceryListPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {checkedIds.length > 0 && (
+            <button
+              type="button"
+              data-testid="delete-selected"
+              onClick={() => void handleDeleteSelected()}
+              disabled={deleteItem.isPending}
+              className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              {deleteItem.isPending ? "Deleting…" : `Delete selected (${checkedIds.length})`}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowAdd((v) => !v)}
@@ -175,6 +199,14 @@ export function GroceryListPage() {
                   key={item.id}
                   className={`flex items-center gap-3 px-4 py-3 ${idx !== 0 ? "border-t" : ""}`}
                 >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${item.name}`}
+                    data-testid={`select-${item.id}`}
+                    checked={checkedIds.includes(item.id)}
+                    onChange={() => toggleChecked(item.id)}
+                    className="h-4 w-4 rounded border-input"
+                  />
                   <input
                     type="checkbox"
                     checked={item.status === "bought"}
