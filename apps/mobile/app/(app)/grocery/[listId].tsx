@@ -9,7 +9,7 @@ import {
 import type { GroceryItemResponse } from "@baskety/core";
 import { Badge, Spinner } from "@baskety/ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -145,16 +145,17 @@ export default function GroceryListDetailScreen() {
   // Multi-select state
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Keep the rename text input in sync when the list loads/changes.
   useEffect(() => {
     setRenameText(list?.name ?? "");
   }, [list?.name]);
 
-  function exitSelectMode() {
+  const exitSelectMode = useCallback(() => {
     setSelectMode(false);
     setSelectedIds([]);
-  }
+  }, []);
 
   function startSelect(id: string) {
     setSelectMode(true);
@@ -181,12 +182,15 @@ export default function GroceryListDetailScreen() {
 
   async function handleDeleteSelected() {
     const ids = [...selectedIds];
+    setIsDeleting(true);
     try {
       await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
     } catch {
-      // ignore
+      // individual errors surfaced via TanStack Query error state
+    } finally {
+      setIsDeleting(false);
+      exitSelectMode();
     }
-    exitSelectMode();
   }
 
   useEffect(() => {
@@ -211,7 +215,7 @@ export default function GroceryListDetailScreen() {
           </View>
         ),
     });
-  }, [list?.name, listId, navigation, selectMode]);
+  }, [exitSelectMode, list?.name, listId, navigation, selectMode]);
 
   if (invLoading || listLoading || itemsLoading) {
     return (
@@ -280,7 +284,7 @@ export default function GroceryListDetailScreen() {
               onToggle={() => handleToggle(item)}
               onSwipeRight={() => handleSwipeRight(item)}
               onSwipeLeft={() => handleSwipeLeft(item)}
-              onLongPress={() => startSelect(item.id)}
+              onLongPress={() => (selectMode ? toggleSelected(item.id) : startSelect(item.id))}
               onSelectToggle={() => toggleSelected(item.id)}
             />
           ))}
@@ -291,11 +295,11 @@ export default function GroceryListDetailScreen() {
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={[styles.deleteBtn, selectedIds.length === 0 && styles.deleteBtnDisabled]}
-            disabled={selectedIds.length === 0 || deleteItem.isPending}
+            disabled={selectedIds.length === 0 || isDeleting}
             onPress={() => void handleDeleteSelected()}
           >
             <Text style={styles.deleteBtnText}>
-              {deleteItem.isPending ? "Deleting…" : `Delete selected (${selectedIds.length})`}
+              {isDeleting ? "Deleting…" : `Delete selected (${selectedIds.length})`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -305,7 +309,10 @@ export default function GroceryListDetailScreen() {
         visible={renameVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setRenameVisible(false)}
+        onRequestClose={() => {
+          setRenameVisible(false);
+          setRenameText(list?.name ?? "");
+        }}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -322,7 +329,10 @@ export default function GroceryListDetailScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalCancelBtn]}
-                onPress={() => setRenameVisible(false)}
+                onPress={() => {
+                  setRenameVisible(false);
+                  setRenameText(list?.name ?? "");
+                }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>

@@ -4,6 +4,7 @@ import {
   useDeleteListItem,
   useGroceryItems,
   useGroceryList,
+  useRenameList,
   useUpdateListItem,
 } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -33,12 +34,16 @@ export function GroceryListPage() {
   const addItem = useAddListItem(inventoryId, listId);
   const completeList = useCompleteList(inventoryId, listId);
   const deleteItem = useDeleteListItem(inventoryId, listId);
+  const renameList = useRenameList(inventoryId, listId);
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [newUnit, setNewUnit] = useState("pcs");
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameText, setRenameText] = useState("");
 
   if (loadingList || loadingItems || !inventoryId) {
     return (
@@ -85,8 +90,39 @@ export function GroceryListPage() {
 
   const handleDeleteSelected = async () => {
     const ids = [...checkedIds];
-    await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
-    setCheckedIds([]);
+    setIsDeleting(true);
+    try {
+      await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
+    } catch {
+      // individual errors surfaced via TanStack Query error state
+    } finally {
+      setIsDeleting(false);
+      setCheckedIds([]);
+    }
+  };
+
+  const handleRenameOpen = () => {
+    setRenameText(list?.name ?? "");
+    setRenameDialogOpen(true);
+  };
+
+  const handleRenameConfirm = async () => {
+    const name = renameText.trim();
+    if (!name) {
+      setRenameDialogOpen(false);
+      return;
+    }
+    try {
+      await renameList.mutateAsync(name);
+    } catch {
+      // ignore
+    }
+    setRenameDialogOpen(false);
+  };
+
+  const handleRenameCancel = () => {
+    setRenameText(list?.name ?? "");
+    setRenameDialogOpen(false);
   };
 
   const grouped = STATUS_ORDER.reduce<Record<ItemStatus, typeof items>>(
@@ -108,8 +144,16 @@ export function GroceryListPage() {
       </button>
 
       <div className="mb-6 flex items-start justify-between">
-        <div>
+        <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{list.name}</h1>
+          <button
+            type="button"
+            aria-label="Rename list"
+            onClick={handleRenameOpen}
+            className="rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            ✏️
+          </button>
           <p className="mt-1 text-sm text-muted-foreground">
             {new Date(list.created_at).toLocaleDateString()}
           </p>
@@ -120,10 +164,10 @@ export function GroceryListPage() {
               type="button"
               data-testid="delete-selected"
               onClick={() => void handleDeleteSelected()}
-              disabled={deleteItem.isPending}
+              disabled={isDeleting}
               className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
-              {deleteItem.isPending ? "Deleting…" : `Delete selected (${checkedIds.length})`}
+              {isDeleting ? "Deleting…" : `Delete selected (${checkedIds.length})`}
             </button>
           )}
           <button
@@ -209,6 +253,7 @@ export function GroceryListPage() {
                   />
                   <input
                     type="checkbox"
+                    aria-label={`Mark ${item.name} as bought`}
                     checked={item.status === "bought"}
                     onChange={() => handleToggle(item.id, item.status as ItemStatus)}
                     className="h-4 w-4 rounded border-input"
@@ -234,6 +279,46 @@ export function GroceryListPage() {
 
       {(items ?? []).length === 0 && (
         <p className="py-12 text-center text-muted-foreground">No items yet. Add one above.</p>
+      )}
+
+      {renameDialogOpen && (
+        <dialog
+          open
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          aria-label="Rename list dialog"
+        >
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="mb-4 text-lg font-semibold">Rename list</h2>
+            <input
+              autoFocus
+              value={renameText}
+              onChange={(e) => setRenameText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleRenameConfirm();
+                if (e.key === "Escape") handleRenameCancel();
+              }}
+              placeholder="List name"
+              className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleRenameCancel}
+                className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRenameConfirm()}
+                disabled={!renameText.trim() || renameList.isPending}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {renameList.isPending ? "Saving…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </dialog>
       )}
     </div>
   );
