@@ -29,7 +29,7 @@ type mockRepo struct {
 	getBatchFn          func(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error)
 	listActiveBatchesFn func(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error)
 	markBatchEmptiedFn  func(ctx context.Context, id uuid.UUID) error
-	patchBatchFn        func(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error)
+	patchBatchFn        func(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error)
 }
 
 func (m *mockRepo) CreateInventory(ctx context.Context, householdID uuid.UUID, name string, description *string) (*inventory.Inventory, error) {
@@ -77,8 +77,8 @@ func (m *mockRepo) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*
 func (m *mockRepo) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
 	return m.markBatchEmptiedFn(ctx, id)
 }
-func (m *mockRepo) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time) (*inventory.InventoryBatch, error) {
-	return m.patchBatchFn(ctx, id, quantity, expiresAt)
+func (m *mockRepo) PatchBatch(ctx context.Context, id uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error) {
+	return m.patchBatchFn(ctx, id, quantity, expiresAt, notes)
 }
 
 func TestCreateInventory_Success(t *testing.T) {

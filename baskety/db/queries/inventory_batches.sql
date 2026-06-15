@@ -16,7 +16,10 @@ UPDATE inventory_batches SET emptied_at = NOW() WHERE id = $1;
 
 -- name: PatchBatch :one
 UPDATE inventory_batches
-SET quantity = $2, expires_at = $3
+SET
+  quantity   = $2,
+  expires_at = $3,
+  notes      = COALESCE(sqlc.narg('notes'), notes)
 WHERE id = $1 AND emptied_at IS NULL
 RETURNING *;
 

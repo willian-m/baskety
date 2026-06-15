@@ -263,6 +263,27 @@ func TestHandlePatchBatch(t *testing.T) {
 		assert.NotNil(t, resp["data"])
 	})
 
+	t.Run("notes updated", func(t *testing.T) {
+		svc := &mockService{
+			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, req inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+				return &inventory.BatchResponse{ID: batchID.String(), ItemID: itemID.String(), Quantity: req.Quantity, Notes: req.Notes}, nil
+			},
+		}
+		r := setupRouter(svc, hID)
+		note := "test note"
+		body, _ := json.Marshal(inventory.PatchBatchRequest{Quantity: 5, Notes: &note})
+		req := httptest.NewRequest(http.MethodPatch, "/"+invID.String()+"/items/"+itemID.String()+"/batches/"+batchID.String(), bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var resp struct {
+			Data inventory.BatchResponse `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.NotNil(t, resp.Data.Notes)
+		assert.Equal(t, "test note", *resp.Data.Notes)
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		svc := &mockService{
 			patchBatchFn: func(_ context.Context, _, _, _ uuid.UUID, _ inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {

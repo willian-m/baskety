@@ -260,7 +260,7 @@ func (s *Service) PatchBatch(ctx context.Context, batchID, itemID, householdID u
 	if _, err := s.assertItemScope(ctx, itemID, householdID); err != nil {
 		return nil, err
 	}
-	batch, err := s.repo.PatchBatch(ctx, batchID, req.Quantity, req.ExpiresAt)
+	batch, err := s.repo.PatchBatch(ctx, batchID, req.Quantity, req.ExpiresAt, req.Notes)
 	if err != nil {
 		return nil, fmt.Errorf("patch batch: %w", err)
 	}
