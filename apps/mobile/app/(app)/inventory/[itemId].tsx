@@ -249,7 +249,7 @@ function EditItemModal({
   const [notes, setNotes] = useState(item.notes ?? "");
   const updateItem = useUpdateItem(inventoryId, item.id);
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     if (!name.trim() || !category.trim() || !unit.trim()) {
       Alert.alert("Required fields", "Name, category, and unit cannot be blank.");
       return;
@@ -274,7 +274,7 @@ function EditItemModal({
         },
       },
     );
-  }
+  }, [name, category, unit, targetQty, notes, updateItem, onClose]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -351,7 +351,7 @@ function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemI
     ({ item: batch }: { item: BatchResponse }) => (
       <BatchRow batch={batch} unit={item?.unit ?? ""} onEdit={() => setEditingBatch(batch)} />
     ),
-    [item?.unit, setEditingBatch],
+    [item?.unit],
   );
 
   if (itemLoading || batchesLoading) {
