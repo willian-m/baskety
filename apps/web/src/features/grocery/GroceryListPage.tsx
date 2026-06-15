@@ -63,12 +63,14 @@ export function GroceryListPage() {
     if (!el) return;
 
     const appRoot = document.getElementById("root") ?? document.body;
-    const siblings = Array.from(appRoot.children).filter(
-      (child) => !el.contains(child) && child !== el.closest("[aria-modal]"),
-    );
+    const siblings = Array.from(appRoot.children).filter((child) => !child.contains(el));
     siblings.forEach((s) => s.setAttribute("aria-hidden", "true"));
 
-    const focusable = Array.from(el.querySelectorAll<HTMLElement>("input, button"));
+    const focusable = Array.from(
+      el.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    );
     triggerRef.current = document.activeElement;
     focusable[0]?.focus();
     const handleKey = (e: KeyboardEvent) => {
@@ -173,10 +175,10 @@ export function GroceryListPage() {
     }
     try {
       await renameList.mutateAsync(name);
+      setRenameDialogOpen(false);
     } catch {
-      // ignore
+      // Keep the dialog open on failure; error surfaced via renameList.isError
     }
-    setRenameDialogOpen(false);
   };
 
   const grouped = STATUS_ORDER.reduce<Record<ItemStatus, typeof items>>(
@@ -323,8 +325,12 @@ export function GroceryListPage() {
                   aria-label={item.name}
                   className={`flex items-center gap-3 px-4 py-3 ${idx !== 0 ? "border-t" : ""}`}
                 >
+                  <span aria-hidden="true" className="sr-only">
+                    Select
+                  </span>
                   <input
                     type="checkbox"
+                    title="Select for deletion"
                     aria-label={`Select ${item.name}`}
                     data-testid={`select-${item.id}`}
                     checked={checkedIds.includes(item.id)}
@@ -333,6 +339,7 @@ export function GroceryListPage() {
                   />
                   <input
                     type="checkbox"
+                    title="Mark as bought"
                     aria-label={`Mark ${item.name} as bought`}
                     checked={item.status === "bought"}
                     onChange={() => handleToggle(item.id, item.status as ItemStatus)}
@@ -383,6 +390,11 @@ export function GroceryListPage() {
               placeholder="List name"
               className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
+            {renameList.isError && (
+              <p role="alert" className="mb-4 text-sm text-red-500">
+                Failed to rename. Please try again.
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 type="button"

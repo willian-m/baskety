@@ -294,7 +294,7 @@ export default function GroceryListDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.tabs}>
+      <View style={styles.tabs} accessibilityRole="tablist">
         {TABS.map((tab) => (
           <Pressable
             key={tab.key}
@@ -338,7 +338,10 @@ export default function GroceryListDetailScreen() {
             style={[styles.deleteBtn, selectedIds.length === 0 && styles.deleteBtnDisabled]}
             disabled={selectedIds.length === 0 || isDeleting}
             accessibilityLabel="Delete selected items"
-            accessibilityState={{ disabled: selectedIds.length === 0 || isDeleting }}
+            accessibilityState={{
+              disabled: selectedIds.length === 0 || isDeleting,
+              busy: isDeleting,
+            }}
             onPress={() => void handleDeleteSelected()}
           >
             <Text style={styles.deleteBtnText}>
