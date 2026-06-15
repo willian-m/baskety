@@ -199,10 +199,20 @@ export function useDeleteListItem(inventoryId: string, listId: string) {
       );
       return { previous };
     },
-    onError: (_err, _itemId, context) => {
-      if (context?.previous !== undefined) {
-        qc.setQueryData(itemsKey, context.previous);
-      }
+    onError: (_err, itemId, context) => {
+      const prev = context?.previous;
+      if (!prev) return;
+      qc.setQueryData<GroceryItemResponse[]>(itemsKey, (current) => {
+        if (!Array.isArray(current)) return current;
+        const already = current.find((it) => it.id === itemId);
+        if (already) return current; // already present, no-op
+        const originalIndex = prev.findIndex((it) => it.id === itemId);
+        const item = prev[originalIndex];
+        if (!item) return current;
+        const result = [...current];
+        result.splice(Math.min(originalIndex, result.length), 0, item);
+        return result;
+      });
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: itemsKey });

@@ -384,8 +384,18 @@ export default function GroceryListDetailScreen() {
           setRenameError(null);
         }}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} accessibilityViewIsModal={true}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => {
+            setRenameVisible(false);
+            setRenameError(null);
+          }}
+        >
+          <Pressable
+            style={styles.modalCard}
+            accessibilityViewIsModal={true}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text style={styles.modalTitle}>Rename list</Text>
             <TextInput
               style={styles.modalInput}
@@ -423,8 +433,8 @@ export default function GroceryListDetailScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
