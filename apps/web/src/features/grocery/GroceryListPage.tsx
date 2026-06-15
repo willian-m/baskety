@@ -206,6 +206,7 @@ export function GroceryListPage() {
               data-testid="delete-selected"
               onClick={() => void handleDeleteSelected()}
               disabled={isDeleting}
+              aria-busy={isDeleting}
               className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
             >
               {isDeleting ? "Deleting…" : `Delete selected (${checkedIds.length})`}
@@ -344,7 +345,6 @@ export function GroceryListPage() {
               Rename list
             </h2>
             <input
-              autoFocus
               aria-label="List name"
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}

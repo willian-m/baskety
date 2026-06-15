@@ -112,6 +112,7 @@ function SwipeableItem({
         onPress={onSelectToggle}
         onLongPress={onLongPress}
         accessibilityRole="checkbox"
+        accessibilityLabel={item.name}
         accessibilityState={{ checked: selected }}
       >
         {rowContent}
@@ -242,12 +243,18 @@ export default function GroceryListDetailScreen() {
           </Pressable>
         ) : (
           <View style={styles.headerActions}>
-            <Pressable onPress={() => setRenameVisible(true)} style={styles.headerIconBtn}>
+            <Pressable
+              onPress={() => setRenameVisible(true)}
+              style={styles.headerIconBtn}
+              accessibilityLabel="Rename list"
+              accessibilityRole="button"
+            >
               <Text style={styles.headerIcon}>✏️</Text>
             </Pressable>
             <Pressable
               onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
               style={styles.headerBtn}
+              accessibilityRole="button"
             >
               <Text style={styles.headerBtnText}>Start Trip</Text>
             </Pressable>
