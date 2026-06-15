@@ -9,7 +9,7 @@ import {
 } from "@baskety/core";
 import type { BatchResponse, InventoryItemResponse } from "@baskety/core";
 import { Button, Card, ExpiryBadge, Spinner, TextInput } from "@baskety/ui";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -369,7 +369,7 @@ function ItemRow({
 
   const isEditing = editingItemId === item.id;
 
-  const handleStartEdit = () => {
+  const handleStartEdit = useCallback(() => {
     // Reset local form state to current item values each time we enter edit
     setName(item.name);
     setCategory(item.category);
@@ -377,7 +377,7 @@ function ItemRow({
     setTargetQty(String(item.target_quantity));
     swipeableRef.current?.close();
     onStartEdit(item.id);
-  };
+  }, [item.name, item.category, item.unit, item.target_quantity, item.id, onStartEdit]);
 
   const handleSave = async () => {
     setSaveError(null);
@@ -399,10 +399,18 @@ function ItemRow({
     }
   };
 
-  const renderRightActions = () => (
-    <Pressable style={styles.swipeRightAction} onPress={handleStartEdit}>
-      <Text style={styles.swipeActionText}>Edit</Text>
-    </Pressable>
+  const renderRightActions = useCallback(
+    () => (
+      <Pressable
+        style={styles.swipeRightAction}
+        onPress={handleStartEdit}
+        accessibilityLabel="Edit item"
+        accessibilityRole="button"
+      >
+        <Text style={styles.swipeActionText}>Edit</Text>
+      </Pressable>
+    ),
+    [handleStartEdit],
   );
 
   if (isEditing) {
@@ -447,10 +455,17 @@ function ItemRow({
               style={[styles.saveButton, updateItem.isPending && { opacity: 0.5 }]}
               onPress={handleSave}
               disabled={updateItem.isPending}
+              accessibilityLabel="Save"
+              accessibilityRole="button"
             >
               <Text style={styles.saveButtonText}>Save</Text>
             </Pressable>
-            <Pressable style={styles.cancelButton} onPress={onCancelEdit}>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={onCancelEdit}
+              accessibilityLabel="Cancel"
+              accessibilityRole="button"
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
           </View>
@@ -542,6 +557,7 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
           style={styles.searchInput}
           autoCapitalize="none"
           clearButtonMode="while-editing"
+          accessibilityLabel="Search inventory items"
         />
         <View style={styles.addButtonWrap}>
           <Button
@@ -555,6 +571,8 @@ function InventoryListContent({ inventoryId }: { inventoryId: string }) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipRow}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Filter by category"
       >
         {categories.map((cat) => (
           <CategoryChip
