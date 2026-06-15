@@ -8,7 +8,7 @@ import {
   useUpdateListItem,
 } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
@@ -45,6 +45,10 @@ export function GroceryListPage() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameText, setRenameText] = useState("");
 
+  useEffect(() => {
+    setRenameText(list?.name ?? "");
+  }, [list?.name]);
+
   if (loadingList || loadingItems || !inventoryId) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -68,11 +72,15 @@ export function GroceryListPage() {
 
   const handleAddItem = async () => {
     if (!newName.trim()) return;
-    await addItem.mutateAsync({
-      name: newName.trim(),
-      quantity: parseFloat(newQty) || 1,
-      unit: newUnit,
-    });
+    try {
+      await addItem.mutateAsync({
+        name: newName.trim(),
+        quantity: parseFloat(newQty) || 1,
+        unit: newUnit,
+      });
+    } catch {
+      // individual errors surfaced via TanStack Query error state
+    }
     setNewName("");
     setNewQty("1");
     setNewUnit("pcs");
@@ -80,7 +88,11 @@ export function GroceryListPage() {
   };
 
   const handleComplete = async () => {
-    await completeList.mutateAsync();
+    try {
+      await completeList.mutateAsync();
+    } catch {
+      // individual errors surfaced via TanStack Query error state
+    }
     void navigate({ to: "/grocery" });
   };
 
@@ -196,6 +208,7 @@ export function GroceryListPage() {
           <div className="flex flex-wrap gap-2">
             <input
               autoFocus
+              aria-label="Item name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
@@ -205,12 +218,14 @@ export function GroceryListPage() {
               className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <input
+              aria-label="Quantity"
               type="number"
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
               className="flex h-9 w-20 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <input
+              aria-label="Unit"
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
               placeholder="Unit"
@@ -282,13 +297,16 @@ export function GroceryListPage() {
       )}
 
       {renameDialogOpen && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          aria-label="Rename list dialog"
-        >
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-semibold">Rename list</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-dialog-title"
+            className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
+          >
+            <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
+              Rename list
+            </h2>
             <input
               autoFocus
               value={renameText}
@@ -318,7 +336,7 @@ export function GroceryListPage() {
               </button>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
     </div>
   );

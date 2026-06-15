@@ -108,7 +108,12 @@ function SwipeableItem({
   // In select mode, disable swipe gestures so taps reliably toggle selection.
   if (selectMode) {
     return (
-      <TouchableOpacity onPress={onSelectToggle} onLongPress={onLongPress}>
+      <TouchableOpacity
+        onPress={onSelectToggle}
+        onLongPress={onLongPress}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected }}
+      >
         {rowContent}
       </TouchableOpacity>
     );
@@ -116,7 +121,7 @@ function SwipeableItem({
 
   return (
     <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-      <TouchableOpacity onPress={onToggle} onLongPress={onLongPress}>
+      <TouchableOpacity onPress={onToggle} onLongPress={onLongPress} accessibilityLabel={item.name}>
         {rowContent}
       </TouchableOpacity>
     </Animated.View>
@@ -261,6 +266,8 @@ export default function GroceryListDetailScreen() {
             key={tab.key}
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             onPress={() => setActiveTab(tab.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab.key }}
           >
             <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
               {tab.label}
