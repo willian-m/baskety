@@ -122,7 +122,13 @@ function SwipeableItem({
 
   return (
     <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
-      <TouchableOpacity onPress={onToggle} onLongPress={onLongPress} accessibilityLabel={item.name}>
+      <TouchableOpacity
+        onPress={onToggle}
+        onLongPress={onLongPress}
+        accessibilityLabel={item.name}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: item.status === "bought" }}
+      >
         {rowContent}
       </TouchableOpacity>
     </Animated.View>

@@ -233,7 +233,12 @@ export function GroceryListPage() {
       </div>
 
       {showAdd && (
-        <div className="mb-6 rounded-lg border p-4">
+        <div
+          className="mb-6 rounded-lg border p-4"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowAdd(false);
+          }}
+        >
           <h3 className="mb-3 font-medium">Add item</h3>
           <div className="flex flex-wrap gap-2">
             <input
@@ -329,17 +334,13 @@ export function GroceryListPage() {
       )}
 
       {renameDialogOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={handleRenameCancel}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="rename-dialog-title"
             className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
           >
             <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
               Rename list
