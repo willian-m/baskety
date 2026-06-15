@@ -9,6 +9,7 @@ import {
 } from "@baskety/core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
@@ -42,6 +43,8 @@ export function GroceryListPage() {
   const [newUnit, setNewUnit] = useState("pcs");
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameText, setRenameText] = useState("");
 
@@ -62,8 +65,7 @@ export function GroceryListPage() {
     const el = dialogRef.current;
     if (!el) return;
 
-    const appRoot = document.getElementById("root") ?? document.body;
-    const siblings = Array.from(appRoot.children).filter((child) => !child.contains(el));
+    const siblings = Array.from(document.body.children).filter((child) => !child.contains(el));
     siblings.forEach((s) => s.setAttribute("aria-hidden", "true"));
 
     const focusable = Array.from(
@@ -94,7 +96,10 @@ export function GroceryListPage() {
     return () => {
       siblings.forEach((s) => s.removeAttribute("aria-hidden"));
       document.removeEventListener("keydown", handleKey);
-      (triggerRef.current as HTMLElement | null)?.focus();
+      const node = triggerRef.current as HTMLElement | null;
+      if (node?.isConnected) {
+        node.focus();
+      }
     };
   }, [renameDialogOpen, handleRenameCancel]);
 
@@ -114,9 +119,14 @@ export function GroceryListPage() {
     );
   }
 
-  const handleToggle = (itemId: string, current: ItemStatus) => {
+  const handleToggle = async (itemId: string, current: ItemStatus) => {
     const next: ItemStatus = current === "pending" ? "bought" : "pending";
-    void updateItem.mutateAsync({ itemId, status: next });
+    setToggleError(null);
+    try {
+      await updateItem.mutateAsync({ itemId, status: next });
+    } catch {
+      setToggleError("Failed to update item.");
+    }
   };
 
   const handleAddItem = async () => {
@@ -152,13 +162,16 @@ export function GroceryListPage() {
   const handleDeleteSelected = async () => {
     const ids = [...checkedIds];
     setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
-    } catch {
-      // individual errors surfaced via TanStack Query error state
+      const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
+      const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+      setCheckedIds(failedIds);
+      if (failedIds.length > 0) {
+        setDeleteError("Failed to delete some items. Please try again.");
+      }
     } finally {
       setIsDeleting(false);
-      setCheckedIds([]);
     }
   };
 
@@ -170,7 +183,6 @@ export function GroceryListPage() {
   const handleRenameConfirm = async () => {
     const name = renameText.trim();
     if (!name) {
-      setRenameDialogOpen(false);
       return;
     }
     try {
@@ -216,16 +228,23 @@ export function GroceryListPage() {
         </div>
         <div className="flex gap-2">
           {checkedIds.length > 0 && (
-            <button
-              type="button"
-              data-testid="delete-selected"
-              onClick={() => void handleDeleteSelected()}
-              disabled={isDeleting}
-              aria-busy={isDeleting}
-              className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-            >
-              {isDeleting ? "Deleting…" : `Delete selected (${checkedIds.length})`}
-            </button>
+            <div className="flex flex-col items-end">
+              <button
+                type="button"
+                data-testid="delete-selected"
+                onClick={() => void handleDeleteSelected()}
+                disabled={isDeleting}
+                aria-busy={isDeleting}
+                className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting…" : `Delete selected (${checkedIds.length})`}
+              </button>
+              {deleteError && (
+                <p role="alert" className="mt-1 text-sm text-red-600">
+                  {deleteError}
+                </p>
+              )}
+            </div>
           )}
           <button
             type="button"
@@ -309,6 +328,12 @@ export function GroceryListPage() {
         </div>
       )}
 
+      {toggleError && (
+        <p role="alert" className="mb-4 text-sm text-red-600">
+          {toggleError}
+        </p>
+      )}
+
       {STATUS_ORDER.map((status) => {
         const group = grouped[status] ?? [];
         if (group.length === 0) return null;
@@ -325,18 +350,22 @@ export function GroceryListPage() {
                   aria-label={item.name}
                   className={`flex items-center gap-3 px-4 py-3 ${idx !== 0 ? "border-t" : ""}`}
                 >
-                  <span aria-hidden="true" className="sr-only">
-                    Select
-                  </span>
-                  <input
-                    type="checkbox"
+                  <label
+                    className="flex cursor-pointer items-center gap-1"
                     title="Select for deletion"
-                    aria-label={`Select ${item.name}`}
-                    data-testid={`select-${item.id}`}
-                    checked={checkedIds.includes(item.id)}
-                    onChange={() => toggleChecked(item.id)}
-                    className="h-4 w-4 rounded border-input"
-                  />
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${item.name} for deletion`}
+                      data-testid={`select-${item.id}`}
+                      checked={checkedIds.includes(item.id)}
+                      onChange={() => toggleChecked(item.id)}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    <span aria-hidden="true" className="text-xs text-gray-400">
+                      ✕
+                    </span>
+                  </label>
                   <input
                     type="checkbox"
                     title="Mark as bought"
@@ -368,53 +397,58 @@ export function GroceryListPage() {
         <p className="py-12 text-center text-muted-foreground">No items yet. Add one above.</p>
       )}
 
-      {renameDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rename-dialog-title"
-            className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
-          >
-            <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
-              Rename list
-            </h2>
-            <input
-              aria-label="List name"
-              value={renameText}
-              onChange={(e) => setRenameText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleRenameConfirm();
-              }}
-              placeholder="List name"
-              className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-            {renameList.isError && (
-              <p role="alert" className="mb-4 text-sm text-red-500">
-                Failed to rename. Please try again.
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleRenameCancel}
-                className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleRenameConfirm()}
-                disabled={!renameText.trim() || renameList.isPending}
-                className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {renameList.isPending ? "Saving…" : "Confirm"}
-              </button>
+      {renameDialogOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rename-dialog-title"
+              className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
+            >
+              <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
+                Rename list
+              </h2>
+              <input
+                aria-label="List name"
+                value={renameText}
+                onChange={(e) => setRenameText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (renameText.trim() === "") return;
+                    void handleRenameConfirm();
+                  }
+                }}
+                placeholder="List name"
+                className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              {renameList.isError && (
+                <p role="alert" className="mb-4 text-sm text-red-500">
+                  Failed to rename. Please try again.
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleRenameCancel}
+                  className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRenameConfirm()}
+                  disabled={!renameText.trim() || renameList.isPending}
+                  className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {renameList.isPending ? "Saving…" : "Confirm"}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -185,15 +185,27 @@ export function useArchiveList(inventoryId: string, listId: string) {
 
 export function useDeleteListItem(inventoryId: string, listId: string) {
   const qc = useQueryClient();
+  const itemsKey = ["inventories", inventoryId, "lists", listId, "items"] as const;
   return useMutation({
     mutationFn: (itemId: string) =>
       request<void>(`/inventories/${inventoryId}/lists/${listId}/items/${itemId}`, {
         method: "DELETE",
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({
-        queryKey: ["inventories", inventoryId, "lists", listId, "items"],
-      });
+    onMutate: async (itemId: string) => {
+      await qc.cancelQueries({ queryKey: itemsKey });
+      const previous = qc.getQueryData<GroceryItemResponse[]>(itemsKey);
+      qc.setQueryData<GroceryItemResponse[]>(itemsKey, (old) =>
+        old?.filter((item) => item.id !== itemId),
+      );
+      return { previous };
+    },
+    onError: (_err, _itemId, context) => {
+      if (context?.previous !== undefined) {
+        qc.setQueryData(itemsKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: itemsKey });
     },
   });
 }

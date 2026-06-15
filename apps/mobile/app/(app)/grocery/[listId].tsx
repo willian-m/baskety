@@ -121,7 +121,7 @@ function SwipeableItem({
     return (
       <TouchableOpacity
         onPress={onSelectToggle}
-        onLongPress={onLongPress}
+        onLongPress={undefined}
         accessibilityRole="checkbox"
         accessibilityLabel={item.name}
         accessibilityState={{ checked: selected }}
@@ -163,12 +163,15 @@ export default function GroceryListDetailScreen() {
 
   // Rename modal state
   const [renameVisible, setRenameVisible] = useState(false);
-  const [renameText, setRenameText] = useState(list?.name ?? "");
+  const [renameText, setRenameText] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   // Multi-select state
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   // Keep the rename text input in sync when the list loads/changes.
   useEffect(() => {
@@ -183,10 +186,11 @@ export default function GroceryListDetailScreen() {
   const handleToggle = useCallback(
     async (item: GroceryItemResponse) => {
       const next = item.status === "bought" ? "pending" : "bought";
+      setToggleError(null);
       try {
         await updateItem.mutateAsync({ itemId: item.id, status: next });
       } catch {
-        // ignore
+        setToggleError("Failed to update item.");
       }
     },
     [updateItem],
@@ -194,10 +198,11 @@ export default function GroceryListDetailScreen() {
 
   const handleSwipeRight = useCallback(
     async (item: GroceryItemResponse) => {
+      setToggleError(null);
       try {
         await updateItem.mutateAsync({ itemId: item.id, status: "bought" });
       } catch {
-        // ignore
+        setToggleError("Failed to update item.");
       }
     },
     [updateItem],
@@ -205,10 +210,11 @@ export default function GroceryListDetailScreen() {
 
   const handleSwipeLeft = useCallback(
     async (item: GroceryItemResponse) => {
+      setToggleError(null);
       try {
         await updateItem.mutateAsync({ itemId: item.id, status: "skipped" });
       } catch {
-        // ignore
+        setToggleError("Failed to update item.");
       }
     },
     [updateItem],
@@ -226,25 +232,30 @@ export default function GroceryListDetailScreen() {
   async function handleConfirmRename() {
     const name = renameText.trim();
     if (!name) {
-      setRenameVisible(false);
       return;
     }
+    setRenameError(null);
     try {
       await renameList.mutateAsync(name);
+      setRenameVisible(false);
     } catch {
-      // ignore
+      setRenameError("Failed to rename. Please try again.");
     }
-    setRenameVisible(false);
   }
 
   async function handleDeleteSelected() {
     const ids = [...selectedIds];
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
       const failed = ids.filter((_, i) => results[i].status === "rejected");
       setSelectedIds(failed);
-      if (failed.length === 0) exitSelectMode();
+      if (failed.length === 0) {
+        exitSelectMode();
+      } else {
+        setDeleteError("Some items could not be deleted.");
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -261,7 +272,10 @@ export default function GroceryListDetailScreen() {
         ) : (
           <View style={styles.headerActions}>
             <Pressable
-              onPress={() => setRenameVisible(true)}
+              onPress={() => {
+                setRenameError(null);
+                setRenameVisible(true);
+              }}
               style={styles.headerIconBtn}
               accessibilityLabel="Rename list"
               accessibilityRole="button"
@@ -310,12 +324,20 @@ export default function GroceryListDetailScreen() {
         ))}
       </View>
 
+      {toggleError && (
+        <Text style={styles.toggleError} accessibilityRole="alert">
+          {toggleError}
+        </Text>
+      )}
+
       {filtered.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyText}>No items in this view.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.listContent}>
+        <ScrollView
+          contentContainerStyle={[styles.listContent, selectMode && { paddingBottom: 80 }]}
+        >
           {filtered.map((item) => (
             <SwipeableItem
               key={item.id}
@@ -334,6 +356,7 @@ export default function GroceryListDetailScreen() {
 
       {selectMode && (
         <View style={styles.bottomBar}>
+          {deleteError && <Text style={{ color: "red", fontSize: 12 }}>{deleteError}</Text>}
           <TouchableOpacity
             style={[styles.deleteBtn, selectedIds.length === 0 && styles.deleteBtnDisabled]}
             disabled={selectedIds.length === 0 || isDeleting}
@@ -358,10 +381,11 @@ export default function GroceryListDetailScreen() {
         onRequestClose={() => {
           setRenameVisible(false);
           setRenameText(list?.name ?? "");
+          setRenameError(null);
         }}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={styles.modalCard} accessibilityViewIsModal={true}>
             <Text style={styles.modalTitle}>Rename list</Text>
             <TextInput
               style={styles.modalInput}
@@ -373,12 +397,14 @@ export default function GroceryListDetailScreen() {
               returnKeyType="done"
               onSubmitEditing={() => void handleConfirmRename()}
             />
+            {renameError && <Text style={{ color: "red", fontSize: 12 }}>{renameError}</Text>}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalCancelBtn]}
                 onPress={() => {
                   setRenameVisible(false);
                   setRenameText(list?.name ?? "");
+                  setRenameError(null);
                 }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
@@ -443,6 +469,12 @@ const styles = StyleSheet.create({
   itemRowSelected: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
   checkbox: { fontSize: 20, marginRight: 12, color: "#2563eb" },
   emptyText: { fontSize: 15, color: "#6b7280" },
+  toggleError: {
+    color: "#dc2626",
+    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
   headerActions: { flexDirection: "row", alignItems: "center" },
   headerIconBtn: { marginRight: 12, paddingHorizontal: 4 },
   headerIcon: { fontSize: 18 },
