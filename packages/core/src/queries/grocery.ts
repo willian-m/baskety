@@ -197,3 +197,40 @@ export function useArchiveList(inventoryId: string, listId: string) {
     },
   });
 }
+
+export function useDeleteListItem(inventoryId: string, listId: string) {
+  const qc = useQueryClient();
+  const itemsKey = ["inventories", inventoryId, "lists", listId, "items"] as const;
+  return useMutation({
+    mutationFn: (itemId: string) =>
+      request<void>(`/inventories/${inventoryId}/lists/${listId}/items/${itemId}`, {
+        method: "DELETE",
+      }),
+    onMutate: async (itemId: string) => {
+      await qc.cancelQueries({ queryKey: itemsKey });
+      const previous = qc.getQueryData<GroceryItemResponse[]>(itemsKey);
+      qc.setQueryData<GroceryItemResponse[]>(itemsKey, (old) =>
+        old?.filter((item) => item.id !== itemId),
+      );
+      return { previous };
+    },
+    onError: (_err, itemId, context) => {
+      const prev = context?.previous;
+      if (!prev) return;
+      qc.setQueryData<GroceryItemResponse[]>(itemsKey, (current) => {
+        if (!Array.isArray(current)) return current;
+        const already = current.find((it) => it.id === itemId);
+        if (already) return current; // already present, no-op
+        const originalIndex = prev.findIndex((it) => it.id === itemId);
+        const item = prev[originalIndex];
+        if (!item) return current;
+        const result = [...current];
+        result.splice(Math.min(originalIndex, result.length), 0, item);
+        return result;
+      });
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: itemsKey });
+    },
+  });
+}
