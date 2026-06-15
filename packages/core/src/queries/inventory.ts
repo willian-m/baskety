@@ -198,14 +198,16 @@ export function usePatchBatch(inventoryId: string, itemId: string) {
       batchId,
       quantity,
       expires_at,
+      notes,
     }: {
       batchId: string;
       quantity: number;
       expires_at: string | null;
+      notes?: string | null;
     }) =>
       request<BatchResponse>(`/inventories/${inventoryId}/items/${itemId}/batches/${batchId}`, {
         method: "PATCH",
-        body: JSON.stringify({ quantity, expires_at }),
+        body: JSON.stringify({ quantity, expires_at, notes }),
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });

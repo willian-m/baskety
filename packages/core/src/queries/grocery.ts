@@ -129,6 +129,21 @@ export function useUpdateListItem(inventoryId: string, listId: string) {
   });
 }
 
+export function useDeleteListItem(inventoryId: string, listId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) =>
+      request<void>(`/inventories/${inventoryId}/lists/${listId}/items/${itemId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: ["inventories", inventoryId, "lists", listId, "items"],
+      });
+    },
+  });
+}
+
 export function useAutoGenerateList(inventoryId: string) {
   const qc = useQueryClient();
   return useMutation({
