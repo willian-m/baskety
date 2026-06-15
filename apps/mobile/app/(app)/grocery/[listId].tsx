@@ -9,7 +9,7 @@ import {
 import type { GroceryItemResponse } from "@baskety/core";
 import { Badge, Spinner } from "@baskety/ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -63,6 +63,16 @@ function SwipeableItem({
   const translateX = useRef(new Animated.Value(0)).current;
   const THRESHOLD = 60;
 
+  const onToggleRef = useRef(onToggle);
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onSwipeRightRef = useRef(onSwipeRight);
+
+  useLayoutEffect(() => {
+    onToggleRef.current = onToggle;
+    onSwipeLeftRef.current = onSwipeLeft;
+    onSwipeRightRef.current = onSwipeRight;
+  });
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
@@ -73,12 +83,13 @@ function SwipeableItem({
       onPanResponderRelease: (_, gs) => {
         if (gs.dx > THRESHOLD) {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          onSwipeRight();
+          onSwipeRightRef.current();
         } else if (gs.dx < -THRESHOLD) {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          onSwipeLeft();
+          onSwipeLeftRef.current();
         } else {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          onToggleRef.current();
         }
       },
     }),
@@ -230,12 +241,12 @@ export default function GroceryListDetailScreen() {
     const ids = [...selectedIds];
     setIsDeleting(true);
     try {
-      await Promise.all(ids.map((id) => deleteItem.mutateAsync(id)));
-    } catch {
-      // individual errors surfaced via TanStack Query error state
+      const results = await Promise.allSettled(ids.map((id) => deleteItem.mutateAsync(id)));
+      const failed = ids.filter((_, i) => results[i].status === "rejected");
+      setSelectedIds(failed);
+      if (failed.length === 0) exitSelectMode();
     } finally {
       setIsDeleting(false);
-      exitSelectMode();
     }
   }
 
@@ -261,6 +272,7 @@ export default function GroceryListDetailScreen() {
               onPress={() => router.push(`/(app)/grocery/${listId}/trip`)}
               style={styles.headerBtn}
               accessibilityRole="button"
+              accessibilityLabel="Start trip"
             >
               <Text style={styles.headerBtnText}>Start Trip</Text>
             </Pressable>

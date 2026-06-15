@@ -60,6 +60,13 @@ export function GroceryListPage() {
     if (!renameDialogOpen) return;
     const el = dialogRef.current;
     if (!el) return;
+
+    const appRoot = document.getElementById("root") ?? document.body;
+    const siblings = Array.from(appRoot.children).filter(
+      (child) => !el.contains(child) && child !== el.closest("[aria-modal]"),
+    );
+    siblings.forEach((s) => s.setAttribute("aria-hidden", "true"));
+
     const focusable = Array.from(el.querySelectorAll<HTMLElement>("input, button"));
     focusable[0]?.focus();
     const handleKey = (e: KeyboardEvent) => {
@@ -80,7 +87,10 @@ export function GroceryListPage() {
       }
     };
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    return () => {
+      siblings.forEach((s) => s.removeAttribute("aria-hidden"));
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [renameDialogOpen, handleRenameCancel]);
 
   if (loadingList || loadingItems || !inventoryId) {
@@ -112,13 +122,13 @@ export function GroceryListPage() {
         quantity: parseFloat(newQty) || 1,
         unit: newUnit,
       });
+      setNewName("");
+      setNewQty("1");
+      setNewUnit("pcs");
+      setShowAdd(false);
     } catch {
       // individual errors surfaced via TanStack Query error state
     }
-    setNewName("");
-    setNewQty("1");
-    setNewUnit("pcs");
-    setShowAdd(false);
   };
 
   const handleComplete = async () => {
@@ -215,25 +225,35 @@ export function GroceryListPage() {
           <button
             type="button"
             onClick={() => setShowAdd((v) => !v)}
+            aria-expanded={showAdd}
+            aria-controls="add-item-panel"
             className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
           >
             Add item
           </button>
           {list.status === "active" && (
-            <button
-              type="button"
-              onClick={() => void handleComplete()}
-              disabled={completeList.isPending}
-              className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {completeList.isPending ? "Completing…" : "Complete list"}
-            </button>
+            <div className="flex flex-col items-end">
+              <button
+                type="button"
+                onClick={() => void handleComplete()}
+                disabled={completeList.isPending}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {completeList.isPending ? "Completing…" : "Complete list"}
+              </button>
+              {completeList.isError && (
+                <p role="alert" className="mt-1 text-sm text-red-500">
+                  Failed to complete list. Please try again.
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>
 
       {showAdd && (
         <div
+          id="add-item-panel"
           className="mb-6 rounded-lg border p-4"
           onKeyDown={(e) => {
             if (e.key === "Escape") setShowAdd(false);
@@ -276,6 +296,11 @@ export function GroceryListPage() {
               {addItem.isPending ? "Adding…" : "Add"}
             </button>
           </div>
+          {addItem.isError && (
+            <p role="alert" className="mt-1 text-sm text-red-500">
+              Failed to add item. Please try again.
+            </p>
+          )}
         </div>
       )}
 
