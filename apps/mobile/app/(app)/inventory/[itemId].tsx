@@ -10,7 +10,7 @@ import {
 import type { BatchResponse, InventoryItemResponse } from "@baskety/core";
 import { Button, Card, ExpiryBadge, Spinner, TextInput } from "@baskety/ui";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -53,7 +53,12 @@ function BatchRow({
         <View style={styles.batchHeaderRight}>
           <ExpiryBadge expiresAt={batch.expires_at} />
           {onEdit ? (
-            <Pressable onPress={onEdit} style={styles.batchEditBtn} accessibilityLabel="Edit batch">
+            <Pressable
+              onPress={onEdit}
+              style={styles.batchEditBtn}
+              accessibilityLabel="Edit batch"
+              accessibilityRole="button"
+            >
               <Text style={styles.batchEditIcon}>✏️</Text>
             </Pressable>
           ) : null}
@@ -154,7 +159,7 @@ function EditBatchModal({
   const [notes, setNotes] = useState(batch.notes ?? "");
   const patchBatch = usePatchBatch(inventoryId, itemId);
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     const qty = parseFloat(quantity);
     if (isNaN(qty) || qty <= 0) {
       Alert.alert("Invalid quantity", "Please enter a positive number.");
@@ -176,8 +181,9 @@ function EditBatchModal({
     } catch {
       Alert.alert("Error", "Failed to update batch.");
     }
-  }
+  }, [quantity, expiresAt, notes, patchBatch, onClose, batch.id]);
 
+  // Modal is always visible when mounted; mount/unmount is controlled by the parent via key prop
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -316,28 +322,14 @@ function EditItemModal({
   );
 }
 
+const BatchSeparator = () => <View style={styles.separator} />;
+
 function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemId: string }) {
   const { data: item, isLoading: itemLoading } = useInventoryItem(inventoryId, itemId);
   const { data: batches, isLoading: batchesLoading } = useBatches(inventoryId, itemId);
   const deleteItem = useDeleteItem(inventoryId);
   const [editVisible, setEditVisible] = useState(false);
   const [editingBatch, setEditingBatch] = useState<BatchResponse | null>(null);
-
-  if (itemLoading || batchesLoading) {
-    return (
-      <View style={styles.centered}>
-        <Spinner />
-      </View>
-    );
-  }
-
-  if (!item) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Item not found.</Text>
-      </View>
-    );
-  }
 
   function handleDelete() {
     Alert.alert("Delete item", `Are you sure you want to delete "${item!.name}"?`, [
@@ -355,17 +347,50 @@ function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemI
     ]);
   }
 
+  const renderBatchItem = useCallback(
+    ({ item: batch }: { item: BatchResponse }) => (
+      <BatchRow batch={batch} unit={item?.unit ?? ""} onEdit={() => setEditingBatch(batch)} />
+    ),
+    [item?.unit, setEditingBatch],
+  );
+
+  if (itemLoading || batchesLoading) {
+    return (
+      <View style={styles.centered}>
+        <Spinner />
+      </View>
+    );
+  }
+
+  if (!item) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Item not found.</Text>
+      </View>
+    );
+  }
+
   const activeBatches = (batches ?? []).filter((b) => b.emptied_at === null);
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.detailContent}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
+      <Pressable
+        onPress={() => router.back()}
+        style={styles.backBtn}
+        accessibilityLabel="Go back"
+        accessibilityRole="button"
+      >
         <Text style={styles.backBtnLabel}>← Back</Text>
       </Pressable>
       <Card>
         <View style={styles.detailHeader}>
           <Text style={styles.itemName}>{item.name}</Text>
-          <Pressable onPress={() => setEditVisible(true)} style={styles.editBtn}>
+          <Pressable
+            onPress={() => setEditVisible(true)}
+            style={styles.editBtn}
+            accessibilityLabel="Edit item"
+            accessibilityRole="button"
+          >
             <Text style={styles.editBtnLabel}>Edit</Text>
           </Pressable>
         </View>
@@ -384,10 +409,8 @@ function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemI
         <FlatList
           data={activeBatches}
           keyExtractor={(b) => b.id}
-          renderItem={({ item: batch }) => (
-            <BatchRow batch={batch} unit={item.unit} onEdit={() => setEditingBatch(batch)} />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={renderBatchItem}
+          ItemSeparatorComponent={BatchSeparator}
           scrollEnabled={false}
         />
       )}
@@ -416,6 +439,7 @@ function ItemDetailContent({ inventoryId, itemId }: { inventoryId: string; itemI
 
       {editingBatch !== null ? (
         <EditBatchModal
+          key={editingBatch.id}
           batch={editingBatch}
           inventoryId={inventoryId}
           itemId={itemId}
