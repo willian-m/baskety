@@ -238,31 +238,92 @@ describe("InventoryTable", () => {
     expect(addBatch.mock.calls[0]![0]).toMatchObject({ quantity: 3 });
   });
 
-  describe("20.3 — Category datalist", () => {
-    it("renders a <datalist id='category-suggestions'> element", async () => {
+  describe("category combobox", () => {
+    it("does not render a <datalist> element", async () => {
       renderTable();
       await screen.findByText("Rice");
-      const datalist = document.getElementById("category-suggestions");
-      expect(datalist).toBeInTheDocument();
-      expect(datalist!.tagName.toLowerCase()).toBe("datalist");
+      expect(document.getElementById("category-suggestions")).not.toBeInTheDocument();
     });
 
-    it("populates the datalist with real category values, not 'Uncategorized'", async () => {
-      renderTable();
-      await screen.findByText("Rice");
-      const datalist = document.getElementById("category-suggestions")!;
-      const options = Array.from(datalist.querySelectorAll("option")).map((o) => o.value);
-      expect(options).toContain("Dairy");
-      expect(options).toContain("Non perishable");
-      expect(options).not.toContain("Uncategorized");
-    });
-
-    it("category input in edit mode has list='category-suggestions'", async () => {
+    it("category input in edit mode has no list attribute", async () => {
       const user = userEvent.setup();
       renderTable();
       await user.click(await screen.findByText("Rice"));
       const categoryInput = await screen.findByLabelText("Category");
-      expect(categoryInput).toHaveAttribute("list", "category-suggestions");
+      expect(categoryInput).not.toHaveAttribute("list");
+    });
+
+    it("focusing the category input in edit mode opens a dropdown with existing categories", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await user.click(await screen.findByText("Rice"));
+      const categoryInput = await screen.findByLabelText("Category");
+      await user.click(categoryInput);
+      expect(await screen.findByRole("listbox")).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Dairy" })).toBeInTheDocument();
+    });
+
+    it("clicking a dropdown suggestion updates the category field", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await user.click(await screen.findByText("Rice"));
+      const categoryInput = await screen.findByLabelText("Category");
+      await user.click(categoryInput);
+      await user.click(await screen.findByRole("option", { name: "Dairy" }));
+      expect(categoryInput).toHaveValue("Dairy");
+    });
+  });
+
+  describe("category header rename", () => {
+    it("clicking a category header reveals an input pre-filled with the category name", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await user.click(await screen.findByText("Dairy"));
+      const input = await screen.findByLabelText("Rename category Dairy");
+      expect(input).toHaveValue("Dairy");
+    });
+
+    it("pressing Escape while renaming cancels without calling the API", async () => {
+      const user = userEvent.setup();
+      const update = vi.fn();
+      server.use(
+        http.put(`${BASE}/inventories/:invId/items/:itemId`, async ({ request }) => {
+          update(await request.json());
+          return HttpResponse.json({ data: inventoryItemFixture() });
+        }),
+      );
+      renderTable();
+      await user.click(await screen.findByText("Dairy"));
+      const input = await screen.findByLabelText("Rename category Dairy");
+      await user.clear(input);
+      await user.type(input, "Fresh");
+      await user.keyboard("{Escape}");
+      await waitFor(() => {
+        expect(screen.queryByLabelText("Rename category Dairy")).not.toBeInTheDocument();
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("pressing Enter renames all items in the category via PUT requests", async () => {
+      const user = userEvent.setup();
+      const update = vi.fn();
+      server.use(
+        http.put(`${BASE}/inventories/:invId/items/:itemId`, async ({ request }) => {
+          update(await request.json());
+          return HttpResponse.json({ data: inventoryItemFixture() });
+        }),
+      );
+      renderTable();
+      await user.click(await screen.findByText("Non perishable"));
+      const input = await screen.findByLabelText("Rename category Non perishable");
+      await user.clear(input);
+      await user.type(input, "Pantry");
+      await user.keyboard("{Enter}");
+      await waitFor(() => {
+        // "Non perishable" has Rice + Beans → 2 PUT calls
+        expect(update).toHaveBeenCalledTimes(2);
+      });
+      expect(update.mock.calls.every((c) => c[0].category === "Pantry")).toBe(true);
     });
   });
 
@@ -503,6 +564,108 @@ describe("InventoryTable", () => {
     expect(patchBatch.mock.calls[0]![0]).toMatchObject({ quantity: 5 });
   });
 
+  describe("checkbox select + per-row trash icon", () => {
+    it("renders a select checkbox for each item row", async () => {
+      renderTable();
+      await screen.findByText("Rice");
+      expect(screen.getByRole("checkbox", { name: "Select Rice" })).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Select Beans" })).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Select Milk" })).toBeInTheDocument();
+    });
+
+    it("clicking an item checkbox selects it and shows the bulk delete button", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await screen.findByText("Rice");
+
+      const riceCheckbox = screen.getByRole("checkbox", { name: "Select Rice" });
+      await user.click(riceCheckbox);
+
+      expect(riceCheckbox).toBeChecked();
+      expect(await screen.findByRole("button", { name: /Delete 1 item/ })).toBeInTheDocument();
+    });
+
+    it("clicking a selected checkbox deselects it and hides the delete button", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await screen.findByText("Rice");
+
+      const riceCheckbox = screen.getByRole("checkbox", { name: "Select Rice" });
+      await user.click(riceCheckbox);
+      await user.click(riceCheckbox);
+
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: /Delete \d+ items?/ })).not.toBeInTheDocument();
+      });
+      expect(riceCheckbox).not.toBeChecked();
+    });
+
+    it("select-all header checkbox selects all visible items", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await screen.findByText("Rice");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select all items" }));
+      expect(await screen.findByRole("button", { name: /Delete 3 items/ })).toBeInTheDocument();
+    });
+
+    it("select-all deselects all when all items are already selected", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await screen.findByText("Rice");
+
+      const selectAll = screen.getByRole("checkbox", { name: "Select all items" });
+      await user.click(selectAll);
+      await screen.findByRole("button", { name: /Delete 3 items/ });
+
+      await user.click(selectAll);
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: /Delete \d+ items?/ })).not.toBeInTheDocument();
+      });
+    });
+
+    it("renders a Delete button for each item row", async () => {
+      renderTable();
+      await screen.findByText("Rice");
+      expect(screen.getByRole("button", { name: "Delete Rice" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete Beans" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete Milk" })).toBeInTheDocument();
+    });
+
+    it("clicking the trash icon opens the confirmation modal for that single item", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await screen.findByText("Rice");
+
+      await user.click(screen.getByRole("button", { name: "Delete Rice" }));
+
+      const modal = await screen.findByRole("dialog");
+      expect(modal).toBeInTheDocument();
+      expect(within(modal).getByText(/Delete 1 item/)).toBeInTheDocument();
+      expect(within(modal).getByText(/irreversible/i)).toBeInTheDocument();
+    });
+
+    it("confirming delete via trash icon calls the API for exactly that item only", async () => {
+      const user = userEvent.setup();
+      const deleteHandler = vi.fn();
+      server.use(
+        http.delete(`${BASE}/inventories/:invId/items/:itemId`, ({ params }) => {
+          deleteHandler(params.itemId);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      renderTable();
+      await screen.findByText("Rice");
+
+      await user.click(screen.getByRole("button", { name: "Delete Rice" }));
+      const modal = await screen.findByRole("dialog");
+      await user.click(within(modal).getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(deleteHandler).toHaveBeenCalledTimes(1));
+      expect(deleteHandler).toHaveBeenCalledWith("item-rice");
+    });
+  });
+
   it("search-to-add: typing an unmatched name then 'Add this item' shows a pre-filled row and saving calls useCreateItem", async () => {
     const user = userEvent.setup();
     const create = vi.fn();
@@ -538,5 +701,125 @@ describe("InventoryTable", () => {
       expect(create).toHaveBeenCalledTimes(1);
     });
     expect(create.mock.calls[0]![0]).toMatchObject({ name: "Quinoa", unit: "kg" });
+  });
+
+  describe("batch removal", () => {
+    function setupBatchRemovalHandlers(batchId = "batch-rm-1") {
+      server.use(
+        http.get(`${BASE}/inventories/:invId/items/:itemId/batches`, () =>
+          HttpResponse.json({
+            data: [
+              batchFixture({ id: batchId, quantity: 2 }),
+              batchFixture({ id: "batch-rm-2", quantity: 1 }),
+            ],
+          }),
+        ),
+      );
+    }
+
+    async function expandMilkBatches(user: ReturnType<typeof userEvent.setup>) {
+      renderTable();
+      const expandBtn = await screen.findByRole("button", { name: "Expand batches" });
+      await user.click(expandBtn);
+      await screen.findByText(/└ Batch 2 L/);
+    }
+
+    it("each expanded batch row has a remove-batch button", async () => {
+      const user = userEvent.setup();
+      setupBatchRemovalHandlers();
+      await expandMilkBatches(user);
+
+      const removeBtns = screen.getAllByRole("button", { name: "Remove batch" });
+      expect(removeBtns).toHaveLength(2);
+    });
+
+    it("clicking remove-batch opens the choice modal", async () => {
+      const user = userEvent.setup();
+      setupBatchRemovalHandlers();
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByRole("button", { name: "Remove batch" })[0]!);
+
+      const modal = await screen.findByRole("dialog");
+      expect(within(modal).getByRole("button", { name: "Mark as consumed" })).toBeInTheDocument();
+      expect(within(modal).getByRole("button", { name: "Delete permanently" })).toBeInTheDocument();
+      expect(within(modal).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+
+    it("cancel closes the modal without making any request", async () => {
+      const user = userEvent.setup();
+      const emptied = vi.fn();
+      const deleted = vi.fn();
+      server.use(
+        http.post(`${BASE}/inventories/:invId/items/:itemId/batches/:batchId/empty`, () => {
+          emptied();
+          return new HttpResponse(null, { status: 200 });
+        }),
+        http.delete(`${BASE}/inventories/:invId/items/:itemId/batches/:batchId`, () => {
+          deleted();
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      setupBatchRemovalHandlers();
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByRole("button", { name: "Remove batch" })[0]!);
+      await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(emptied).not.toHaveBeenCalled();
+      expect(deleted).not.toHaveBeenCalled();
+    });
+
+    it('"Mark as consumed" calls the empty endpoint and closes the modal', async () => {
+      const user = userEvent.setup();
+      const emptied = vi.fn();
+      server.use(
+        http.post(
+          `${BASE}/inventories/:invId/items/:itemId/batches/:batchId/empty`,
+          ({ params }) => {
+            emptied(params.batchId);
+            return HttpResponse.json({ data: { status: "emptied" } });
+          },
+        ),
+      );
+      setupBatchRemovalHandlers("batch-rm-1");
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByRole("button", { name: "Remove batch" })[0]!);
+      await user.click(await screen.findByRole("button", { name: "Mark as consumed" }));
+
+      await waitFor(() => {
+        expect(emptied).toHaveBeenCalledTimes(1);
+      });
+      expect(emptied).toHaveBeenCalledWith("batch-rm-1");
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+    });
+
+    it('"Delete permanently" calls the delete endpoint and closes the modal', async () => {
+      const user = userEvent.setup();
+      const deleted = vi.fn();
+      server.use(
+        http.delete(`${BASE}/inventories/:invId/items/:itemId/batches/:batchId`, ({ params }) => {
+          deleted(params.batchId);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      setupBatchRemovalHandlers("batch-rm-1");
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByRole("button", { name: "Remove batch" })[0]!);
+      await user.click(await screen.findByRole("button", { name: "Delete permanently" }));
+
+      await waitFor(() => {
+        expect(deleted).toHaveBeenCalledTimes(1);
+      });
+      expect(deleted).toHaveBeenCalledWith("batch-rm-1");
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+    });
   });
 });

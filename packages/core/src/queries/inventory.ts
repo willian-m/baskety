@@ -136,6 +136,50 @@ export function useUpdateItem(inventoryId: string, itemId: string) {
   });
 }
 
+export function useRenameCategory(inventoryId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ items, to }: { to: string; items: InventoryItemResponse[] }) => {
+      await Promise.all(
+        items.map((item) =>
+          request<InventoryItemResponse>(`/inventories/${inventoryId}/items/${item.id}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              name: item.name,
+              category: to,
+              unit: item.unit,
+              target_quantity: item.target_quantity,
+              notes: item.notes ?? null,
+            }),
+          }),
+        ),
+      );
+    },
+    onMutate: async ({ items, to }) => {
+      await qc.cancelQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      const previous = qc.getQueryData<InventoryItemResponse[]>([
+        "inventories",
+        inventoryId,
+        "items",
+      ]);
+      const ids = new Set(items.map((i) => i.id));
+      qc.setQueryData<InventoryItemResponse[]>(
+        ["inventories", inventoryId, "items"],
+        (old) => old?.map((item) => (ids.has(item.id) ? { ...item, category: to } : item)) ?? [],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        qc.setQueryData(["inventories", inventoryId, "items"], context.previous);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
+    },
+  });
+}
+
 export function useDeleteItem(inventoryId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -208,6 +252,38 @@ export function usePatchBatch(inventoryId: string, itemId: string) {
       request<BatchResponse>(`/inventories/${inventoryId}/items/${itemId}/batches/${batchId}`, {
         method: "PATCH",
         body: JSON.stringify({ quantity, expires_at, notes }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      void qc.invalidateQueries({
+        queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
+      });
+    },
+  });
+}
+
+export function useMarkBatchEmptied(inventoryId: string, itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) =>
+      request<void>(`/inventories/${inventoryId}/items/${itemId}/batches/${batchId}/empty`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
+      void qc.invalidateQueries({
+        queryKey: ["inventories", inventoryId, "items", itemId, "batches"],
+      });
+    },
+  });
+}
+
+export function useDeleteBatch(inventoryId: string, itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string) =>
+      request<void>(`/inventories/${inventoryId}/items/${itemId}/batches/${batchId}`, {
+        method: "DELETE",
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["inventories", inventoryId, "items"] });
