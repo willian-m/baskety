@@ -5,7 +5,6 @@ import { Route as GroceryListRoute } from "./routes/_app.grocery.$listId.js";
 import { Route as GroceryIndexRoute } from "./routes/_app.grocery.index.js";
 import { Route as GroceryRoute } from "./routes/_app.grocery.js";
 import { Route as AppIndexRoute } from "./routes/_app.index.js";
-import { Route as InventoryItemRoute } from "./routes/_app.inventory.$itemId.js";
 import { Route as InventoryIndexRoute } from "./routes/_app.inventory.index.js";
 import { Route as InventoryRoute } from "./routes/_app.inventory.js";
 import { Route as AppRoute } from "./routes/_app.js";
@@ -25,7 +24,7 @@ const routeTree = RootRoute.addChildren([
   AppRoute.addChildren([
     AppIndexRoute,
     GroceryRoute.addChildren([GroceryIndexRoute, GroceryListRoute]),
-    InventoryRoute.addChildren([InventoryIndexRoute, InventoryItemRoute]),
+    InventoryRoute.addChildren([InventoryIndexRoute]),
     ReceiptRoute.addChildren([ReceiptIndexRoute, ReceiptReviewRoute]),
     ReportsRoute.addChildren([ReportsIndexRoute]),
     SettingsRoute.addChildren([SettingsIndexRoute]),

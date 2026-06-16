@@ -196,13 +196,13 @@ describe("InventoryTable", () => {
     await user.click(expandBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/└ Batch 1 L/)).toBeInTheDocument();
+      expect(screen.getByText(/└ Batch Qty: 1 L/)).toBeInTheDocument();
     });
 
     // Collapse
     await user.click(screen.getByRole("button", { name: "Collapse batches" }));
     await waitFor(() => {
-      expect(screen.queryByText(/└ Batch 1 L/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/└ Batch Qty: 1 L/)).not.toBeInTheDocument();
     });
   });
 
@@ -847,7 +847,7 @@ describe("InventoryTable", () => {
       renderTable();
       const expandBtn = await screen.findByRole("button", { name: "Expand batches" });
       await user.click(expandBtn);
-      await screen.findByText(/└ Batch 2 L/);
+      await screen.findByText(/└ Batch Qty: 2 L/);
     }
 
     it("each expanded batch row has a remove-batch button", async () => {
@@ -946,6 +946,84 @@ describe("InventoryTable", () => {
       await waitFor(() => {
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe("inline batch editing", () => {
+    async function expandMilkBatches(user: ReturnType<typeof userEvent.setup>) {
+      server.use(
+        http.get(`${BASE}/inventories/:invId/items/:itemId/batches`, () =>
+          HttpResponse.json({
+            data: [
+              batchFixture({ id: "be-1", quantity: 2, expires_at: "2030-06-01T00:00:00Z" }),
+              batchFixture({ id: "be-2", quantity: 1, expires_at: null }),
+            ],
+          }),
+        ),
+      );
+      renderTable();
+      await user.click(await screen.findByRole("button", { name: "Expand batches" }));
+      await screen.findByText(/└ Batch Qty: 2 L/);
+    }
+
+    it("clicking a batch row enters edit mode with pre-filled qty and expiry", async () => {
+      const user = userEvent.setup();
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByText(/└ Batch/)[0]!);
+
+      expect(await screen.findByLabelText("Batch quantity")).toHaveValue(2);
+      expect(screen.getByLabelText("Batch expiry")).toHaveValue("2030-06-01");
+    });
+
+    it("saving a batch edit calls PATCH and exits edit mode", async () => {
+      const user = userEvent.setup();
+      const patch = vi.fn();
+      server.use(
+        http.patch(
+          `${BASE}/inventories/:invId/items/:itemId/batches/:batchId`,
+          async ({ request, params }) => {
+            patch({ batchId: params.batchId, body: await request.json() });
+            return HttpResponse.json({ data: batchFixture({ id: params.batchId as string }) });
+          },
+        ),
+      );
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByText(/└ Batch/)[0]!);
+
+      const qtyInput = await screen.findByLabelText("Batch quantity");
+      await user.clear(qtyInput);
+      await user.type(qtyInput, "5");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(patch).toHaveBeenCalledTimes(1));
+      expect(patch.mock.calls[0]![0]).toMatchObject({ batchId: "be-1", body: { quantity: 5 } });
+      await waitFor(() =>
+        expect(screen.queryByLabelText("Batch quantity")).not.toBeInTheDocument(),
+      );
+    });
+
+    it("pressing Escape cancels the edit without calling PATCH", async () => {
+      const user = userEvent.setup();
+      const patch = vi.fn();
+      server.use(
+        http.patch(`${BASE}/inventories/:invId/items/:itemId/batches/:batchId`, () => {
+          patch();
+          return HttpResponse.json({ data: batchFixture() });
+        }),
+      );
+      await expandMilkBatches(user);
+
+      await user.click(screen.getAllByText(/└ Batch/)[0]!);
+      await screen.findByLabelText("Batch quantity");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() =>
+        expect(screen.queryByLabelText("Batch quantity")).not.toBeInTheDocument(),
+      );
+      expect(patch).not.toHaveBeenCalled();
     });
   });
 });

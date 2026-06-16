@@ -882,15 +882,54 @@ type BatchRowsProps = {
 function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }: BatchRowsProps) {
   const { data: batches, isLoading } = useBatches(inventoryId, item.id, enabled);
   const addBatch = useAddBatch(inventoryId, item.id);
+  const patchBatch = usePatchBatch(inventoryId, item.id);
   const markEmptied = useMarkBatchEmptied(inventoryId, item.id);
   const deleteBatch = useDeleteBatch(inventoryId, item.id);
 
   const [adding, setAdding] = useState(false);
   const [removingBatch, setRemovingBatch] = useState<BatchResponse | null>(null);
+  const [editingBatch, setEditingBatch] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState("");
+  const [editExpiry, setEditExpiry] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [failedEdit, setFailedEdit] = useState(false);
   const [qty, setQty] = useState("");
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
   const [failedBatch, setFailedBatch] = useState(false);
+
+  const enterBatchEdit = (batch: BatchResponse) => {
+    setEditingBatch(batch.id);
+    setEditQty(String(batch.quantity));
+    setEditExpiry(batch.expires_at ? batch.expires_at.slice(0, 10) : "");
+    setEditNotes(batch.notes ?? "");
+    setFailedEdit(false);
+  };
+
+  const saveBatchEdit = async (batchId: string) => {
+    setFailedEdit(false);
+    try {
+      await patchBatch.mutateAsync({
+        batchId,
+        quantity: parseFloat(editQty) || 0,
+        expires_at: editExpiry ? `${editExpiry}T00:00:00Z` : null,
+        notes: editNotes || null,
+      });
+      setEditingBatch(null);
+    } catch {
+      setFailedEdit(true);
+    }
+  };
+
+  const onBatchEditKeyDown = (e: React.KeyboardEvent, batchId: string) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void saveBatchEdit(batchId);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditingBatch(null);
+    }
+  };
 
   // Open add form automatically when triggered via "+" button.
   useEffect(() => {
@@ -937,37 +976,107 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
 
   return (
     <>
-      {rows.map((batch) => (
-        <tr key={batch.id} className="group border-b bg-muted/10 text-sm">
-          <td className="px-2 py-1" />
-          <td className="px-2 py-1 text-muted-foreground">
-            <span className="inline-flex items-center gap-2">
-              <span>
-                └ Batch {batch.quantity} {item.unit}
+      {rows.map((batch) =>
+        editingBatch === batch.id ? (
+          <tr
+            key={batch.id}
+            className={`border-b bg-muted/10 text-sm ${patchBatch.isPending ? "pointer-events-none opacity-50" : ""}`}
+          >
+            <td className="px-2 py-1" />
+            <td className="px-2 py-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">└</span>
+                <input
+                  autoFocus
+                  aria-label="Batch quantity"
+                  type="number"
+                  value={editQty}
+                  onChange={(e) => setEditQty(e.target.value)}
+                  onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
+                  className={inputClass}
+                />
+                <span className="text-xs text-muted-foreground">{item.unit}</span>
+              </div>
+            </td>
+            <td className="px-2 py-1">
+              <div className="flex flex-col gap-1">
+                <input
+                  aria-label="Batch expiry"
+                  type="date"
+                  value={editExpiry}
+                  onChange={(e) => setEditExpiry(e.target.value)}
+                  onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
+                  className={inputClass}
+                />
+                <input
+                  aria-label="Batch notes"
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
+                  placeholder="Notes"
+                  className={inputClass}
+                />
+              </div>
+            </td>
+            <td className="px-2 py-1">
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  type="button"
+                  disabled={patchBatch.isPending}
+                  onClick={() => void saveBatchEdit(batch.id)}
+                  className="inline-flex h-7 items-center rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingBatch(null)}
+                  className="inline-flex h-7 items-center rounded-md border px-2 text-xs font-medium hover:bg-muted"
+                >
+                  Cancel
+                </button>
+              </div>
+              {failedEdit && <p className="text-xs text-red-600">Save failed</p>}
+            </td>
+          </tr>
+        ) : (
+          <tr
+            key={batch.id}
+            className="group border-b bg-muted/10 text-sm cursor-pointer"
+            onClick={() => enterBatchEdit(batch)}
+          >
+            <td className="px-2 py-1" />
+            <td className="px-2 py-1 text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span>
+                  └ Batch Qty: {batch.quantity} {item.unit}
+                  {batch.notes ? ` - ${batch.notes}` : ""}
+                </span>
+                <ExpiryBadge expiresAt={batch.expires_at} />
               </span>
-              <ExpiryBadge expiresAt={batch.expires_at} />
-            </span>
-          </td>
-          <td className="px-2 py-1 text-muted-foreground">
-            {batch.expires_at ? new Date(batch.expires_at).toLocaleDateString() : "No expiry"}
-          </td>
-          <td className="px-2 py-1">
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                aria-label="Remove batch"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRemovingBatch(batch);
-                }}
-                className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-red-600 focus-visible:opacity-100"
-              >
-                <TrashIcon />
-              </button>
-            </div>
-          </td>
-        </tr>
-      ))}
+            </td>
+            <td className="px-2 py-1 text-muted-foreground">
+              {batch.expires_at ? new Date(batch.expires_at).toLocaleDateString() : "No expiry"}
+            </td>
+            <td className="px-2 py-1">
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  aria-label="Remove batch"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRemovingBatch(batch);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-red-600 focus-visible:opacity-100"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ),
+      )}
 
       {removingBatch && (
         <tr>
