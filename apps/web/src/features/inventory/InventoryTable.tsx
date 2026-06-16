@@ -11,7 +11,6 @@ import {
   type BatchResponse,
   type InventoryItemResponse,
 } from "@baskety/core";
-import { Link } from "@tanstack/react-router";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 function TrashIcon() {
@@ -218,7 +217,15 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
   }
 
   return (
-    <tr className={`bg-muted/40 ${isPending ? "opacity-60" : ""}`}>
+    <tr
+      className={`bg-muted/40 ${isPending ? "opacity-60" : ""} ${!editing ? "cursor-pointer" : ""}`}
+      onClick={() => {
+        if (!editing) {
+          setDraft(category);
+          setEditing(true);
+        }
+      }}
+    >
       <td colSpan={4} className="px-2 py-2">
         {editing ? (
           <input
@@ -228,19 +235,11 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKey}
             onBlur={commit}
+            onClick={(e) => e.stopPropagation()}
             className="h-7 rounded border border-input bg-background px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         ) : (
-          <strong
-            className="cursor-pointer text-sm font-semibold hover:text-primary"
-            title="Click to rename"
-            onClick={() => {
-              setDraft(category);
-              setEditing(true);
-            }}
-          >
-            {category}
-          </strong>
+          <strong className="text-sm font-semibold">{category}</strong>
         )}
       </td>
     </tr>
@@ -870,7 +869,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
 
   return (
     <>
-      {rows.map((batch, idx) => (
+      {rows.map((batch) => (
         <tr key={batch.id} className="group border-b bg-muted/10 text-sm">
           <td className="px-2 py-1" />
           <td className="px-2 py-1 text-muted-foreground">
@@ -886,15 +885,6 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
           </td>
           <td className="px-2 py-1">
             <div className="flex items-center justify-end gap-2">
-              {idx === rows.length - 1 && (
-                <Link
-                  to="/inventory/$itemId"
-                  params={{ itemId: item.id }}
-                  className="text-xs text-primary hover:underline"
-                >
-                  View details →
-                </Link>
-              )}
               <button
                 type="button"
                 aria-label="Remove batch"
