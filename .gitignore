@@ -73,3 +73,10 @@ service-account.json
 *~
 .DS_Store
 Thumbs.db
+
+# Go workspace (local dev only)
+go.work
+go.work.sum
+
+# Images
+*.jpg

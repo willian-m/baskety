@@ -166,6 +166,8 @@ Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
 | 14 | Mobile: Inventory + Grocery Screens | Done |
 | 15–16 | Mobile: Receipt scanning + Settings | Not started |
 | 17–18 | Docker/CI/CD + hardening | Not started |
+| 19 | Inventory UX Redesign (web table + mobile swipeable cards) | Done |
+| 20 | UX Polish: category autocomplete, grocery mgmt, household switcher | Not started |
 
 Sprint plans: `docs/superpowers/sprints/sprint-NN.md`
 

@@ -26,7 +26,9 @@
 | 16 | Mobile — Testing + EAS Build Pipeline | 3.5d | Week 17 |
 | 17 | Docker, CI/CD, Release Pipeline | 4d | Week 18 |
 | 18 | End-to-End Hardening + Launch Readiness | 4.5d | Week 19 |
-| **Total** | | **83.5d** | **19 weeks** |
+| 19 | Inventory UX Redesign (web table + mobile swipeable cards) | 5.5d | Week 20 |
+| 20 | UX Polish: category autocomplete, grocery mgmt, household switcher | 3.75d | Week 21 |
+| **Total** | | **92.75d** | **21 weeks** |
 
 ## Effort Summary
 
@@ -39,7 +41,9 @@
 | Mobile App (all screens + tests + EAS build) | 13–16 | ~18d |
 | Docker + CI/CD + Release Pipeline | 17 | 4d |
 | Hardening + Launch Readiness | 18 | 4.5d |
-| **Total** | **18 sprints** | **~83.5d** |
+| Inventory UX Redesign | 19 | 5.5d |
+| UX Polish (autocomplete, grocery mgmt, switcher) | 20 | 3.75d |
+| **Total** | **20 sprints** | **~92.75d** |
 
 **Calendar duration:** ~19 weeks (~4.5 months) with one full-time developer.
 
