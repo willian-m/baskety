@@ -31,6 +31,7 @@ type mockService struct {
 	addBatchFn          func(ctx context.Context, itemID, householdID uuid.UUID, req inventory.AddBatchRequest) (*inventory.BatchResponse, error)
 	listActiveBatchesFn func(ctx context.Context, itemID, householdID uuid.UUID) ([]*inventory.BatchResponse, error)
 	markBatchEmptiedFn  func(ctx context.Context, batchID, householdID uuid.UUID) error
+	deleteBatchFn       func(ctx context.Context, batchID, householdID uuid.UUID) error
 	getEffectiveQtyFn   func(ctx context.Context, itemID, householdID uuid.UUID) (float64, error)
 	patchBatchFn        func(ctx context.Context, batchID, itemID, householdID uuid.UUID, req inventory.PatchBatchRequest) (*inventory.BatchResponse, error)
 }
@@ -73,6 +74,9 @@ func (m *mockService) ListActiveBatches(ctx context.Context, itemID, householdID
 }
 func (m *mockService) MarkBatchEmptied(ctx context.Context, batchID, householdID uuid.UUID) error {
 	return m.markBatchEmptiedFn(ctx, batchID, householdID)
+}
+func (m *mockService) DeleteBatch(ctx context.Context, batchID, householdID uuid.UUID) error {
+	return m.deleteBatchFn(ctx, batchID, householdID)
 }
 func (m *mockService) GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error) {
 	return m.getEffectiveQtyFn(ctx, itemID, householdID)

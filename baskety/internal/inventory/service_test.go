@@ -29,6 +29,7 @@ type mockRepo struct {
 	getBatchFn          func(ctx context.Context, id uuid.UUID) (*inventory.InventoryBatch, error)
 	listActiveBatchesFn func(ctx context.Context, itemID uuid.UUID) ([]*inventory.InventoryBatch, error)
 	markBatchEmptiedFn  func(ctx context.Context, id uuid.UUID) error
+	deleteBatchFn       func(ctx context.Context, id uuid.UUID) error
 	patchBatchFn        func(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error)
 }
 
@@ -76,6 +77,9 @@ func (m *mockRepo) ListActiveBatches(ctx context.Context, itemID uuid.UUID) ([]*
 }
 func (m *mockRepo) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error {
 	return m.markBatchEmptiedFn(ctx, id)
+}
+func (m *mockRepo) DeleteBatch(ctx context.Context, id uuid.UUID) error {
+	return m.deleteBatchFn(ctx, id)
 }
 func (m *mockRepo) PatchBatch(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*inventory.InventoryBatch, error) {
 	return m.patchBatchFn(ctx, id, itemID, quantity, expiresAt, notes)
@@ -204,6 +208,61 @@ func TestCreateItem_UniqueViolation_ReturnsErrInvalidInput(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, inventory.ErrInvalidInput)
 	assert.Contains(t, err.Error(), "already exists")
+}
+
+func TestDeleteBatch(t *testing.T) {
+	batchID := uuid.New()
+	itemID := uuid.New()
+	invID := uuid.New()
+	hID := uuid.New()
+
+	okScaffold := func(deleteFn func(ctx context.Context, id uuid.UUID) error) *mockRepo {
+		return &mockRepo{
+			getBatchFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryBatch, error) {
+				return &inventory.InventoryBatch{ID: id, ItemID: itemID}, nil
+			},
+			getItemFn: func(_ context.Context, id uuid.UUID) (*inventory.InventoryItem, error) {
+				return &inventory.InventoryItem{ID: id, InventoryID: invID}, nil
+			},
+			getInventoryFn: func(_ context.Context, id uuid.UUID) (*inventory.Inventory, error) {
+				return &inventory.Inventory{ID: id, HouseholdID: hID}, nil
+			},
+			deleteBatchFn: deleteFn,
+		}
+	}
+
+	t.Run("success", func(t *testing.T) {
+		deleted := false
+		repo := okScaffold(func(_ context.Context, id uuid.UUID) error {
+			assert.Equal(t, batchID, id)
+			deleted = true
+			return nil
+		})
+		svc := inventory.NewService(repo)
+		require.NoError(t, svc.DeleteBatch(context.Background(), batchID, hID))
+		assert.True(t, deleted)
+	})
+
+	t.Run("wrong household returns not found", func(t *testing.T) {
+		repo := okScaffold(func(_ context.Context, _ uuid.UUID) error {
+			t.Fatal("delete should not be called for wrong household")
+			return nil
+		})
+		svc := inventory.NewService(repo)
+		err := svc.DeleteBatch(context.Background(), batchID, uuid.New())
+		assert.ErrorIs(t, err, inventory.ErrNotFound)
+	})
+
+	t.Run("batch not found propagates", func(t *testing.T) {
+		repo := &mockRepo{
+			getBatchFn: func(_ context.Context, _ uuid.UUID) (*inventory.InventoryBatch, error) {
+				return nil, fmt.Errorf("wrap: %w", inventory.ErrNotFound)
+			},
+		}
+		svc := inventory.NewService(repo)
+		err := svc.DeleteBatch(context.Background(), batchID, hID)
+		assert.ErrorIs(t, err, inventory.ErrNotFound)
+	})
 }
 
 func TestPatchBatch(t *testing.T) {

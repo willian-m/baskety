@@ -31,6 +31,7 @@ type ServiceIface interface {
 	AddBatch(ctx context.Context, itemID, householdID uuid.UUID, req AddBatchRequest) (*BatchResponse, error)
 	ListActiveBatches(ctx context.Context, itemID, householdID uuid.UUID) ([]*BatchResponse, error)
 	MarkBatchEmptied(ctx context.Context, batchID, householdID uuid.UUID) error
+	DeleteBatch(ctx context.Context, batchID, householdID uuid.UUID) error
 	GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error)
 	PatchBatch(ctx context.Context, batchID, itemID, householdID uuid.UUID, req PatchBatchRequest) (*BatchResponse, error)
 }
@@ -244,6 +245,13 @@ func (s *Service) MarkBatchEmptied(ctx context.Context, batchID, householdID uui
 		return err
 	}
 	return s.repo.MarkBatchEmptied(ctx, batchID)
+}
+
+func (s *Service) DeleteBatch(ctx context.Context, batchID, householdID uuid.UUID) error {
+	if _, err := s.assertBatchScope(ctx, batchID, householdID); err != nil {
+		return err
+	}
+	return s.repo.DeleteBatch(ctx, batchID)
 }
 
 func (s *Service) GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error) {

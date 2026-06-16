@@ -117,8 +117,14 @@ func (m *mockInventory) ListActiveBatches(ctx context.Context, itemID, household
 func (m *mockInventory) MarkBatchEmptied(ctx context.Context, batchID, householdID uuid.UUID) error {
 	return nil
 }
+func (m *mockInventory) DeleteBatch(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
 func (m *mockInventory) GetEffectiveQuantity(ctx context.Context, itemID, householdID uuid.UUID) (float64, error) {
 	return m.getEffectiveQtyFn(ctx, itemID, householdID)
+}
+func (m *mockInventory) PatchBatch(_ context.Context, _, _, _ uuid.UUID, _ inventory.PatchBatchRequest) (*inventory.BatchResponse, error) {
+	return nil, nil
 }
 
 func okInventory(householdID uuid.UUID) *mockInventory {

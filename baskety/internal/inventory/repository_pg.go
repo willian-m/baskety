@@ -256,6 +256,13 @@ func (r *pgRepository) MarkBatchEmptied(ctx context.Context, id uuid.UUID) error
 	return nil
 }
 
+func (r *pgRepository) DeleteBatch(ctx context.Context, id uuid.UUID) error {
+	if err := r.q.DeleteInventoryBatch(ctx, shared.UUIDToPg(id)); err != nil {
+		return fmt.Errorf("delete batch: %w", err)
+	}
+	return nil
+}
+
 func (r *pgRepository) PatchBatch(ctx context.Context, id, itemID uuid.UUID, quantity float64, expiresAt *time.Time, notes *string) (*InventoryBatch, error) {
 	row, err := r.q.PatchBatch(ctx, sqlc.PatchBatchParams{
 		ID:        shared.UUIDToPg(id),

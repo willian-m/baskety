@@ -313,6 +313,22 @@ func (h *Handler) HandleMarkBatchEmptied(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{"status": "emptied"}})
 }
 
+func (h *Handler) HandleDeleteBatch(w http.ResponseWriter, r *http.Request) {
+	hid, ok := householdFromCtx(w, r)
+	if !ok {
+		return
+	}
+	batchID, ok := parseParam(w, r, "batchID", "batch ID")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteBatch(r.Context(), batchID, hid); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) HandlePatchBatch(w http.ResponseWriter, r *http.Request) {
 	hid, ok := householdFromCtx(w, r)
 	if !ok {

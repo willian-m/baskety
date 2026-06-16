@@ -45,6 +45,15 @@ func (q *Queries) CreateInventoryBatch(ctx context.Context, arg CreateInventoryB
 	return i, err
 }
 
+const deleteInventoryBatch = `-- name: DeleteInventoryBatch :exec
+DELETE FROM inventory_batches WHERE id = $1
+`
+
+func (q *Queries) DeleteInventoryBatch(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteInventoryBatch, id)
+	return err
+}
+
 const getInventoryBatchByID = `-- name: GetInventoryBatchByID :one
 SELECT id, item_id, quantity, expires_at, added_at, emptied_at, notes, created_at FROM inventory_batches WHERE id = $1
 `

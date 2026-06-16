@@ -23,6 +23,9 @@ SET
 WHERE id = sqlc.arg('id') AND item_id = sqlc.arg('item_id') AND emptied_at IS NULL
 RETURNING *;
 
+-- name: DeleteInventoryBatch :exec
+DELETE FROM inventory_batches WHERE id = $1;
+
 -- name: ListExpiringBatches :many
 SELECT * FROM inventory_batches
 WHERE emptied_at IS NULL AND expires_at <= $1
