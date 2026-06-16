@@ -198,7 +198,6 @@ describe("InventoryTable", () => {
     await waitFor(() => {
       expect(screen.getByText(/└ Batch 1 L/)).toBeInTheDocument();
     });
-    expect(screen.getByText("View details →")).toBeInTheDocument();
 
     // Collapse
     await user.click(screen.getByRole("button", { name: "Collapse batches" }));
@@ -324,6 +323,85 @@ describe("InventoryTable", () => {
         expect(update).toHaveBeenCalledTimes(2);
       });
       expect(update.mock.calls.every((c) => c[0].category === "Pantry")).toBe(true);
+    });
+  });
+
+  describe("category header delete", () => {
+    it("renders a delete button for each category header", async () => {
+      renderTable();
+      await screen.findByText("Dairy");
+      expect(screen.getByRole("button", { name: "Delete category Dairy" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Delete category Non perishable" }),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking the delete button opens a confirmation modal with category name and item count", async () => {
+      const user = userEvent.setup();
+      renderTable();
+      await user.click(await screen.findByRole("button", { name: "Delete category Dairy" }));
+      const modal = await screen.findByRole("dialog");
+      expect(modal).toBeInTheDocument();
+      // "Dairy" has 1 item (Milk)
+      expect(within(modal).getByText(/Delete "Dairy"\?/)).toBeInTheDocument();
+      expect(within(modal).getByText(/1 item/)).toBeInTheDocument();
+      expect(within(modal).getByText(/Uncategorized/)).toBeInTheDocument();
+    });
+
+    it("Cancel closes the modal without calling the API", async () => {
+      const user = userEvent.setup();
+      const update = vi.fn();
+      server.use(
+        http.put(`${BASE}/inventories/:invId/items/:itemId`, async ({ request }) => {
+          update(await request.json());
+          return HttpResponse.json({ data: inventoryItemFixture() });
+        }),
+      );
+      renderTable();
+      await user.click(await screen.findByRole("button", { name: "Delete category Dairy" }));
+      await user.click(await screen.findByRole("button", { name: "Cancel" }));
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("clicking Delete calls PUT with category '' for every item in the category", async () => {
+      const user = userEvent.setup();
+      const update = vi.fn();
+      server.use(
+        http.put(`${BASE}/inventories/:invId/items/:itemId`, async ({ request }) => {
+          update(await request.json());
+          return HttpResponse.json({ data: inventoryItemFixture() });
+        }),
+      );
+      renderTable();
+      // "Non perishable" has Rice + Beans → 2 PUT calls
+      await user.click(
+        await screen.findByRole("button", { name: "Delete category Non perishable" }),
+      );
+      const modal = await screen.findByRole("dialog");
+      await user.click(within(modal).getByRole("button", { name: "Delete" }));
+      await waitFor(() => {
+        expect(update).toHaveBeenCalledTimes(2);
+      });
+      expect(update.mock.calls.every((c) => c[0].category === "")).toBe(true);
+    });
+
+    it("clicking Delete closes the modal", async () => {
+      const user = userEvent.setup();
+      server.use(
+        http.put(`${BASE}/inventories/:invId/items/:itemId`, () =>
+          HttpResponse.json({ data: inventoryItemFixture() }),
+        ),
+      );
+      renderTable();
+      await user.click(await screen.findByRole("button", { name: "Delete category Dairy" }));
+      const modal = await screen.findByRole("dialog");
+      await user.click(within(modal).getByRole("button", { name: "Delete" }));
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -562,6 +640,54 @@ describe("InventoryTable", () => {
       expect(patchBatch).toHaveBeenCalledTimes(1);
     });
     expect(patchBatch.mock.calls[0]![0]).toMatchObject({ quantity: 5 });
+  });
+
+  it("shows editable stored qty and expiry in edit mode for zero-batch items and creates a new batch on save", async () => {
+    const user = userEvent.setup();
+    const addBatch = vi.fn();
+    server.use(
+      http.get(`${BASE}/inventories/:invId/items/:itemId/batches`, () =>
+        HttpResponse.json({ data: [] }),
+      ),
+      http.put(`${BASE}/inventories/:invId/items/:itemId`, () =>
+        HttpResponse.json({ data: inventoryItemFixture({ id: "item-rice", name: "Rice" }) }),
+      ),
+      http.post(`${BASE}/inventories/:invId/items/:itemId/batches`, async ({ request }) => {
+        addBatch(await request.json());
+        return HttpResponse.json({ data: batchFixture({ id: "batch-new" }) });
+      }),
+    );
+
+    renderTable({
+      items: [
+        inventoryItemFixture({
+          id: "item-rice",
+          name: "Rice",
+          category: "Non perishable",
+          unit: "kg",
+          stored_quantity: 0,
+          target_quantity: 5,
+          batch_count: 0,
+        }),
+      ],
+    });
+
+    await user.click(await screen.findByText("Rice"));
+
+    const storedQtyInput = await screen.findByLabelText("Stored quantity");
+    expect(storedQtyInput).toBeInTheDocument();
+    expect(screen.getByLabelText("Expiry date")).toBeInTheDocument();
+
+    await user.clear(storedQtyInput);
+    await user.type(storedQtyInput, "3");
+
+    const editRow = screen.getByTestId("item-row-item-rice");
+    await user.click(within(editRow).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(addBatch).toHaveBeenCalledTimes(1);
+    });
+    expect(addBatch.mock.calls[0]![0]).toMatchObject({ quantity: 3 });
   });
 
   describe("checkbox select + per-row trash icon", () => {

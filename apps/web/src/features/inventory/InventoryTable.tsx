@@ -193,6 +193,7 @@ type CategoryHeaderRowProps = {
 function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHeaderRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(category);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   function commit() {
     const trimmed = draft.trim();
@@ -217,32 +218,91 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
   }
 
   return (
-    <tr
-      className={`bg-muted/40 ${isPending ? "opacity-60" : ""} ${!editing ? "cursor-pointer" : ""}`}
-      onClick={() => {
-        if (!editing) {
-          setDraft(category);
-          setEditing(true);
-        }
-      }}
-    >
-      <td colSpan={4} className="px-2 py-2">
-        {editing ? (
-          <input
-            autoFocus
-            aria-label={`Rename category ${category}`}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKey}
-            onBlur={commit}
-            onClick={(e) => e.stopPropagation()}
-            className="h-7 rounded border border-input bg-background px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        ) : (
-          <strong className="text-sm font-semibold">{category}</strong>
-        )}
-      </td>
-    </tr>
+    <>
+      <tr
+        className={`group bg-muted/40 ${isPending ? "opacity-60" : ""} ${!editing ? "cursor-pointer" : ""}`}
+        onClick={() => {
+          if (!editing) {
+            setDraft(category);
+            setEditing(true);
+          }
+        }}
+      >
+        <td colSpan={4} className="px-2 py-2">
+          <div className="flex items-center justify-between">
+            {editing ? (
+              <input
+                autoFocus
+                aria-label={`Rename category ${category}`}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={handleKey}
+                onBlur={commit}
+                onClick={(e) => e.stopPropagation()}
+                className="h-7 rounded border border-input bg-background px-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            ) : (
+              <strong className="text-sm font-semibold">{category}</strong>
+            )}
+            {!editing && (
+              <button
+                type="button"
+                aria-label={`Delete category ${category}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteModal(true);
+                }}
+                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+              >
+                <TrashIcon />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+      {showDeleteModal && (
+        <tr>
+          <td colSpan={4}>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-category-title"
+            >
+              <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-xl">
+                <h2 id="delete-category-title" className="text-lg font-semibold">
+                  Delete &quot;{category}&quot;?
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  All {items.length} item{items.length !== 1 ? "s" : ""} in this category will
+                  become Uncategorized. This action cannot be undone.
+                </p>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    autoFocus
+                    type="button"
+                    className="rounded px-4 py-2 text-sm"
+                    onClick={() => setShowDeleteModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    onClick={() => {
+                      onRename({ to: "", items });
+                      setShowDeleteModal(false);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -522,6 +582,7 @@ function ItemRow({
   const updateItem = useUpdateItem(inventoryId, item.id);
   const { data: batchesData } = useBatches(inventoryId, item.id, isEditing);
   const patchBatch = usePatchBatch(inventoryId, item.id);
+  const addBatch = useAddBatch(inventoryId, item.id);
 
   const [name, setName] = useState(item.name);
   const [target, setTarget] = useState(String(item.target_quantity));
@@ -579,7 +640,14 @@ function ItemRow({
                 expires_at: batchExpiry ? `${batchExpiry}T00:00:00Z` : null,
               }),
             ]
-          : []),
+          : item.batch_count === 0 && parseFloat(batchQty) > 0
+            ? [
+                addBatch.mutateAsync({
+                  quantity: parseFloat(batchQty),
+                  expires_at: batchExpiry ? `${batchExpiry}T00:00:00Z` : null,
+                }),
+              ]
+            : []),
       ]);
       setName(savedName);
       setCategory(savedCategory);
@@ -607,7 +675,7 @@ function ItemRow({
   };
 
   const canDisclose = item.batch_count > 1;
-  const isPending = updateItem.isPending || patchBatch.isPending;
+  const isPending = updateItem.isPending || patchBatch.isPending || addBatch.isPending;
   const isSaveDisabled = isPending || (isEditing && item.batch_count === 1 && !batchesData?.[0]);
 
   if (isEditing) {
@@ -650,7 +718,7 @@ function ItemRow({
             </div>
           </td>
           <td className="px-2 py-1">
-            {item.batch_count === 1 ? (
+            {item.batch_count <= 1 ? (
               <div className="flex flex-col gap-1">
                 <input
                   aria-label="Stored quantity"
