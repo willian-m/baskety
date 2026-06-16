@@ -10,6 +10,14 @@ import { server } from "../../test/server.js";
 import { InventoryPage } from "./InventoryPage.js";
 import { InventoryTable } from "./InventoryTable.js";
 
+// useActiveInventory calls useUiStore (Zustand), which was resolved by pnpm
+// against react@19 while the rest of the app uses react@18. The mismatch
+// causes an "invalid hook call" crash in the test runner. Mock the hook so
+// InventoryPage tests never reach Zustand.
+vi.mock("../../hooks/useActiveInventory.js", () => ({
+  useActiveInventory: () => "inv-1",
+}));
+
 const BASE = "/api/v1";
 const INV_ID = "inv-1";
 
