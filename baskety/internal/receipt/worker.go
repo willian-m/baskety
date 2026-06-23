@@ -2,7 +2,6 @@ package receipt
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -25,13 +24,13 @@ func (ProcessReceiptScanArgs) Kind() string { return JobProcessReceiptScan }
 
 // ProcessReceiptScanWorker runs the OCR -> LLM -> pending_review pipeline.
 type ProcessReceiptScanWorker struct {
-	repo Repository
-	ocr  OCRProvider
-	llm  LLMProvider
+	repo        Repository
+	ocr         OCRProvider
+	llmResolver LLMProviderResolver
 }
 
-func NewProcessReceiptScanWorker(repo Repository, ocr OCRProvider, llm LLMProvider) *ProcessReceiptScanWorker {
-	return &ProcessReceiptScanWorker{repo: repo, ocr: ocr, llm: llm}
+func NewProcessReceiptScanWorker(repo Repository, ocr OCRProvider, llmResolver LLMProviderResolver) *ProcessReceiptScanWorker {
+	return &ProcessReceiptScanWorker{repo: repo, ocr: ocr, llmResolver: llmResolver}
 }
 
 // HandleJob is the JobHandler entrypoint for the in-process queue.
@@ -77,7 +76,11 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 	}
 
 	// 2. LLM
-	items, err := w.llm.ParseReceipt(ctx, text)
+	llmProvider, err := w.llmResolver(ctx, scan.HouseholdID)
+	if err != nil {
+		return fail("resolve_llm", err)
+	}
+	items, rawLLMResponse, err := llmProvider.ParseReceipt(ctx, text)
 	if err != nil {
 		return fail("llm", err)
 	}
@@ -87,15 +90,8 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 		}
 	}
 
-	// 3. Record the LLM result and move to pending_review.
-	// The LLMProvider interface does not expose the true raw response, so we
-	// store the JSON re-encoding of the parsed items. This is self-consistent
-	// and far more useful for debugging than a summary string.
-	llmResult, err := json.Marshal(items)
-	if err != nil {
-		return fail("encode_llm_result", err)
-	}
-	if _, err := w.repo.SetLLMResult(ctx, scanID, string(llmResult)); err != nil {
+	// 3. Store the raw LLM response and move to pending_review.
+	if _, err := w.repo.SetLLMResult(ctx, scanID, rawLLMResponse); err != nil {
 		return fail("persist_llm", err)
 	}
 	if _, err := w.repo.UpdateScanStatus(ctx, scanID, StatusPendingReview, nil); err != nil {

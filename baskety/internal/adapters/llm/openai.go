@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/willian-m/baskety/internal/receipt"
 )
@@ -21,7 +22,8 @@ func NewOpenAILLM(apiKey, model string) *OpenAILLM {
 	return &OpenAILLM{APIKey: apiKey, Model: model}
 }
 
-func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, error) {
+func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, string, error) {
+	slog.Debug("openai request", "model", l.Model, "prompt_len", len(parsePrompt)+len(ocrText))
 	reqBody := map[string]any{
 		"model": l.Model,
 		"messages": []map[string]string{
@@ -33,7 +35,7 @@ func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt
 	headers := map[string]string{"Authorization": "Bearer " + l.APIKey}
 	data, err := doJSONPost(ctx, "https://api.openai.com/v1/chat/completions", headers, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("openai: %w", err)
+		return nil, "", fmt.Errorf("openai: %w", err)
 	}
 	var resp struct {
 		Choices []struct {
@@ -43,12 +45,15 @@ func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("openai decode: %w", err)
+		return nil, "", fmt.Errorf("openai decode: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("openai: empty choices")
+		return nil, "", fmt.Errorf("openai: empty choices")
 	}
-	return parseMaybeWrappedArray(resp.Choices[0].Message.Content)
+	raw := resp.Choices[0].Message.Content
+	slog.Debug("openai response", "model", l.Model, "response", raw)
+	items, err := parseMaybeWrappedArray(raw)
+	return items, raw, err
 }
 
 // parseMaybeWrappedArray handles models that, when asked for a json_object,

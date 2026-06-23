@@ -1,6 +1,10 @@
 package receipt
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 // OCRProvider extracts raw text from a receipt image. Implementations are
 // pluggable (Tesseract, cloud OCR, etc.) so self-hosters can substitute models.
@@ -11,8 +15,15 @@ type OCRProvider interface {
 // LLMProvider turns raw OCR text into structured line items. Implementations are
 // pluggable (Ollama, OpenAI, Anthropic, ...).
 type LLMProvider interface {
-	ParseReceipt(ctx context.Context, ocrText string) ([]ParsedLineItem, error)
+	// ParseReceipt returns the parsed line items and the raw response text from
+	// the model, so callers can store or log the original output for debugging.
+	ParseReceipt(ctx context.Context, ocrText string) ([]ParsedLineItem, string, error)
 }
+
+// LLMProviderResolver builds an LLMProvider for the given household, reading
+// the household's configured default provider from the settings store. The
+// resolver is called per-job so settings changes take effect immediately.
+type LLMProviderResolver func(ctx context.Context, householdID uuid.UUID) (LLMProvider, error)
 
 // ParsedLineItem is the structured output of LLM receipt parsing for a single
 // line. All fields except RawText are optional pointers because the model may

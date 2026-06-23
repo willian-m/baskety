@@ -6,23 +6,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/willian-m/baskety/internal/receipt"
+	"github.com/willian-m/baskety/internal/settings"
 )
 
 // lineItemJSON is the JSON shape we ask every model to emit.
 type lineItemJSON struct {
-	Name             *string  `json:"name"`
-	Brand            *string  `json:"brand"`
-	Quantity         *float64 `json:"quantity"`
-	Unit             *string  `json:"unit"`
-	PricePerUnitMinor *int64  `json:"price_per_unit_minor"`
-	Currency         *string  `json:"currency"`
-	StoreName        *string  `json:"store_name"`
-	Confidence       *float64 `json:"confidence"`
-	RawText          *string  `json:"raw_text"`
+	Name              *string  `json:"name"`
+	Brand             *string  `json:"brand"`
+	Quantity          *float64 `json:"quantity"`
+	Unit              *string  `json:"unit"`
+	PricePerUnitMinor *int64   `json:"price_per_unit_minor"`
+	Currency          *string  `json:"currency"`
+	StoreName         *string  `json:"store_name"`
+	Confidence        *float64 `json:"confidence"`
+	RawText           *string  `json:"raw_text"`
 }
 
 const parsePrompt = `You are a receipt parser. Given the raw OCR text of a grocery receipt, extract each purchased line item. Respond with ONLY a JSON array (no prose, no markdown fences). Each element must have these fields:
@@ -127,24 +129,49 @@ func NewOllamaLLM(baseURL, model string) *OllamaLLM {
 	return &OllamaLLM{BaseURL: strings.TrimRight(baseURL, "/"), Model: model}
 }
 
-func (l *OllamaLLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, error) {
+func (l *OllamaLLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, string, error) {
+	prompt := parsePrompt + ocrText
+	slog.Debug("ollama request", "url", l.BaseURL+"/api/generate", "model", l.Model, "prompt", prompt)
 	reqBody := map[string]any{
 		"model":  l.Model,
-		"prompt": parsePrompt + ocrText,
+		"prompt": prompt,
 		"stream": false,
 		"format": "json",
 	}
 	data, err := doJSONPost(ctx, l.BaseURL+"/api/generate", nil, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("ollama: %w", err)
+		return nil, "", fmt.Errorf("ollama: %w", err)
 	}
 	var resp struct {
 		Response string `json:"response"`
 	}
 	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("ollama decode: %w", err)
+		return nil, "", fmt.Errorf("ollama decode: %w", err)
 	}
-	return toParsedLineItems(resp.Response)
+	slog.Debug("ollama response", "model", l.Model, "response", resp.Response)
+	items, err := toParsedLineItems(resp.Response)
+	return items, resp.Response, err
 }
 
 var _ receipt.LLMProvider = (*OllamaLLM)(nil)
+
+// NewFromConfig builds the right LLMProvider from a stored settings config.
+func NewFromConfig(cfg *settings.LLMProviderConfig) (receipt.LLMProvider, error) {
+	var apiKey, endpoint string
+	if cfg.APIKeyEncrypted != nil {
+		apiKey = *cfg.APIKeyEncrypted
+	}
+	if cfg.EndpointURL != nil {
+		endpoint = *cfg.EndpointURL
+	}
+	switch cfg.Provider {
+	case "ollama":
+		return NewOllamaLLM(endpoint, cfg.Model), nil
+	case "openai":
+		return NewOpenAILLM(apiKey, cfg.Model), nil
+	case "anthropic":
+		return NewAnthropicLLM(apiKey, cfg.Model), nil
+	default:
+		return nil, fmt.Errorf("unknown LLM provider %q", cfg.Provider)
+	}
+}

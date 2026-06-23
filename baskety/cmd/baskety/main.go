@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/willian-m/baskety/internal/adapters/llm"
 	"github.com/willian-m/baskety/internal/adapters/ocr"
 	"github.com/willian-m/baskety/internal/adapters/storage"
@@ -27,6 +29,12 @@ import (
 )
 
 func main() {
+	level := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+
 	if err := run(context.Background(), os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -97,9 +105,15 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	grocerySvc := grocery.NewService(groceryRepo, inventorySvc)
 	groceryHandler := grocery.NewHandler(grocerySvc)
 
+	// Settings domain: system/household/user settings + LLM/OCR provider configs.
+	// Created before the receipt worker so the resolver can read household configs.
+	settingsRepo := settings.NewPgRepository(pool)
+	settingsSvc := settings.NewService(settingsRepo)
+	settingsHandler := settings.NewHandler(settingsSvc)
+
 	// Receipt domain: file storage + OCR/LLM adapters + in-process job queue.
-	// Defaults target a self-hosted stack (local disk, Tesseract, Ollama). These
-	// are configurable via env in a later sprint; see internal/adapters/*.
+	// The LLM resolver reads the household's default provider config per-job so
+	// settings changes take effect without a restart.
 	if cfg.Storage.LocalPath == "" {
 		cfg.Storage.LocalPath = "./uploads"
 	}
@@ -111,11 +125,20 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	default:
 		ocrProvider = ocr.NewTesseractOCR(cfg.OCR.BinPath)
 	}
-	llmProvider := llm.NewOllamaLLM("", "")
+	llmResolver := func(ctx context.Context, householdID uuid.UUID) (receipt.LLMProvider, error) {
+		cfg, err := settingsRepo.GetDefaultLLMProvider(ctx, householdID)
+		if err != nil {
+			if errors.Is(err, settings.ErrNotFound) {
+				return llm.NewOllamaLLM("", ""), nil
+			}
+			return nil, fmt.Errorf("loading LLM provider config: %w", err)
+		}
+		return llm.NewFromConfig(cfg)
+	}
 
 	jobQueue := receipt.NewInProcessQueue(2, 64)
 	receiptRepo := receipt.NewPgRepository(pool)
-	receiptWorker := receipt.NewProcessReceiptScanWorker(receiptRepo, ocrProvider, llmProvider)
+	receiptWorker := receipt.NewProcessReceiptScanWorker(receiptRepo, ocrProvider, llmResolver)
 	jobQueue.Register(receipt.JobProcessReceiptScan, receiptWorker.HandleJob)
 	defer jobQueue.Shutdown()
 
@@ -130,11 +153,6 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	catalogHandler := catalog.NewHandler(catalogSvc)
 	catalogWorker := catalog.NewProcessPurchaseTransactionWorker(catalogRepo, inventoryRepo, pool)
 	jobQueue.Register(catalog.JobProcessPurchaseTransaction, catalogWorker.HandleJob)
-
-	// Settings domain: system/household/user settings + LLM/OCR provider configs.
-	settingsRepo := settings.NewPgRepository(pool)
-	settingsSvc := settings.NewService(settingsRepo)
-	settingsHandler := settings.NewHandler(settingsSvc)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
