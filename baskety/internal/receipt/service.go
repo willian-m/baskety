@@ -146,6 +146,18 @@ func (s *Service) UpdateScanItem(ctx context.Context, itemID, scanID, householdI
 	if err != nil {
 		return nil, fmt.Errorf("updating scan item: %w", err)
 	}
+
+	if req.InventoryItemID != nil && *req.InventoryItemID != "" {
+		invID, err := uuid.Parse(*req.InventoryItemID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid inventory_item_id: %w", ErrInvalidInput)
+		}
+		if err := s.repo.LinkScanItemToInventory(ctx, itemID, invID); err != nil {
+			return nil, fmt.Errorf("linking scan item to inventory: %w", err)
+		}
+		updated.InventoryItemID = &invID
+	}
+
 	return toScanItemResponse(updated), nil
 }
 

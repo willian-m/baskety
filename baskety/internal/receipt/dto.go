@@ -6,6 +6,7 @@ import "time"
 
 type UpdateScanItemRequest struct {
 	Status              string   `json:"status"`
+	InventoryItemID     *string  `json:"inventory_item_id"`
 	CorrectedName       *string  `json:"corrected_name"`
 	CorrectedBrand      *string  `json:"corrected_brand"`
 	CorrectedStoreName  *string  `json:"corrected_store_name"`

@@ -55,6 +55,7 @@ func (m *mockRepo) ListScanItems(ctx context.Context, scanID uuid.UUID) ([]*rece
 func (m *mockRepo) UpdateScanItem(ctx context.Context, id uuid.UUID, req receipt.UpdateScanItemRequest) (*receipt.ReceiptScanItem, error) {
 	return m.updateItemFn(ctx, id, req)
 }
+func (m *mockRepo) LinkScanItemToInventory(_ context.Context, _, _ uuid.UUID) error { return nil }
 func (m *mockRepo) CreatePurchaseTransaction(ctx context.Context, householdID uuid.UUID, scanItemID uuid.UUID, purchasedAt time.Time) (*receipt.PurchaseTransaction, error) {
 	return m.createTxFn(ctx, householdID, scanItemID, purchasedAt)
 }

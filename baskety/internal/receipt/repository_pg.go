@@ -232,6 +232,16 @@ func (r *pgRepository) UpdateScanItem(ctx context.Context, id uuid.UUID, req Upd
 	return toScanItem(row), nil
 }
 
+func (r *pgRepository) LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID) error {
+	if err := r.q.LinkReceiptScanItemToInventory(ctx, sqlc.LinkReceiptScanItemToInventoryParams{
+		ID:              shared.UUIDToPg(scanItemID),
+		InventoryItemID: shared.UUIDToPg(inventoryItemID),
+	}); err != nil {
+		return fmt.Errorf("link scan item to inventory: %w", err)
+	}
+	return nil
+}
+
 // --- purchase transactions ---
 
 // CreatePurchaseTransaction records a purchase derived from an accepted/corrected
