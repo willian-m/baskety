@@ -6,19 +6,28 @@ import type { ScanItemResponse, ScanResponse } from "../api/types.js";
 // ── Request shapes ────────────────────────────────────────────────────────────
 
 // Backend-defined scan status values (model.go).
-type ScanStatus = "uploading" | "ocr_processing" | "llm_processing" | "pending_review" | "committed" | "failed";
+type ScanStatus =
+  | "uploading"
+  | "ocr_processing"
+  | "llm_processing"
+  | "pending_review"
+  | "committed"
+  | "failed";
 
 // Backend-defined scan item status values (model.go).
 type ScanItemStatus = "pending" | "accepted" | "rejected" | "corrected";
 
 interface UpdateScanItemRequest {
   status: ScanItemStatus;
+  inventory_item_id?: string | null;
   corrected_name?: string | null;
   corrected_brand?: string | null;
   corrected_quantity?: number | null;
   corrected_price_minor?: number | null;
+  corrected_total_price_minor?: number | null;
   corrected_currency?: string | null;
   corrected_store_name?: string | null;
+  corrected_unit?: string | null;
 }
 
 // ── Scans ─────────────────────────────────────────────────────────────────────
@@ -93,6 +102,10 @@ export function useCommitScan() {
     onSuccess: (_data, { scanId }) => {
       void qc.invalidateQueries({ queryKey: ["receipts"] });
       void qc.invalidateQueries({ queryKey: ["receipts", scanId] });
+      // Committing adds inventory batches (and may create new inventory items) via
+      // a background job, so refresh inventory views. The job is async, so an
+      // already-open inventory list also refetches on its next focus/navigation.
+      void qc.invalidateQueries({ queryKey: ["inventories"] });
     },
   });
 }

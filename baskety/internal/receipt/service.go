@@ -35,13 +35,14 @@ type ServiceIface interface {
 }
 
 type Service struct {
-	repo  Repository
-	files shared.FileStore
-	queue JobQueue
+	repo      Repository
+	files     shared.FileStore
+	queue     JobQueue
+	inventory InventoryLookup // optional; used to enforce the inventory item's unit on link
 }
 
-func NewService(repo Repository, files shared.FileStore, queue JobQueue) *Service {
-	return &Service{repo: repo, files: files, queue: queue}
+func NewService(repo Repository, files shared.FileStore, queue JobQueue, inventory InventoryLookup) *Service {
+	return &Service{repo: repo, files: files, queue: queue, inventory: inventory}
 }
 
 var _ ServiceIface = (*Service)(nil)
@@ -152,10 +153,22 @@ func (s *Service) UpdateScanItem(ctx context.Context, itemID, scanID, householdI
 		if err != nil {
 			return nil, fmt.Errorf("invalid inventory_item_id: %w", ErrInvalidInput)
 		}
-		if err := s.repo.LinkScanItemToInventory(ctx, itemID, invID); err != nil {
+		// Force the unit to the linked inventory item's stored unit, overriding
+		// any unit the client sent: when an item already exists, its unit is
+		// authoritative and the user reconciles quantities against it.
+		var unit *string
+		if s.inventory != nil {
+			if u, found, uerr := s.inventory.ItemUnit(ctx, invID); uerr == nil && found && u != "" {
+				unit = &u
+			}
+		}
+		if err := s.repo.LinkScanItemToInventory(ctx, itemID, invID, unit); err != nil {
 			return nil, fmt.Errorf("linking scan item to inventory: %w", err)
 		}
 		updated.InventoryItemID = &invID
+		if unit != nil {
+			updated.CorrectedUnit = unit
+		}
 	}
 
 	return toScanItemResponse(updated), nil

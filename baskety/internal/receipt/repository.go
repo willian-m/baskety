@@ -18,7 +18,7 @@ type Repository interface {
 	CreateScanItem(ctx context.Context, scanID uuid.UUID, item ParsedLineItem) (*ReceiptScanItem, error)
 	ListScanItems(ctx context.Context, scanID uuid.UUID) ([]*ReceiptScanItem, error)
 	UpdateScanItem(ctx context.Context, id uuid.UUID, req UpdateScanItemRequest) (*ReceiptScanItem, error)
-	LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID) error
+	LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID, unit *string) error
 
 	CreatePurchaseTransaction(ctx context.Context, householdID uuid.UUID, scanItemID uuid.UUID, purchasedAt time.Time) (*PurchaseTransaction, error)
 }

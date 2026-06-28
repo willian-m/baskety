@@ -12,6 +12,10 @@ type OCRConfig struct {
 	Provider    string `mapstructure:"provider"`
 	EndpointURL string `mapstructure:"endpoint_url"`
 	BinPath     string `mapstructure:"bin_path"`
+	// Languages is the tesseract -l value (e.g. "por+eng"). Only used when
+	// provider=tesseract; the HTTP OCR services set their language via their own
+	// env. Empty falls back to "por+eng".
+	Languages string `mapstructure:"languages"`
 }
 
 // StorageConfig holds configuration for the file storage backend.

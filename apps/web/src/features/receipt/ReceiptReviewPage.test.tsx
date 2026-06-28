@@ -114,7 +114,28 @@ vi.mock("@baskety/core", () => {
     return { mutateAsync, isPending, isError, error };
   }
 
-  return { useScan, useScanItems, useUpdateScanItem, useCommitScan };
+  // The review page also reads the household's inventory items (for the link
+  // picker) and the active inventory. These tests don't exercise linking, so
+  // empty stubs are sufficient.
+  function useInventories() {
+    return { data: [] as unknown[] };
+  }
+  function useInventoryItems(_inventoryId: string) {
+    return { data: [] as unknown[] };
+  }
+  function useUiStore<T>(selector: (s: { activeInventoryId: string | null }) => T): T {
+    return selector({ activeInventoryId: null });
+  }
+
+  return {
+    useScan,
+    useScanItems,
+    useUpdateScanItem,
+    useCommitScan,
+    useInventories,
+    useInventoryItems,
+    useUiStore,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -277,6 +298,48 @@ describe("ReceiptReviewPage", () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole("button", { name: /commit/i })).not.toBeDisabled());
+  });
+
+  it("editing unit price auto-fills total via quantity", async () => {
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({
+          data: [scanItemFixture({ id: "item-1", parsed_quantity: 2, parsed_price_minor: null })],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const unitPrice = await screen.findByLabelText("Unit price");
+    await user.clear(unitPrice);
+    await user.type(unitPrice, "5");
+
+    expect((screen.getByLabelText("Total") as HTMLInputElement).value).toBe("10");
+  });
+
+  it("editing total auto-fills unit price via quantity", async () => {
+    server.use(
+      http.get(`/api/v1/receipts/${SCAN_ID}`, () =>
+        HttpResponse.json({ data: scanFixture({ id: SCAN_ID }) }),
+      ),
+      http.get(`/api/v1/receipts/${SCAN_ID}/items`, () =>
+        HttpResponse.json({
+          data: [scanItemFixture({ id: "item-1", parsed_quantity: 2, parsed_price_minor: null })],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    const total = await screen.findByLabelText("Total");
+    await user.clear(total);
+    await user.type(total, "10");
+
+    expect((screen.getByLabelText("Unit price") as HTMLInputElement).value).toBe("5");
   });
 
   it("clicking commit sends POST to commit endpoint", async () => {

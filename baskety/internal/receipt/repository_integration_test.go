@@ -344,3 +344,68 @@ func TestIntegration_Receipt_CommitFlow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, receipt.StatusCommitted, fetched.Status)
 }
+
+func TestIntegration_Receipt_PriceUnitFields(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires docker")
+	}
+	ctx := context.Background()
+	pool := testutil.NewTestDB(t)
+	repo := receipt.NewPgRepository(pool)
+
+	householdID, userID := seedHousehold(ctx, t, pool)
+
+	var inventoryID, inventoryItemID uuid.UUID
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO inventories (household_id, name) VALUES ($1, $2) RETURNING id`,
+		householdID, "Pantry").Scan(&inventoryID))
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO inventory_items (inventory_id, name, unit, target_quantity) VALUES ($1, $2, $3, $4) RETURNING id`,
+		inventoryID, "Tomato", "kg", 1.0).Scan(&inventoryItemID))
+
+	scan, err := repo.CreateScan(ctx, householdID, nil, "/uploads/test.jpg", userID)
+	require.NoError(t, err)
+
+	name := "Tomato"
+	qty := 2.0
+	unitPrice := int64(150)
+	totalPrice := int64(300)
+	parsedUnit := "ea"
+	item, err := repo.CreateScanItem(ctx, scan.ID, receipt.ParsedLineItem{
+		RawText:               "TOM AT 2 x 1,50 3,00",
+		ParsedName:            &name,
+		ParsedQuantity:        &qty,
+		ParsedUnit:            &parsedUnit,
+		ParsedPriceMinor:      &unitPrice,
+		ParsedTotalPriceMinor: &totalPrice,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, item.ParsedTotalPriceMinor)
+	assert.Equal(t, totalPrice, *item.ParsedTotalPriceMinor)
+
+	// Linking with a unit forces corrected_unit while keeping parsed_unit.
+	invUnit := "kg"
+	require.NoError(t, repo.LinkScanItemToInventory(ctx, item.ID, inventoryItemID, &invUnit))
+
+	// Update corrected total price + unit and read it back.
+	correctedTotal := int64(290)
+	correctedUnit := "kg"
+	updated, err := repo.UpdateScanItem(ctx, item.ID, receipt.UpdateScanItemRequest{
+		Status:                   receipt.ItemStatusCorrected,
+		CorrectedTotalPriceMinor: &correctedTotal,
+		CorrectedUnit:            &correctedUnit,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, updated.CorrectedTotalPriceMinor)
+	assert.Equal(t, correctedTotal, *updated.CorrectedTotalPriceMinor)
+	require.NotNil(t, updated.CorrectedUnit)
+	assert.Equal(t, "kg", *updated.CorrectedUnit)
+	require.NotNil(t, updated.ParsedUnit)
+	assert.Equal(t, "ea", *updated.ParsedUnit, "parsed_unit (receipt's unit) is preserved")
+
+	// CreatePurchaseTransaction reads the item via the hand-written getScanItem
+	// SQL, exercising the new columns in the SELECT/Scan list.
+	tx, err := repo.CreatePurchaseTransaction(ctx, householdID, item.ID, time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+}

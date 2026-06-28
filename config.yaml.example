@@ -26,10 +26,18 @@ encryption:
   key_file: /run/secrets/baskety_key
 
 log:
-  level: info
+  level: info          # set to "debug" (or env LOG_LEVEL=debug) to log the full LLM prompt
   format: json
+
+# LLM receipt-parsing observability (env-only, no config key):
+#   BASKETY_LLM_LOG_FILE=/data/llm-debug.jsonl
+# When set, every LLM request/response exchange (prompt, raw response, parsed
+# item count, parse error) is appended as a JSON line for prompt iteration.
+# The raw response is always summarised to the standard log regardless.
 
 ocr:
   provider: tesseract      # "tesseract" (local binary, default) | "http" (docker OCR service)
   endpoint_url: http://ocr:8000   # used when provider=http; set automatically when using --profile easyocr or --profile paddleocr
   bin_path: ""             # path to tesseract binary when provider=tesseract; empty = use $PATH
+  languages: por+eng       # tesseract -l value when provider=tesseract (language packs must be installed).
+                           # HTTP OCR services set their own language via OCR_LANGUAGES (easyocr) / OCR_LANG (paddleocr).

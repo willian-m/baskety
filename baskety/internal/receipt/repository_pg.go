@@ -64,27 +64,30 @@ func toScan(row sqlc.ReceiptScan) *ReceiptScan {
 
 func toScanItem(row sqlc.ReceiptScanItem) *ReceiptScanItem {
 	return &ReceiptScanItem{
-		ID:                  shared.PgToUUID(row.ID),
-		ReceiptScanID:       shared.PgToUUID(row.ReceiptScanID),
-		RawText:             row.RawText,
-		ParsedName:          row.ParsedName,
-		ParsedBrand:         row.ParsedBrand,
-		ParsedQuantity:      pgNumericToFloatPtr(row.ParsedQuantity),
-		ParsedUnit:          row.ParsedUnit,
-		ParsedPriceMinor:    row.ParsedPricePerUnitMinor,
-		ParsedCurrency:      row.ParsedCurrency,
-		ParsedStoreName:     row.ParsedStoreName,
-		ConfidenceScore:     pgNumericToFloatPtr(row.ConfidenceScore),
-		Status:              row.Status,
-		InventoryItemID:     shared.PgToUUIDPtr(row.InventoryItemID),
-		CorrectedName:       row.CorrectedName,
-		CorrectedBrand:      row.CorrectedBrand,
-		CorrectedQuantity:   pgNumericToFloatPtr(row.CorrectedQuantity),
-		CorrectedPriceMinor: row.CorrectedPricePerUnitMinor,
-		CorrectedCurrency:   row.CorrectedCurrency,
-		CorrectedStoreName:  row.CorrectedStoreName,
-		CreatedAt:           row.CreatedAt.Time,
-		UpdatedAt:           row.UpdatedAt.Time,
+		ID:                       shared.PgToUUID(row.ID),
+		ReceiptScanID:            shared.PgToUUID(row.ReceiptScanID),
+		RawText:                  row.RawText,
+		ParsedName:               row.ParsedName,
+		ParsedBrand:              row.ParsedBrand,
+		ParsedQuantity:           pgNumericToFloatPtr(row.ParsedQuantity),
+		ParsedUnit:               row.ParsedUnit,
+		ParsedPriceMinor:         row.ParsedPricePerUnitMinor,
+		ParsedTotalPriceMinor:    row.ParsedTotalPriceMinor,
+		ParsedCurrency:           row.ParsedCurrency,
+		ParsedStoreName:          row.ParsedStoreName,
+		ConfidenceScore:          pgNumericToFloatPtr(row.ConfidenceScore),
+		Status:                   row.Status,
+		InventoryItemID:          shared.PgToUUIDPtr(row.InventoryItemID),
+		CorrectedName:            row.CorrectedName,
+		CorrectedBrand:           row.CorrectedBrand,
+		CorrectedQuantity:        pgNumericToFloatPtr(row.CorrectedQuantity),
+		CorrectedPriceMinor:      row.CorrectedPricePerUnitMinor,
+		CorrectedTotalPriceMinor: row.CorrectedTotalPriceMinor,
+		CorrectedCurrency:        row.CorrectedCurrency,
+		CorrectedStoreName:       row.CorrectedStoreName,
+		CorrectedUnit:            row.CorrectedUnit,
+		CreatedAt:                row.CreatedAt.Time,
+		UpdatedAt:                row.UpdatedAt.Time,
 	}
 }
 
@@ -190,6 +193,7 @@ func (r *pgRepository) CreateScanItem(ctx context.Context, scanID uuid.UUID, ite
 		ParsedQuantity:          floatPtrToPgNumeric(item.ParsedQuantity),
 		ParsedUnit:              item.ParsedUnit,
 		ParsedPricePerUnitMinor: item.ParsedPriceMinor,
+		ParsedTotalPriceMinor:   item.ParsedTotalPriceMinor,
 		ParsedCurrency:          item.ParsedCurrency,
 		ParsedStoreName:         item.ParsedStoreName,
 		ConfidenceScore:         floatPtrToPgNumeric(item.ConfidenceScore),
@@ -220,8 +224,10 @@ func (r *pgRepository) UpdateScanItem(ctx context.Context, id uuid.UUID, req Upd
 		CorrectedBrand:             req.CorrectedBrand,
 		CorrectedQuantity:          floatPtrToPgNumeric(req.CorrectedQuantity),
 		CorrectedPricePerUnitMinor: req.CorrectedPriceMinor,
+		CorrectedTotalPriceMinor:   req.CorrectedTotalPriceMinor,
 		CorrectedCurrency:          req.CorrectedCurrency,
 		CorrectedStoreName:         req.CorrectedStoreName,
+		CorrectedUnit:              req.CorrectedUnit,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -232,10 +238,14 @@ func (r *pgRepository) UpdateScanItem(ctx context.Context, id uuid.UUID, req Upd
 	return toScanItem(row), nil
 }
 
-func (r *pgRepository) LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID) error {
+// LinkScanItemToInventory links a scan item to an inventory item. When unit is
+// non-nil it also sets corrected_unit, so the unit is forced to the one already
+// stored on the inventory item (the receipt's unit is kept in parsed_unit).
+func (r *pgRepository) LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID, unit *string) error {
 	if err := r.q.LinkReceiptScanItemToInventory(ctx, sqlc.LinkReceiptScanItemToInventoryParams{
 		ID:              shared.UUIDToPg(scanItemID),
 		InventoryItemID: shared.UUIDToPg(inventoryItemID),
+		CorrectedUnit:   unit,
 	}); err != nil {
 		return fmt.Errorf("link scan item to inventory: %w", err)
 	}
@@ -287,20 +297,20 @@ func (r *pgRepository) CreatePurchaseTransaction(ctx context.Context, householdI
 // only generates a list query for scan items.
 func (r *pgRepository) getScanItem(ctx context.Context, id uuid.UUID) (*ReceiptScanItem, error) {
 	const q = `SELECT id, receipt_scan_id, raw_text, parsed_name, parsed_brand,
-		parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency,
-		parsed_store_name, confidence_score, status, inventory_item_id,
+		parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_total_price_minor,
+		parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id,
 		corrected_name, corrected_brand, corrected_quantity,
-		corrected_price_per_unit_minor, corrected_currency, corrected_store_name,
-		created_at, updated_at
+		corrected_price_per_unit_minor, corrected_total_price_minor, corrected_currency,
+		corrected_store_name, corrected_unit, created_at, updated_at
 		FROM receipt_scan_items WHERE id = $1`
 	var row sqlc.ReceiptScanItem
 	err := r.pool.QueryRow(ctx, q, shared.UUIDToPg(id)).Scan(
 		&row.ID, &row.ReceiptScanID, &row.RawText, &row.ParsedName, &row.ParsedBrand,
-		&row.ParsedQuantity, &row.ParsedUnit, &row.ParsedPricePerUnitMinor, &row.ParsedCurrency,
-		&row.ParsedStoreName, &row.ConfidenceScore, &row.Status, &row.InventoryItemID,
+		&row.ParsedQuantity, &row.ParsedUnit, &row.ParsedPricePerUnitMinor, &row.ParsedTotalPriceMinor,
+		&row.ParsedCurrency, &row.ParsedStoreName, &row.ConfidenceScore, &row.Status, &row.InventoryItemID,
 		&row.CorrectedName, &row.CorrectedBrand, &row.CorrectedQuantity,
-		&row.CorrectedPricePerUnitMinor, &row.CorrectedCurrency, &row.CorrectedStoreName,
-		&row.CreatedAt, &row.UpdatedAt,
+		&row.CorrectedPricePerUnitMinor, &row.CorrectedTotalPriceMinor, &row.CorrectedCurrency,
+		&row.CorrectedStoreName, &row.CorrectedUnit, &row.CreatedAt, &row.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

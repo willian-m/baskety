@@ -20,9 +20,19 @@ services:
     image: ghcr.io/willian-m/baskety:latest
     ports:
       - "8080:8080"
+    environment:
+      # Observability for receipt LLM parsing.
+      # LOG_LEVEL=debug additionally logs the full prompt; the raw LLM response is
+      # always logged at info, so `docker compose logs baskety` shows it either way.
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Every LLM request/response exchange (prompt, raw response, parsed item
+      # count, parse error) is appended as a JSON line to this file, mounted to
+      # ./logs on the host for easy prompt iteration. Set to "" to disable.
+      BASKETY_LLM_LOG_FILE: ${BASKETY_LLM_LOG_FILE:-/var/log/baskety/llm-debug.jsonl}
     volumes:
       - ./config.yaml:/etc/baskety/config.yaml:ro
       - baskety_uploads:/data/uploads
+      - ./logs:/var/log/baskety
     secrets:
       - baskety_key
     depends_on:
@@ -57,7 +67,8 @@ services:
     volumes:
       - easyocr_models:/root/.EasyOCR
     environment:
-      OCR_LANGUAGES: "en"
+      # Comma-separated EasyOCR language codes; "pt,en" handles Portuguese receipts.
+      OCR_LANGUAGES: "${OCR_LANGUAGES:-pt,en}"
     networks:
       default:
         aliases: [ocr]
@@ -76,7 +87,8 @@ services:
     volumes:
       - paddleocr_models:/root/.paddleocr
     environment:
-      OCR_LANG: "en"
+      # PaddleOCR language code; "pt" handles Portuguese receipts.
+      OCR_LANG: "${OCR_LANG:-pt}"
     networks:
       default:
         aliases: [ocr]

@@ -25,6 +25,7 @@ type mockRepo struct {
 	createItemFn   func(ctx context.Context, scanID uuid.UUID, item receipt.ParsedLineItem) (*receipt.ReceiptScanItem, error)
 	listItemsFn    func(ctx context.Context, scanID uuid.UUID) ([]*receipt.ReceiptScanItem, error)
 	updateItemFn   func(ctx context.Context, id uuid.UUID, req receipt.UpdateScanItemRequest) (*receipt.ReceiptScanItem, error)
+	linkFn         func(ctx context.Context, scanItemID, inventoryItemID uuid.UUID, unit *string) error
 	createTxFn     func(ctx context.Context, householdID uuid.UUID, scanItemID uuid.UUID, purchasedAt time.Time) (*receipt.PurchaseTransaction, error)
 }
 
@@ -55,9 +56,34 @@ func (m *mockRepo) ListScanItems(ctx context.Context, scanID uuid.UUID) ([]*rece
 func (m *mockRepo) UpdateScanItem(ctx context.Context, id uuid.UUID, req receipt.UpdateScanItemRequest) (*receipt.ReceiptScanItem, error) {
 	return m.updateItemFn(ctx, id, req)
 }
-func (m *mockRepo) LinkScanItemToInventory(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (m *mockRepo) LinkScanItemToInventory(ctx context.Context, scanItemID, inventoryItemID uuid.UUID, unit *string) error {
+	if m.linkFn != nil {
+		return m.linkFn(ctx, scanItemID, inventoryItemID, unit)
+	}
+	return nil
+}
 func (m *mockRepo) CreatePurchaseTransaction(ctx context.Context, householdID uuid.UUID, scanItemID uuid.UUID, purchasedAt time.Time) (*receipt.PurchaseTransaction, error) {
 	return m.createTxFn(ctx, householdID, scanItemID, purchasedAt)
+}
+
+// --- mock InventoryLookup ---
+
+type mockInventory struct {
+	householdItemsFn func(ctx context.Context, householdID uuid.UUID) ([]receipt.InventoryItemRef, error)
+	itemUnitFn       func(ctx context.Context, itemID uuid.UUID) (string, bool, error)
+}
+
+func (m *mockInventory) HouseholdItems(ctx context.Context, householdID uuid.UUID) ([]receipt.InventoryItemRef, error) {
+	if m.householdItemsFn != nil {
+		return m.householdItemsFn(ctx, householdID)
+	}
+	return nil, nil
+}
+func (m *mockInventory) ItemUnit(ctx context.Context, itemID uuid.UUID) (string, bool, error) {
+	if m.itemUnitFn != nil {
+		return m.itemUnitFn(ctx, itemID)
+	}
+	return "", false, nil
 }
 
 // --- mock FileStore ---
@@ -107,7 +133,7 @@ func TestUploadScan_Success(t *testing.T) {
 	}}
 	q := &mockQueue{}
 
-	svc := receipt.NewService(repo, files, q)
+	svc := receipt.NewService(repo, files, q, nil)
 	resp, err := svc.UploadScan(ctx, hid, uid, nil, "receipt.jpg", strings.NewReader("img"))
 	require.NoError(t, err)
 	assert.Equal(t, receipt.StatusUploading, resp.Status)
@@ -129,7 +155,7 @@ func TestGetScan_WrongHousehold(t *testing.T) {
 			return &receipt.ReceiptScan{ID: scanID, HouseholdID: owner, Status: receipt.StatusPendingReview}, nil
 		},
 	}
-	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{})
+	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{}, nil)
 	_, err := svc.GetScan(ctx, scanID, caller)
 	require.ErrorIs(t, err, receipt.ErrNotFound)
 }
@@ -144,7 +170,7 @@ func TestCommitScan_NotPendingReview(t *testing.T) {
 			return &receipt.ReceiptScan{ID: scanID, HouseholdID: hid, Status: receipt.StatusOCRProcessing}, nil
 		},
 	}
-	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{})
+	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{}, nil)
 	_, err := svc.CommitScan(ctx, scanID, hid, receipt.CommitScanRequest{PurchasedAt: time.Now()})
 	require.ErrorIs(t, err, receipt.ErrInvalidInput)
 }
@@ -176,10 +202,57 @@ func TestCommitScan_CreatesTransactions(t *testing.T) {
 			return &receipt.ReceiptScan{ID: scanID, HouseholdID: hid, Status: status}, nil
 		},
 	}
-	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{})
+	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{}, nil)
 	resp, err := svc.CommitScan(ctx, scanID, hid, receipt.CommitScanRequest{PurchasedAt: time.Now()})
 	require.NoError(t, err)
 	assert.Equal(t, receipt.StatusCommitted, resp.Status)
 	require.Len(t, txCalls, 1, "only the accepted item should create a transaction")
 	assert.Equal(t, acceptedID, txCalls[0])
+}
+
+func TestUpdateScanItem_LinkForcesInventoryUnit(t *testing.T) {
+	ctx := context.Background()
+	scanID := uuid.New()
+	hid := uuid.New()
+	itemID := uuid.New()
+	invItemID := uuid.New()
+	invIDStr := invItemID.String()
+	userUnit := "g" // what the client sends — must be overridden
+
+	var linkedUnit *string
+	repo := &mockRepo{
+		getScanFn: func(ctx context.Context, id uuid.UUID) (*receipt.ReceiptScan, error) {
+			return &receipt.ReceiptScan{ID: scanID, HouseholdID: hid, Status: receipt.StatusPendingReview}, nil
+		},
+		listItemsFn: func(ctx context.Context, sid uuid.UUID) ([]*receipt.ReceiptScanItem, error) {
+			return []*receipt.ReceiptScanItem{{ID: itemID, ReceiptScanID: scanID, Status: receipt.ItemStatusPending}}, nil
+		},
+		updateItemFn: func(ctx context.Context, id uuid.UUID, req receipt.UpdateScanItemRequest) (*receipt.ReceiptScanItem, error) {
+			return &receipt.ReceiptScanItem{ID: id, ReceiptScanID: scanID, Status: req.Status, CorrectedUnit: req.CorrectedUnit}, nil
+		},
+		linkFn: func(ctx context.Context, scanItemID, inventoryItemID uuid.UUID, unit *string) error {
+			assert.Equal(t, itemID, scanItemID)
+			assert.Equal(t, invItemID, inventoryItemID)
+			linkedUnit = unit
+			return nil
+		},
+	}
+	inv := &mockInventory{
+		itemUnitFn: func(ctx context.Context, id uuid.UUID) (string, bool, error) {
+			assert.Equal(t, invItemID, id)
+			return "kg", true, nil
+		},
+	}
+
+	svc := receipt.NewService(repo, &mockFileStore{}, &mockQueue{}, inv)
+	resp, err := svc.UpdateScanItem(ctx, itemID, scanID, hid, receipt.UpdateScanItemRequest{
+		Status:          receipt.ItemStatusCorrected,
+		InventoryItemID: &invIDStr,
+		CorrectedUnit:   &userUnit,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, linkedUnit, "unit should be passed to the link call")
+	assert.Equal(t, "kg", *linkedUnit, "inventory item's stored unit must override the client unit")
+	require.NotNil(t, resp.CorrectedUnit)
+	assert.Equal(t, "kg", *resp.CorrectedUnit)
 }

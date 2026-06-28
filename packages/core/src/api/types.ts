@@ -125,6 +125,7 @@ export interface ScanItemResponse {
   parsed_quantity: number | null;
   parsed_unit: string | null;
   parsed_price_minor: number | null;
+  parsed_total_price_minor: number | null;
   parsed_currency: string | null;
   parsed_store_name: string | null;
   confidence_score: number | null;
@@ -134,8 +135,10 @@ export interface ScanItemResponse {
   corrected_brand: string | null;
   corrected_quantity: number | null;
   corrected_price_minor: number | null;
+  corrected_total_price_minor: number | null;
   corrected_currency: string | null;
   corrected_store_name: string | null;
+  corrected_unit: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -39,27 +39,30 @@ type ReceiptScan struct {
 }
 
 type ReceiptScanItem struct {
-	ID                  uuid.UUID
-	ReceiptScanID       uuid.UUID
-	RawText             string
-	ParsedName          *string
-	ParsedBrand         *string
-	ParsedQuantity      *float64
-	ParsedUnit          *string
-	ParsedPriceMinor    *int64
-	ParsedCurrency      *string
-	ParsedStoreName     *string
-	ConfidenceScore     *float64
-	Status              string
-	InventoryItemID     *uuid.UUID
-	CorrectedName       *string
-	CorrectedBrand      *string
-	CorrectedQuantity   *float64
-	CorrectedPriceMinor *int64
-	CorrectedCurrency   *string
-	CorrectedStoreName  *string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                       uuid.UUID
+	ReceiptScanID            uuid.UUID
+	RawText                  string
+	ParsedName               *string
+	ParsedBrand              *string
+	ParsedQuantity           *float64
+	ParsedUnit               *string
+	ParsedPriceMinor         *int64
+	ParsedTotalPriceMinor    *int64
+	ParsedCurrency           *string
+	ParsedStoreName          *string
+	ConfidenceScore          *float64
+	Status                   string
+	InventoryItemID          *uuid.UUID
+	CorrectedName            *string
+	CorrectedBrand           *string
+	CorrectedQuantity        *float64
+	CorrectedPriceMinor      *int64
+	CorrectedTotalPriceMinor *int64
+	CorrectedCurrency        *string
+	CorrectedStoreName       *string
+	CorrectedUnit            *string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type PurchaseTransaction struct {

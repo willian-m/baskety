@@ -123,7 +123,7 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 	case "http":
 		ocrProvider = ocr.NewHTTPOCR(cfg.OCR.EndpointURL)
 	default:
-		ocrProvider = ocr.NewTesseractOCR(cfg.OCR.BinPath)
+		ocrProvider = ocr.NewTesseractOCR(cfg.OCR.BinPath, cfg.OCR.Languages)
 	}
 	llmResolver := func(ctx context.Context, householdID uuid.UUID) (receipt.LLMProvider, error) {
 		cfg, err := settingsRepo.GetDefaultLLMProvider(ctx, householdID)
@@ -138,11 +138,12 @@ func runServe(ctx context.Context, cfg *shared.Config) error {
 
 	jobQueue := receipt.NewInProcessQueue(2, 64)
 	receiptRepo := receipt.NewPgRepository(pool)
-	receiptWorker := receipt.NewProcessReceiptScanWorker(receiptRepo, ocrProvider, llmResolver)
+	invLookup := receiptInventoryLookup{repo: inventoryRepo}
+	receiptWorker := receipt.NewProcessReceiptScanWorker(receiptRepo, ocrProvider, llmResolver, invLookup)
 	jobQueue.Register(receipt.JobProcessReceiptScan, receiptWorker.HandleJob)
 	defer jobQueue.Shutdown()
 
-	receiptSvc := receipt.NewService(receiptRepo, fileStore, jobQueue)
+	receiptSvc := receipt.NewService(receiptRepo, fileStore, jobQueue, invLookup)
 	receiptHandler := receipt.NewHandler(receiptSvc)
 
 	// Catalog domain: stores, catalog entries, purchase transactions. The
