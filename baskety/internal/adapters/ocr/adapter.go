@@ -14,19 +14,26 @@ var _ receipt.OCRProvider = (*TesseractOCR)(nil)
 // TesseractOCR shells out to the tesseract binary to extract text from an image.
 type TesseractOCR struct {
 	Binary string
+	// Languages is the tesseract -l value, e.g. "por+eng" for Portuguese+English.
+	// The matching language data packs must be installed for the binary.
+	Languages string
 }
 
-func NewTesseractOCR(binary string) *TesseractOCR {
+func NewTesseractOCR(binary, languages string) *TesseractOCR {
 	if binary == "" {
 		binary = "tesseract"
 	}
-	return &TesseractOCR{Binary: binary}
+	if languages == "" {
+		languages = "por+eng"
+	}
+	return &TesseractOCR{Binary: binary, Languages: languages}
 }
 
-// ExtractText runs `tesseract <imagePath> stdout` and returns the recognized text.
+// ExtractText runs `tesseract <imagePath> stdout -l <languages>` and returns the
+// recognized text.
 func (t *TesseractOCR) ExtractText(ctx context.Context, imagePath string) (string, error) {
 	var out, errBuf bytes.Buffer
-	cmd := exec.CommandContext(ctx, t.Binary, imagePath, "stdout")
+	cmd := exec.CommandContext(ctx, t.Binary, imagePath, "stdout", "-l", t.Languages)
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {

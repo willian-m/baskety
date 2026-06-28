@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"github.com/willian-m/baskety/internal/receipt"
 )
@@ -23,14 +22,28 @@ func NewOpenAILLM(apiKey, model string) *OpenAILLM {
 }
 
 func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, string, error) {
-	slog.Debug("openai request", "model", l.Model, "prompt_len", len(parsePrompt)+len(ocrText))
+	prompt := parsePrompt + ocrText
+	// Force the model to call our function: its arguments are guaranteed to be a
+	// JSON object matching the schema, which we parse directly. This avoids the
+	// free-form-JSON shape failures (object vs array) seen with response_format.
 	reqBody := map[string]any{
 		"model": l.Model,
 		"messages": []map[string]string{
-			{"role": "system", "content": "You are a precise receipt-parsing assistant that outputs only JSON."},
-			{"role": "user", "content": parsePrompt + ocrText},
+			{"role": "system", "content": "You are a precise receipt-parsing assistant. Always call the " + recordLineItemsTool + " function."},
+			{"role": "user", "content": prompt},
 		},
-		"response_format": map[string]string{"type": "json_object"},
+		"tools": []map[string]any{{
+			"type": "function",
+			"function": map[string]any{
+				"name":        recordLineItemsTool,
+				"description": "Record the line items extracted from the receipt.",
+				"parameters":  lineItemsResultSchema(),
+			},
+		}},
+		"tool_choice": map[string]any{
+			"type":     "function",
+			"function": map[string]string{"name": recordLineItemsTool},
+		},
 	}
 	headers := map[string]string{"Authorization": "Bearer " + l.APIKey}
 	data, err := doJSONPost(ctx, "https://api.openai.com/v1/chat/completions", headers, reqBody)
@@ -40,7 +53,12 @@ func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt
 	var resp struct {
 		Choices []struct {
 			Message struct {
-				Content string `json:"content"`
+				Content   string `json:"content"`
+				ToolCalls []struct {
+					Function struct {
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls"`
 			} `json:"message"`
 		} `json:"choices"`
 	}
@@ -50,54 +68,18 @@ func (l *OpenAILLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt
 	if len(resp.Choices) == 0 {
 		return nil, "", fmt.Errorf("openai: empty choices")
 	}
+	// Prefer the tool-call arguments; fall back to message content for servers
+	// (or OpenAI-compatible endpoints) that ignore tool_choice.
 	raw := resp.Choices[0].Message.Content
-	slog.Debug("openai response", "model", l.Model, "response", raw)
-	items, err := parseMaybeWrappedArray(raw)
-	return items, raw, err
-}
-
-// parseMaybeWrappedArray handles models that, when asked for a json_object,
-// wrap the array under a key like {"items": [...]}. It first tries a bare array.
-func parseMaybeWrappedArray(content string) ([]receipt.ParsedLineItem, error) {
-	if items, err := toParsedLineItems(content); err == nil {
-		return items, nil
+	if tc := resp.Choices[0].Message.ToolCalls; len(tc) > 0 && tc[0].Function.Arguments != "" {
+		raw = tc[0].Function.Arguments
 	}
-	var wrapper map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(extractJSONObject(content)), &wrapper); err == nil {
-		for _, v := range wrapper {
-			if items, err := toParsedLineItems(string(v)); err == nil {
-				return items, nil
-			}
-		}
+	items, perr := parseLineItemsResponse(raw)
+	recordExchange("openai", l.Model, prompt, raw, len(items), perr)
+	if perr != nil {
+		return nil, raw, fmt.Errorf("openai: %w", perr)
 	}
-	return nil, fmt.Errorf("could not extract line item array from response")
-}
-
-func extractJSONObject(s string) string {
-	start := indexByte(s, '{')
-	end := lastIndexByte(s, '}')
-	if start >= 0 && end > start {
-		return s[start : end+1]
-	}
-	return s
-}
-
-func indexByte(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
-		}
-	}
-	return -1
-}
-
-func lastIndexByte(s string, b byte) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == b {
-			return i
-		}
-	}
-	return -1
+	return items, raw, nil
 }
 
 var _ receipt.LLMProvider = (*OpenAILLM)(nil)

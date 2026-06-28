@@ -15,10 +15,10 @@ const createReceiptScanItem = `-- name: CreateReceiptScanItem :one
 INSERT INTO receipt_scan_items (
     receipt_scan_id, raw_text,
     parsed_name, parsed_brand, parsed_quantity, parsed_unit,
-    parsed_price_per_unit_minor, parsed_currency, parsed_store_name,
+    parsed_price_per_unit_minor, parsed_total_price_minor, parsed_currency, parsed_store_name,
     confidence_score
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at, parsed_total_price_minor, corrected_total_price_minor, corrected_unit
 `
 
 type CreateReceiptScanItemParams struct {
@@ -29,6 +29,7 @@ type CreateReceiptScanItemParams struct {
 	ParsedQuantity          pgtype.Numeric `json:"parsed_quantity"`
 	ParsedUnit              *string        `json:"parsed_unit"`
 	ParsedPricePerUnitMinor *int64         `json:"parsed_price_per_unit_minor"`
+	ParsedTotalPriceMinor   *int64         `json:"parsed_total_price_minor"`
 	ParsedCurrency          *string        `json:"parsed_currency"`
 	ParsedStoreName         *string        `json:"parsed_store_name"`
 	ConfidenceScore         pgtype.Numeric `json:"confidence_score"`
@@ -43,6 +44,7 @@ func (q *Queries) CreateReceiptScanItem(ctx context.Context, arg CreateReceiptSc
 		arg.ParsedQuantity,
 		arg.ParsedUnit,
 		arg.ParsedPricePerUnitMinor,
+		arg.ParsedTotalPriceMinor,
 		arg.ParsedCurrency,
 		arg.ParsedStoreName,
 		arg.ConfidenceScore,
@@ -70,26 +72,33 @@ func (q *Queries) CreateReceiptScanItem(ctx context.Context, arg CreateReceiptSc
 		&i.CorrectedStoreName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParsedTotalPriceMinor,
+		&i.CorrectedTotalPriceMinor,
+		&i.CorrectedUnit,
 	)
 	return i, err
 }
 
 const linkReceiptScanItemToInventory = `-- name: LinkReceiptScanItemToInventory :exec
-UPDATE receipt_scan_items SET inventory_item_id = $2 WHERE id = $1
+UPDATE receipt_scan_items
+SET inventory_item_id = $2,
+    corrected_unit = COALESCE($3, corrected_unit)
+WHERE id = $1
 `
 
 type LinkReceiptScanItemToInventoryParams struct {
 	ID              pgtype.UUID `json:"id"`
 	InventoryItemID pgtype.UUID `json:"inventory_item_id"`
+	CorrectedUnit   *string     `json:"corrected_unit"`
 }
 
 func (q *Queries) LinkReceiptScanItemToInventory(ctx context.Context, arg LinkReceiptScanItemToInventoryParams) error {
-	_, err := q.db.Exec(ctx, linkReceiptScanItemToInventory, arg.ID, arg.InventoryItemID)
+	_, err := q.db.Exec(ctx, linkReceiptScanItemToInventory, arg.ID, arg.InventoryItemID, arg.CorrectedUnit)
 	return err
 }
 
 const listReceiptScanItems = `-- name: ListReceiptScanItems :many
-SELECT id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at FROM receipt_scan_items WHERE receipt_scan_id = $1 ORDER BY created_at ASC
+SELECT id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at, parsed_total_price_minor, corrected_total_price_minor, corrected_unit FROM receipt_scan_items WHERE receipt_scan_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListReceiptScanItems(ctx context.Context, receiptScanID pgtype.UUID) ([]ReceiptScanItem, error) {
@@ -123,6 +132,9 @@ func (q *Queries) ListReceiptScanItems(ctx context.Context, receiptScanID pgtype
 			&i.CorrectedStoreName,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParsedTotalPriceMinor,
+			&i.CorrectedTotalPriceMinor,
+			&i.CorrectedUnit,
 		); err != nil {
 			return nil, err
 		}
@@ -141,11 +153,13 @@ SET status = $2,
     corrected_brand = $4,
     corrected_quantity = $5,
     corrected_price_per_unit_minor = $6,
-    corrected_currency = $7,
-    corrected_store_name = $8,
+    corrected_total_price_minor = $7,
+    corrected_currency = $8,
+    corrected_store_name = $9,
+    corrected_unit = $10,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at
+RETURNING id, receipt_scan_id, raw_text, parsed_name, parsed_brand, parsed_quantity, parsed_unit, parsed_price_per_unit_minor, parsed_currency, parsed_store_name, confidence_score, status, inventory_item_id, corrected_name, corrected_brand, corrected_quantity, corrected_price_per_unit_minor, corrected_currency, corrected_store_name, created_at, updated_at, parsed_total_price_minor, corrected_total_price_minor, corrected_unit
 `
 
 type UpdateReceiptScanItemStatusParams struct {
@@ -155,8 +169,10 @@ type UpdateReceiptScanItemStatusParams struct {
 	CorrectedBrand             *string        `json:"corrected_brand"`
 	CorrectedQuantity          pgtype.Numeric `json:"corrected_quantity"`
 	CorrectedPricePerUnitMinor *int64         `json:"corrected_price_per_unit_minor"`
+	CorrectedTotalPriceMinor   *int64         `json:"corrected_total_price_minor"`
 	CorrectedCurrency          *string        `json:"corrected_currency"`
 	CorrectedStoreName         *string        `json:"corrected_store_name"`
+	CorrectedUnit              *string        `json:"corrected_unit"`
 }
 
 func (q *Queries) UpdateReceiptScanItemStatus(ctx context.Context, arg UpdateReceiptScanItemStatusParams) (ReceiptScanItem, error) {
@@ -167,8 +183,10 @@ func (q *Queries) UpdateReceiptScanItemStatus(ctx context.Context, arg UpdateRec
 		arg.CorrectedBrand,
 		arg.CorrectedQuantity,
 		arg.CorrectedPricePerUnitMinor,
+		arg.CorrectedTotalPriceMinor,
 		arg.CorrectedCurrency,
 		arg.CorrectedStoreName,
+		arg.CorrectedUnit,
 	)
 	var i ReceiptScanItem
 	err := row.Scan(
@@ -193,6 +211,9 @@ func (q *Queries) UpdateReceiptScanItemStatus(ctx context.Context, arg UpdateRec
 		&i.CorrectedStoreName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParsedTotalPriceMinor,
+		&i.CorrectedTotalPriceMinor,
+		&i.CorrectedUnit,
 	)
 	return i, err
 }

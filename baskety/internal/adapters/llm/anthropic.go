@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"github.com/willian-m/baskety/internal/receipt"
 )
@@ -23,13 +22,22 @@ func NewAnthropicLLM(apiKey, model string) *AnthropicLLM {
 }
 
 func (l *AnthropicLLM) ParseReceipt(ctx context.Context, ocrText string) ([]receipt.ParsedLineItem, string, error) {
-	slog.Debug("anthropic request", "model", l.Model, "prompt_len", len(parsePrompt)+len(ocrText))
+	prompt := parsePrompt + ocrText
+	// Force the model to use our tool: the tool_use block's "input" is a JSON
+	// object matching the schema, which we parse directly — more reliable than
+	// asking for free-form JSON in the text response.
 	reqBody := map[string]any{
 		"model":      l.Model,
 		"max_tokens": 4096,
-		"system":     "You are a precise receipt-parsing assistant that outputs only a JSON array.",
+		"system":     "You are a precise receipt-parsing assistant.",
+		"tools": []map[string]any{{
+			"name":         recordLineItemsTool,
+			"description":  "Record the line items extracted from the receipt.",
+			"input_schema": lineItemsResultSchema(),
+		}},
+		"tool_choice": map[string]any{"type": "tool", "name": recordLineItemsTool},
 		"messages": []map[string]string{
-			{"role": "user", "content": parsePrompt + ocrText},
+			{"role": "user", "content": prompt},
 		},
 	}
 	headers := map[string]string{
@@ -42,7 +50,10 @@ func (l *AnthropicLLM) ParseReceipt(ctx context.Context, ocrText string) ([]rece
 	}
 	var resp struct {
 		Content []struct {
-			Text string `json:"text"`
+			Type  string          `json:"type"`
+			Text  string          `json:"text"`
+			Name  string          `json:"name"`
+			Input json.RawMessage `json:"input"`
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(data, &resp); err != nil {
@@ -51,10 +62,23 @@ func (l *AnthropicLLM) ParseReceipt(ctx context.Context, ocrText string) ([]rece
 	if len(resp.Content) == 0 {
 		return nil, "", fmt.Errorf("anthropic: empty content")
 	}
-	raw := resp.Content[0].Text
-	slog.Debug("anthropic response", "model", l.Model, "response", raw)
-	items, err := toParsedLineItems(raw)
-	return items, raw, err
+	// Prefer the tool_use input; fall back to any text block.
+	var raw string
+	for _, c := range resp.Content {
+		if c.Type == "tool_use" && c.Name == recordLineItemsTool && len(c.Input) > 0 {
+			raw = string(c.Input)
+			break
+		}
+	}
+	if raw == "" {
+		raw = resp.Content[0].Text
+	}
+	items, perr := parseLineItemsResponse(raw)
+	recordExchange("anthropic", l.Model, prompt, raw, len(items), perr)
+	if perr != nil {
+		return nil, raw, fmt.Errorf("anthropic: %w", perr)
+	}
+	return items, raw, nil
 }
 
 var _ receipt.LLMProvider = (*AnthropicLLM)(nil)

@@ -209,6 +209,9 @@ type ReceiptScanItem struct {
 	CorrectedStoreName         *string            `json:"corrected_store_name"`
 	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	ParsedTotalPriceMinor      *int64             `json:"parsed_total_price_minor"`
+	CorrectedTotalPriceMinor   *int64             `json:"corrected_total_price_minor"`
+	CorrectedUnit              *string            `json:"corrected_unit"`
 }
 
 type Session struct {

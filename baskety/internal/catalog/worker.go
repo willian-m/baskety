@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -101,30 +102,90 @@ func (w *ProcessPurchaseTransactionWorker) Work(ctx context.Context, args Proces
 		return fmt.Errorf("process purchase transaction: update refs: %w", err)
 	}
 
-	// Add a batch to the mapped inventory item, when present. Guard against
-	// soft-deleted items: the worker bypasses the inventory service layer, so we
-	// re-check the item state here. The purchase transaction is already
-	// committed, so a soft-deleted item is logged and skipped rather than failing
-	// the job.
-	if refs.inventoryItemID != nil && txn.Quantity != nil && *txn.Quantity > 0 {
-		item, ierr := w.inventoryRepo.GetItem(ctx, *refs.inventoryItemID)
-		switch {
-		case errors.Is(ierr, inventory.ErrNotFound):
-			slog.Warn("skipping inventory batch: item not found",
-				"inventory_item_id", refs.inventoryItemID, "transaction_id", txnID)
-		case ierr != nil:
-			return fmt.Errorf("process purchase transaction: get inventory item: %w", ierr)
-		case item.DeletedAt != nil:
-			slog.Warn("skipping inventory batch: item is soft-deleted",
-				"inventory_item_id", refs.inventoryItemID, "transaction_id", txnID)
-		default:
-			if _, err := w.inventoryRepo.AddBatch(ctx, *refs.inventoryItemID, *txn.Quantity, nil, nil); err != nil {
-				return fmt.Errorf("process purchase transaction: add inventory batch: %w", err)
+	// Reflect the purchase in inventory by adding a batch. The item is the one the
+	// scan item was explicitly linked to, an existing item with the same name, or
+	// a newly created item in the household's default inventory — so receipts of
+	// brand-new products still populate inventory.
+	if txn.Quantity != nil && *txn.Quantity > 0 {
+		itemID, rerr := w.resolveInventoryItemID(ctx, txn.HouseholdID, refs)
+		if rerr != nil {
+			return fmt.Errorf("process purchase transaction: resolve inventory item: %w", rerr)
+		}
+		if itemID != nil {
+			// Guard against soft-deleted items: the worker bypasses the inventory
+			// service layer, so we re-check state here. The transaction is already
+			// committed, so a soft-deleted item is logged and skipped rather than
+			// failing the job. (Freshly created items never hit these branches.)
+			item, ierr := w.inventoryRepo.GetItem(ctx, *itemID)
+			switch {
+			case errors.Is(ierr, inventory.ErrNotFound):
+				slog.Warn("skipping inventory batch: item not found",
+					"inventory_item_id", itemID, "transaction_id", txnID)
+			case ierr != nil:
+				return fmt.Errorf("process purchase transaction: get inventory item: %w", ierr)
+			case item.DeletedAt != nil:
+				slog.Warn("skipping inventory batch: item is soft-deleted",
+					"inventory_item_id", itemID, "transaction_id", txnID)
+			default:
+				if _, err := w.inventoryRepo.AddBatch(ctx, *itemID, *txn.Quantity, nil, nil); err != nil {
+					return fmt.Errorf("process purchase transaction: add inventory batch: %w", err)
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+// resolveInventoryItemID determines which inventory item a purchase maps to:
+//  1. the scan item's explicit link, if any;
+//  2. an existing item in the household's default inventory with the same name
+//     (case-insensitive), mirroring the catalog/store upsert-by-name approach;
+//  3. otherwise a newly created item in that default inventory.
+//
+// It returns nil (skipping the batch) only when there is nothing to name the
+// item or the household has no inventory yet.
+func (w *ProcessPurchaseTransactionWorker) resolveInventoryItemID(ctx context.Context, householdID uuid.UUID, refs *scanItemRefs) (*uuid.UUID, error) {
+	if refs.inventoryItemID != nil {
+		return refs.inventoryItemID, nil
+	}
+	if refs.parsedName == nil || strings.TrimSpace(*refs.parsedName) == "" {
+		return nil, nil
+	}
+	name := strings.TrimSpace(*refs.parsedName)
+
+	invs, err := w.inventoryRepo.ListInventories(ctx, householdID)
+	if err != nil {
+		return nil, err
+	}
+	if len(invs) == 0 {
+		slog.Warn("skipping inventory item creation: household has no inventory", "household_id", householdID)
+		return nil, nil
+	}
+	// Oldest inventory = the default, matching the web client's active-inventory
+	// fallback (inventories are listed created_at ASC).
+	inv := invs[0]
+
+	items, err := w.inventoryRepo.ListItems(ctx, inv.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, it := range items {
+		if strings.EqualFold(it.Name, name) {
+			id := it.ID
+			return &id, nil
+		}
+	}
+
+	unit := ""
+	if refs.parsedUnit != nil {
+		unit = *refs.parsedUnit
+	}
+	created, err := w.inventoryRepo.CreateItem(ctx, inv.ID, name, "", unit, 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &created.ID, nil
 }
 
 // loadScanItemRefs reads only the receipt_scan_item columns the worker needs,
@@ -133,7 +194,7 @@ func (w *ProcessPurchaseTransactionWorker) loadScanItemRefs(ctx context.Context,
 	const q = `SELECT
 		COALESCE(corrected_name, parsed_name),
 		COALESCE(corrected_brand, parsed_brand),
-		parsed_unit,
+		COALESCE(corrected_unit, parsed_unit),
 		COALESCE(corrected_store_name, parsed_store_name),
 		inventory_item_id
 		FROM receipt_scan_items WHERE id = $1`

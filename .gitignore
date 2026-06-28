@@ -80,3 +80,6 @@ go.work.sum
 
 # Images
 *.jpg
+
+# Docker Compose LLM debug logs (BASKETY_LLM_LOG_FILE -> ./logs)
+/logs/

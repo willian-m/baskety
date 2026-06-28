@@ -3,6 +3,8 @@ package receipt
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -27,10 +29,11 @@ type ProcessReceiptScanWorker struct {
 	repo        Repository
 	ocr         OCRProvider
 	llmResolver LLMProviderResolver
+	inventory   InventoryLookup // optional; when set, parsed items are matched to existing inventory items
 }
 
-func NewProcessReceiptScanWorker(repo Repository, ocr OCRProvider, llmResolver LLMProviderResolver) *ProcessReceiptScanWorker {
-	return &ProcessReceiptScanWorker{repo: repo, ocr: ocr, llmResolver: llmResolver}
+func NewProcessReceiptScanWorker(repo Repository, ocr OCRProvider, llmResolver LLMProviderResolver, inventory InventoryLookup) *ProcessReceiptScanWorker {
+	return &ProcessReceiptScanWorker{repo: repo, ocr: ocr, llmResolver: llmResolver, inventory: inventory}
 }
 
 // HandleJob is the JobHandler entrypoint for the in-process queue.
@@ -84,11 +87,20 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 	if err != nil {
 		return fail("llm", err)
 	}
+	created := make([]*ReceiptScanItem, 0, len(items))
 	for _, it := range items {
-		if _, err := w.repo.CreateScanItem(ctx, scanID, it); err != nil {
+		ci, err := w.repo.CreateScanItem(ctx, scanID, it)
+		if err != nil {
 			return fail("persist line item", err)
 		}
+		created = append(created, ci)
 	}
+
+	// Auto-match each parsed item to an existing inventory item by name. On a
+	// match we link the item and force its unit to the inventory item's stored
+	// unit (kept separately from the receipt's parsed_unit). This is only a
+	// suggestion: status stays "pending" so the mandatory review step remains.
+	w.matchInventory(ctx, scan.HouseholdID, created)
 
 	// 3. Store the raw LLM response and move to pending_review.
 	if _, err := w.repo.SetLLMResult(ctx, scanID, rawLLMResponse); err != nil {
@@ -98,4 +110,48 @@ func (w *ProcessReceiptScanWorker) Work(ctx context.Context, args ProcessReceipt
 		return fmt.Errorf("process receipt scan: set pending_review: %w", err)
 	}
 	return nil
+}
+
+// matchInventory links scan items whose parsed name matches an existing
+// inventory item (case-insensitive) and forces the matched item's unit. Failures
+// are logged, not fatal: matching is a convenience and must never block review.
+func (w *ProcessReceiptScanWorker) matchInventory(ctx context.Context, householdID uuid.UUID, items []*ReceiptScanItem) {
+	if w.inventory == nil {
+		return
+	}
+	refs, err := w.inventory.HouseholdItems(ctx, householdID)
+	if err != nil {
+		slog.Warn("receipt inventory match: load household items", "household_id", householdID, "error", err)
+		return
+	}
+	if len(refs) == 0 {
+		return
+	}
+	byName := make(map[string]InventoryItemRef, len(refs))
+	for _, ref := range refs {
+		byName[normalizeName(ref.Name)] = ref
+	}
+	for _, it := range items {
+		if it.ParsedName == nil {
+			continue
+		}
+		ref, ok := byName[normalizeName(*it.ParsedName)]
+		if !ok {
+			continue
+		}
+		var unit *string
+		if ref.Unit != "" {
+			u := ref.Unit
+			unit = &u
+		}
+		if err := w.repo.LinkScanItemToInventory(ctx, it.ID, ref.ID, unit); err != nil {
+			slog.Warn("receipt inventory match: link item", "scan_item_id", it.ID, "error", err)
+		}
+	}
+}
+
+// normalizeName folds case and trims surrounding space for name matching,
+// consistent with the case-insensitive matching used elsewhere (catalog upsert).
+func normalizeName(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
 }
