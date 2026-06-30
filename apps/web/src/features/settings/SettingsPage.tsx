@@ -251,9 +251,9 @@ function LLMSection() {
   };
 
   return (
-    <section>
+    <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">LLM Providers</h2>
+        <h2 className="font-serif text-base font-semibold">LLM Providers</h2>
         <button
           type="button"
           onClick={() => (showAdd ? setShowAdd(false) : openAddForm())}
@@ -264,7 +264,7 @@ function LLMSection() {
       </div>
 
       {showAdd && (
-        <div className="mb-4 rounded-lg border p-4">
+        <div className="mb-4 rounded-lg border border-border p-4">
           <h3 className="mb-3 font-medium">New LLM provider</h3>
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -327,7 +327,7 @@ function LLMSection() {
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border border-border">
         {isLoading && <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && (!providers || providers.length === 0) && (
           <p className="px-4 py-3 text-sm text-muted-foreground">No LLM providers configured.</p>
@@ -567,9 +567,9 @@ function OCRSection() {
   };
 
   return (
-    <section>
+    <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">OCR Providers</h2>
+        <h2 className="font-serif text-base font-semibold">OCR Providers</h2>
         <button
           type="button"
           onClick={() => (showAdd ? setShowAdd(false) : openAddForm())}
@@ -580,7 +580,7 @@ function OCRSection() {
       </div>
 
       {showAdd && (
-        <div className="mb-4 rounded-lg border p-4">
+        <div className="mb-4 rounded-lg border border-border p-4">
           <h3 className="mb-3 font-medium">New OCR provider</h3>
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -643,7 +643,7 @@ function OCRSection() {
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border border-border">
         {isLoading && <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && (!providers || providers.length === 0) && (
           <p className="px-4 py-3 text-sm text-muted-foreground">No OCR providers configured.</p>
@@ -664,9 +664,9 @@ function HouseholdSection() {
   const active = households?.find((h) => h.id === activeHouseholdId) ?? households?.[0];
 
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">Household</h2>
-      <div className="rounded-lg border px-4 py-3">
+    <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
+      <h2 className="mb-3 font-serif text-base font-semibold">Household</h2>
+      <div className="rounded-lg border border-border px-4 py-3">
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && active && (
           <div className="flex flex-col gap-1">
@@ -707,9 +707,9 @@ function ShareLinksSection() {
   };
 
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">Share Links</h2>
-      <div className="rounded-lg border p-4">
+    <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
+      <h2 className="mb-3 font-serif text-base font-semibold">Share Links</h2>
+      <div className="rounded-lg border border-border p-4">
         <p className="mb-3 text-sm text-muted-foreground">
           Create a read-only share link to your inventory.
         </p>
@@ -776,18 +776,58 @@ function ShareLinksSection() {
   );
 }
 
+// ── Appearance section ────────────────────────────────────────────────────────
+
+function AppearanceSection() {
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
+  const card = (active: boolean) =>
+    `flex-1 cursor-pointer rounded-[10px] border-2 p-4 ${
+      active ? "border-primary bg-primary/10" : "border-border bg-card"
+    }`;
+  return (
+    <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
+      <div className="mb-4 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+        Appearance
+      </div>
+      <div className="flex gap-3">
+        <button type="button" onClick={() => setTheme("light")} className={card(theme === "light")}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Light</div>
+              <div className="text-[11px] text-muted-foreground">Warm cream</div>
+            </div>
+            {theme === "light" && <span className="text-base font-bold text-primary">✓</span>}
+          </div>
+        </button>
+        <button type="button" onClick={() => setTheme("dark")} className={card(theme === "dark")}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Dark</div>
+              <div className="text-[11px] text-muted-foreground">Espresso</div>
+            </div>
+            {theme === "dark" && <span className="text-base font-bold text-primary">✓</span>}
+          </div>
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
   return (
-    <div className="p-6">
-      <h1 className="mb-6 text-2xl font-bold tracking-tight">Settings</h1>
-      <div className="flex flex-col gap-8">
-        <HouseholdSection />
-        <ShareLinksSection />
-        <LLMSection />
-        <OCRSection />
+    <div className="mx-auto max-w-[640px] px-8 pb-20 pt-8">
+      <div className="mb-6">
+        <h1 className="font-serif text-[28px] font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-[13px] text-muted-foreground">Manage your Baskety household</p>
       </div>
+      <AppearanceSection />
+      <HouseholdSection />
+      <ShareLinksSection />
+      <LLMSection />
+      <OCRSection />
     </div>
   );
 }

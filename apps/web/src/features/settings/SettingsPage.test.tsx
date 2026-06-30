@@ -55,13 +55,36 @@ vi.mock("@baskety/core", () => ({
     isPending: false,
     isError: false,
   }),
+  useUpdateLLMProvider: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+  }),
+  useDeleteLLMProvider: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
   useCreateOCRProvider: () => ({
     mutateAsync: vi.fn().mockResolvedValue({}),
     isPending: false,
     isError: false,
   }),
-  useUiStore: (selector: (s: { activeHouseholdId: string | null }) => unknown) =>
-    selector({ activeHouseholdId: null }),
+  useUpdateOCRProvider: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+  }),
+  useDeleteOCRProvider: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useUiStore: (
+    selector: (s: {
+      activeHouseholdId: string | null;
+      theme: "light" | "dark";
+      setTheme: (theme: "light" | "dark") => void;
+    }) => unknown,
+  ) => selector({ activeHouseholdId: null, theme: "light", setTheme: vi.fn() }),
   useInventories: () => ({ data: [], isLoading: false }),
   useCreateShareLink: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ token: "share-abc123" }),
@@ -98,7 +121,7 @@ describe("SettingsPage", () => {
     const llmSection = screen.getByText("LLM Providers").closest("section")!;
     await user.click(within(llmSection).getByRole("button", { name: "Add provider" }));
 
-    expect(screen.getByPlaceholderText(/provider \(e\.g\. openai\)/i)).toBeInTheDocument();
+    expect(within(llmSection).getByRole("combobox", { name: "Provider" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/model \(e\.g\. gpt-4o\)/i)).toBeInTheDocument();
   });
 
@@ -111,7 +134,10 @@ describe("SettingsPage", () => {
     const llmSection = screen.getByText("LLM Providers").closest("section")!;
     await user.click(within(llmSection).getByRole("button", { name: "Add provider" }));
 
-    await user.type(screen.getByPlaceholderText(/provider \(e\.g\. openai\)/i), "openai");
+    await user.selectOptions(
+      within(llmSection).getByRole("combobox", { name: "Provider" }),
+      "openai",
+    );
     await user.type(screen.getByPlaceholderText(/model \(e\.g\. gpt-4o\)/i), "gpt-4o");
     await user.click(within(llmSection).getByRole("button", { name: "Add" }));
 
