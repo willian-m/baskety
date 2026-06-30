@@ -15,7 +15,7 @@ export function InventoryPage() {
 
   const tableRef = useRef<HTMLDivElement | null>(null);
 
-  const { isLoading: loadingInv, isError: invError } = useInventories();
+  const { data: inventories, isLoading: loadingInv, isError: invError } = useInventories();
   const inventoryId = useActiveInventory();
   const { data: items, isLoading: loadingItems } = useInventoryItems(inventoryId);
 
@@ -67,9 +67,14 @@ export function InventoryPage() {
 
   const showAddThisItem = filtered.length === 0 && search.trim() !== "";
 
+  const activeInventory = inventories?.find((inv) => inv.id === inventoryId);
+
   return (
     <div className="mx-auto max-w-[1060px] px-8 pb-20 pt-8">
-      <PageHeader title="Pantry" subtitle="Track your household inventory and target levels" />
+      <PageHeader
+        title={activeInventory?.name ?? "Inventory"}
+        subtitle="Track your household inventory and target levels"
+      />
 
       <div className="mb-5 flex items-center gap-2.5">
         <div className="relative max-w-[300px] flex-1">

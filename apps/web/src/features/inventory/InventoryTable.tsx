@@ -47,6 +47,10 @@ const UNCATEGORIZED = "Uncategorized";
 const inputClass =
   "h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
+const unitInputClass = inputClass.replace("w-full", "w-20");
+
+const editLabelClass = "w-16 shrink-0 text-xs font-medium text-muted-foreground";
+
 // ── Category combobox ──────────────────────────────────────────────────────────
 
 type CategoryComboboxProps = {
@@ -689,37 +693,46 @@ function ItemRow({
           data-testid={`item-row-${item.id}`}
         >
           <td className="px-2 py-1" />
-          <td className="px-2 py-1" />
           <td className="px-2 py-1">
             <div className="flex flex-col gap-1">
-              <input
-                autoFocus
-                aria-label="Item name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={onKeyDown}
-                className={inputClass}
-              />
-              <div className="flex gap-1">
-                <CategoryCombobox
-                  aria-label="Category"
-                  value={category}
-                  onChange={setCategory}
-                  options={allCategories}
+              <div className="flex items-center gap-2">
+                <span className={editLabelClass}>Name</span>
+                <input
+                  autoFocus
+                  aria-label="Item name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   onKeyDown={onKeyDown}
-                  placeholder="Category"
                   className={inputClass}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={editLabelClass}>Category</span>
+                <div className="flex-1">
+                  <CategoryCombobox
+                    aria-label="Category"
+                    value={category}
+                    onChange={setCategory}
+                    options={allCategories}
+                    onKeyDown={onKeyDown}
+                    placeholder="Category"
+                    className={inputClass}
+                  />
+                </div>
+                <span className="shrink-0 text-xs font-medium text-muted-foreground">Unit</span>
                 <input
                   aria-label="Unit"
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder="Unit"
-                  className={inputClass}
+                  className={unitInputClass}
                 />
               </div>
             </div>
+          </td>
+          <td className="px-2 py-1">
+            <StockBar stored={item.stored_quantity} target={item.target_quantity} />
           </td>
           <td className="px-2 py-1">
             {item.batch_count <= 1 ? (
@@ -990,7 +1003,17 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
             className={`border-b bg-muted/10 text-sm ${patchBatch.isPending ? "pointer-events-none opacity-50" : ""}`}
           >
             <td className="px-2 py-1" />
-            <td className="px-2 py-1" />
+            <td className="px-2 py-1">
+              <input
+                aria-label="Batch notes"
+                type="text"
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
+                placeholder="Notes"
+                className={inputClass}
+              />
+            </td>
             <td className="px-2 py-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">└</span>
@@ -1007,25 +1030,14 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
               </div>
             </td>
             <td className="px-2 py-1">
-              <div className="flex flex-col gap-1">
-                <input
-                  aria-label="Batch expiry"
-                  type="date"
-                  value={editExpiry}
-                  onChange={(e) => setEditExpiry(e.target.value)}
-                  onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
-                  className={inputClass}
-                />
-                <input
-                  aria-label="Batch notes"
-                  type="text"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
-                  placeholder="Notes"
-                  className={inputClass}
-                />
-              </div>
+              <input
+                aria-label="Batch expiry"
+                type="date"
+                value={editExpiry}
+                onChange={(e) => setEditExpiry(e.target.value)}
+                onKeyDown={(e) => onBatchEditKeyDown(e, batch.id)}
+                className={inputClass}
+              />
             </td>
             <td className="px-2 py-1">
               <div className="flex items-center justify-end gap-1">
@@ -1055,12 +1067,11 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
             onClick={() => enterBatchEdit(batch)}
           >
             <td className="px-2 py-1" />
-            <td className="px-2 py-1" />
+            <td className="px-2 py-1 text-muted-foreground">{batch.notes}</td>
             <td className="px-2 py-1 text-muted-foreground">
               <span className="inline-flex items-center gap-2">
                 <span>
                   └ Batch Qty: {batch.quantity} {item.unit}
-                  {batch.notes ? ` - ${batch.notes}` : ""}
                 </span>
                 <ExpiryBadge expiresAt={batch.expires_at} />
               </span>
