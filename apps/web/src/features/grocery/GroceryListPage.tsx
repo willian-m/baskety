@@ -364,9 +364,9 @@ export function GroceryListPage() {
         if (group.length === 0) return null;
         return (
           <div key={status} className="mb-5">
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            <h2 className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
               {STATUS_LABEL[status]} ({group.length})
-            </div>
+            </h2>
             <div className="overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
               {group.map((item) => (
                 <div

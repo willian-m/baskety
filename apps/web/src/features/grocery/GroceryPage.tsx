@@ -78,7 +78,9 @@ function ListCard({ list, inventoryId }: ListCardProps) {
         onClick={() => void navigate({ to: "/grocery/$listId", params: { listId: list.id } })}
       >
         <div className="mb-3 flex items-center justify-between">
-          <Tag>{list.status === "active" ? "List" : list.status}</Tag>
+          <Tag>
+            {list.status === "active" ? "List" : (STATUS_LABEL[list.status] ?? list.status)}
+          </Tag>
           <span className="text-xs text-muted-foreground">
             {new Date(list.created_at).toLocaleDateString()}
           </span>

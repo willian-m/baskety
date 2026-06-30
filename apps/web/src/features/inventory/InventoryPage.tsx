@@ -78,6 +78,7 @@ export function InventoryPage() {
           </span>
           <input
             type="search"
+            aria-label="Search items"
             placeholder="Search items…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -85,6 +86,7 @@ export function InventoryPage() {
           />
         </div>
         <select
+          aria-label="Filter by category"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="h-9 cursor-pointer rounded-lg border-[1.5px] border-border bg-card px-3 text-[13px] text-secondary-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"

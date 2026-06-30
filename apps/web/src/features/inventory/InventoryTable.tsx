@@ -856,7 +856,7 @@ function ItemRow({
                 e.stopPropagation();
                 onDeleteSingle(item.id);
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/70"
             >
               <TrashIcon />
             </button>

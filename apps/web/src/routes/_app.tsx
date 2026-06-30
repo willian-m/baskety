@@ -69,7 +69,10 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="sticky top-0 z-50 flex h-14 items-center border-b border-border bg-card px-8 shadow-soft">
+      <nav
+        aria-label="Primary navigation"
+        className="sticky top-0 z-50 flex h-14 items-center border-b border-border bg-card px-8 shadow-soft"
+      >
         <Link to="/inventory" className="mr-9 flex flex-shrink-0 items-center gap-2.5">
           <BasketLogo />
           <span className="font-serif text-xl font-semibold tracking-tight">Baskety</span>
