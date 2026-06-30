@@ -16,6 +16,9 @@ interface UiState {
   externalUrl: string | null;
   networkProfiles: NetworkProfile[];
   sidebarCollapsed: boolean;
+  theme: "light" | "dark";
+  setTheme: (theme: "light" | "dark") => void;
+  toggleTheme: () => void;
   _hasHydrated: boolean;
   setHasHydrated: (state: boolean) => void;
   setSession: (token: string, firstHouseholdId?: string) => void;
@@ -41,6 +44,9 @@ export const useUiStore = create<UiState>()(
       externalUrl: null,
       networkProfiles: [],
       sidebarCollapsed: false,
+      theme: "light",
+      setTheme: (theme) => set({ theme }),
+      toggleTheme: () => set((s) => ({ theme: s.theme === "light" ? "dark" : "light" })),
       _hasHydrated: false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setSession: (token, firstHouseholdId) =>
@@ -71,6 +77,7 @@ export const useUiStore = create<UiState>()(
         externalUrl: state.externalUrl,
         networkProfiles: state.networkProfiles,
         sidebarCollapsed: state.sidebarCollapsed,
+        theme: state.theme,
         // activeServerUrl: NOT persisted — runtime, computed by useServerUrl
         // _hasHydrated: NOT persisted — recomputed on rehydration
       }),

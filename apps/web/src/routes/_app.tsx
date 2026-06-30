@@ -3,6 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { ThemeToggle } from "../components/ThemeToggle.js";
+import { BasketLogo } from "../components/icons.js";
+
 import { Route as RootRoute } from "./__root.js";
 
 function HouseholdSwitcher() {
@@ -22,9 +25,9 @@ function HouseholdSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-sm font-medium text-muted-foreground hover:text-foreground"
+        className="flex h-[34px] items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 text-[13px] text-secondary-foreground hover:bg-secondary/80"
       >
-        {current.name} ▾
+        {current.name} <span className="text-[9px] text-muted-foreground">▾</span>
       </button>
       {open && (
         <div className="absolute left-0 top-full z-10 mt-1 w-48 rounded-md border bg-background shadow-md">
@@ -65,51 +68,42 @@ function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="font-bold text-lg tracking-tight">
-            Baskety
-          </Link>
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <nav
+        aria-label="Primary navigation"
+        className="sticky top-0 z-50 flex h-14 items-center border-b border-border bg-card px-8 shadow-soft"
+      >
+        <Link to="/inventory" className="mr-9 flex flex-shrink-0 items-center gap-2.5">
+          <BasketLogo />
+          <span className="font-serif text-xl font-semibold tracking-tight">Baskety</span>
+        </Link>
+        <div className="flex h-full items-stretch">
+          {[
+            { to: "/inventory", label: "Inventory" },
+            { to: "/grocery", label: "Grocery" },
+            { to: "/receipt", label: "Receipts" },
+            { to: "/settings", label: "Settings" },
+          ].map((item) => (
             <Link
-              to="/inventory"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              activeProps={{ className: "text-foreground font-medium" }}
+              key={item.to}
+              to={item.to}
+              className="flex items-center border-b-[2.5px] border-t-[2.5px] border-transparent px-4 text-sm text-secondary-foreground hover:text-foreground"
+              activeProps={{ className: "border-b-primary font-semibold text-primary" }}
             >
-              Inventory
+              {item.label}
             </Link>
-            <Link
-              to="/grocery"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              activeProps={{ className: "text-foreground font-medium" }}
-            >
-              Grocery
-            </Link>
-            <Link
-              to="/receipt"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              activeProps={{ className: "text-foreground font-medium" }}
-            >
-              Receipts
-            </Link>
-            <Link
-              to="/settings"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              activeProps={{ className: "text-foreground font-medium" }}
-            >
-              Settings
-            </Link>
-          </div>
+          ))}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex-1" />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
           <HouseholdSwitcher />
           <button
             type="button"
             data-testid="logout-button"
             onClick={() => void handleLogout()}
             disabled={logout.isPending}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            className="h-[34px] rounded-lg border border-border bg-transparent px-3 text-[13px] text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             {logout.isPending ? "Logging out…" : "Logout"}
           </button>

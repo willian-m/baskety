@@ -1,6 +1,8 @@
 import { useInventories, useInventoryItems } from "@baskety/core";
 import { useEffect, useRef, useState } from "react";
 
+import { PageHeader } from "../../components/PageHeader.js";
+import { SearchIcon } from "../../components/icons.js";
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
 import { InventoryTable } from "./InventoryTable.js";
@@ -66,23 +68,28 @@ export function InventoryPage() {
   const showAddThisItem = filtered.length === 0 && search.trim() !== "";
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Inventory</h1>
-      </div>
+    <div className="mx-auto max-w-[1060px] px-8 pb-20 pt-8">
+      <PageHeader title="Pantry" subtitle="Track your household inventory and target levels" />
 
-      <div className="mb-4 flex gap-3">
-        <input
-          type="search"
-          placeholder="Search items…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        />
+      <div className="mb-5 flex items-center gap-2.5">
+        <div className="relative max-w-[300px] flex-1">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
+            <SearchIcon />
+          </span>
+          <input
+            type="search"
+            aria-label="Search items"
+            placeholder="Search items…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border-[1.5px] border-border bg-card px-3 py-1.5 pl-[30px] text-[13px] outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        </div>
         <select
+          aria-label="Filter by category"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-9 cursor-pointer rounded-lg border-[1.5px] border-border bg-card px-3 text-[13px] text-secondary-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <option value="">All categories</option>
           {categories.map((c) => (
@@ -95,7 +102,7 @@ export function InventoryPage() {
           <button
             type="button"
             onClick={() => setNewItemName(search.trim())}
-            className="inline-flex h-9 items-center whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-9 items-center whitespace-nowrap rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
           >
             Add this item
           </button>
@@ -105,7 +112,7 @@ export function InventoryPage() {
       {filtered.length === 0 && newItemName.trim() === "" ? (
         <p className="py-12 text-center text-muted-foreground">No items found.</p>
       ) : (
-        <div ref={tableRef} className="rounded-lg border">
+        <div ref={tableRef}>
           <InventoryTable
             inventoryId={inventoryId}
             items={filtered}

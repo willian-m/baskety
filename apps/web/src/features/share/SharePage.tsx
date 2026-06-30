@@ -31,12 +31,12 @@ export function SharePage() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-6">
         <div className="w-full max-w-sm rounded-lg border p-6">
-          <h2 className="mb-4 text-lg font-semibold">Password required</h2>
+          <h2 className="mb-4 font-serif text-lg font-semibold">Password required</h2>
           <p className="mb-4 text-sm text-muted-foreground">
             This shared inventory is password-protected.
           </p>
           {passwordError && (
-            <p className="mb-3 text-sm text-red-600">Incorrect password, please try again.</p>
+            <p className="mb-3 text-sm text-destructive">Incorrect password, please try again.</p>
           )}
           <form
             onSubmit={(e) => {
@@ -79,7 +79,7 @@ export function SharePage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Shared Inventory</h1>
+        <h1 className="font-serif text-2xl font-bold tracking-tight">Shared Inventory</h1>
       </div>
 
       {items.length === 0 ? (

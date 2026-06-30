@@ -31,6 +31,8 @@ function TrashIcon() {
   );
 }
 
+import { StockBar } from "../../components/StockBar.js";
+
 import { ExpiryBadge } from "./ExpiryBadge.js";
 
 type Props = {
@@ -228,7 +230,7 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
           }
         }}
       >
-        <td colSpan={4} className="px-2 py-2">
+        <td colSpan={5} className="px-2 py-2">
           <div className="flex items-center justify-between">
             {editing ? (
               <input
@@ -252,7 +254,7 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
                   e.stopPropagation();
                   setShowDeleteModal(true);
                 }}
-                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <TrashIcon />
               </button>
@@ -262,7 +264,7 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
       </tr>
       {showDeleteModal && (
         <tr>
-          <td colSpan={4}>
+          <td colSpan={5}>
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
               role="dialog"
@@ -288,7 +290,7 @@ function CategoryHeaderRow({ category, items, onRename, isPending }: CategoryHea
                   </button>
                   <button
                     type="button"
-                    className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    className="rounded bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
                     onClick={() => {
                       onRename({ to: "", items });
                       setShowDeleteModal(false);
@@ -386,7 +388,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
     <>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b-2 border-border text-left text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
             <th className="w-16 px-2 py-2">
               <input
                 type="checkbox"
@@ -405,11 +407,11 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
             <th className="px-2 py-2">
               {selectedItemIds.size > 0 ? (
                 <>
-                  {deleteError && <p className="mb-1 text-xs text-red-600">{deleteError}</p>}
+                  {deleteError && <p className="mb-1 text-xs text-destructive">{deleteError}</p>}
                   <button
                     type="button"
                     onClick={() => setShowDeleteModal(true)}
-                    className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    className="rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90"
                   >
                     Delete {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""}
                   </button>
@@ -418,8 +420,9 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
                 "Item"
               )}
             </th>
-            <th className="w-32 px-2 py-2">Stored Qty</th>
-            <th className="w-32 px-2 py-2">Target Qty</th>
+            <th className="w-24 px-2 py-2 text-center">Stock</th>
+            <th className="w-32 px-2 py-2">Stored</th>
+            <th className="w-32 px-2 py-2">Target</th>
           </tr>
         </thead>
         <tbody>
@@ -475,7 +478,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
                   />
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-2 py-1">
+                    <td colSpan={5} className="px-2 py-1">
                       <button
                         type="button"
                         onClick={() => setAddingInCategory(category)}
@@ -531,7 +534,7 @@ export function InventoryTable({ inventoryId, items, newItemName, onNewItemSaved
                 Cancel
               </button>
               <button
-                className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                className="rounded bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => void handleConfirmDelete()}
               >
                 Delete
@@ -686,6 +689,7 @@ function ItemRow({
           data-testid={`item-row-${item.id}`}
         >
           <td className="px-2 py-1" />
+          <td className="px-2 py-1" />
           <td className="px-2 py-1">
             <div className="flex flex-col gap-1">
               <input
@@ -775,8 +779,8 @@ function ItemRow({
         {failed && (
           <tr>
             <td />
-            <td colSpan={3} className="px-2 pb-2">
-              <p className="text-xs text-red-600">Save failed</p>
+            <td colSpan={4} className="px-2 pb-2">
+              <p className="text-xs text-destructive">Save failed</p>
             </td>
           </tr>
         )}
@@ -787,7 +791,7 @@ function ItemRow({
   return (
     <>
       <tr
-        className={`group cursor-pointer border-b hover:bg-muted/30 ${isSelected ? "bg-blue-50 ring-1 ring-blue-300" : ""}`}
+        className={`group cursor-pointer border-b hover:bg-muted/30 ${isSelected ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
         data-testid={`item-row-${item.id}`}
         onClick={beginEdit}
         onContextMenu={(e) => {
@@ -834,6 +838,9 @@ function ItemRow({
         <td className="px-2 py-2">
           <span className="font-medium">{item.name}</span>
         </td>
+        <td className="px-2 py-2">
+          <StockBar stored={item.stored_quantity} target={item.target_quantity} />
+        </td>
         <td className="px-2 py-2 text-sm">
           {item.stored_quantity} {item.unit}
         </td>
@@ -849,7 +856,7 @@ function ItemRow({
                 e.stopPropagation();
                 onDeleteSingle(item.id);
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/70"
             >
               <TrashIcon />
             </button>
@@ -965,7 +972,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
     return (
       <tr>
         <td />
-        <td colSpan={3} className="px-2 py-2 text-xs text-muted-foreground">
+        <td colSpan={4} className="px-2 py-2 text-xs text-muted-foreground">
           Loading batches…
         </td>
       </tr>
@@ -982,6 +989,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
             key={batch.id}
             className={`border-b bg-muted/10 text-sm ${patchBatch.isPending ? "pointer-events-none opacity-50" : ""}`}
           >
+            <td className="px-2 py-1" />
             <td className="px-2 py-1" />
             <td className="px-2 py-1">
               <div className="flex items-center gap-2">
@@ -1037,7 +1045,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
                   Cancel
                 </button>
               </div>
-              {failedEdit && <p className="text-xs text-red-600">Save failed</p>}
+              {failedEdit && <p className="text-xs text-destructive">Save failed</p>}
             </td>
           </tr>
         ) : (
@@ -1046,6 +1054,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
             className="group border-b bg-muted/10 text-sm cursor-pointer"
             onClick={() => enterBatchEdit(batch)}
           >
+            <td className="px-2 py-1" />
             <td className="px-2 py-1" />
             <td className="px-2 py-1 text-muted-foreground">
               <span className="inline-flex items-center gap-2">
@@ -1068,7 +1077,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
                     e.stopPropagation();
                     setRemovingBatch(batch);
                   }}
-                  className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-red-600 focus-visible:opacity-100"
+                  className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-muted-foreground hover:text-destructive focus-visible:opacity-100"
                 >
                   <TrashIcon />
                 </button>
@@ -1080,7 +1089,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
 
       {removingBatch && (
         <tr>
-          <td colSpan={4}>
+          <td colSpan={5}>
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
               role="dialog"
@@ -1118,7 +1127,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
                           .mutateAsync(removingBatch.id)
                           .then(() => setRemovingBatch(null));
                       }}
-                      className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      className="w-full rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
                     >
                       Delete permanently
                     </button>
@@ -1141,6 +1150,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
       )}
 
       <tr className="border-b bg-muted/10 text-sm">
+        <td className="px-2 py-1" />
         <td className="px-2 py-1" />
         {adding ? (
           <>
@@ -1185,7 +1195,7 @@ function BatchRows({ inventoryId, item, enabled, initiallyAdding, onAddingDone }
                   Cancel
                 </button>
               </div>
-              {failedBatch && <p className="text-xs text-red-600">Add batch failed</p>}
+              {failedBatch && <p className="text-xs text-destructive">Add batch failed</p>}
             </td>
           </>
         ) : (
@@ -1275,6 +1285,7 @@ function NewItemRow({
         data-testid={testId}
       >
         <td className="px-2 py-1" />
+        <td className="px-2 py-1" />
         <td className="px-2 py-1">
           <div className="flex flex-col gap-1">
             <input
@@ -1361,8 +1372,8 @@ function NewItemRow({
       {failed && (
         <tr>
           <td />
-          <td colSpan={3} className="px-2 pb-2">
-            <p className="text-xs text-red-600">{failedMessage}</p>
+          <td colSpan={4} className="px-2 pb-2">
+            <p className="text-xs text-destructive">{failedMessage}</p>
           </td>
         </tr>
       )}

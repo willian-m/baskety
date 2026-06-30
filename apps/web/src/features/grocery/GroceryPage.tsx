@@ -11,8 +11,16 @@ import type { GroceryListResponse } from "@baskety/core";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { PageHeader } from "../../components/PageHeader.js";
+import { Tag } from "../../components/Tag.js";
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 import { SetupWizard } from "../inventory/SetupWizard.js";
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  completed: "Completed",
+  archived: "Archived",
+};
 
 // ── ListCard ──────────────────────────────────────────────────────────────────
 
@@ -63,49 +71,44 @@ function ListCard({ list, inventoryId }: ListCardProps) {
     }
   };
 
-  const statusColor: Record<string, string> = {
-    active: "bg-green-100 text-green-700",
-    completed: "bg-blue-100 text-blue-700",
-    archived: "bg-muted text-muted-foreground",
-  };
-
   return (
-    <div className="relative border-t first:border-t-0">
+    <div className="relative">
       <div
-        className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-muted/50"
+        className="cursor-pointer rounded-2xl border-[1.5px] border-border bg-card p-[22px] shadow-soft transition-shadow hover:shadow-md"
         onClick={() => void navigate({ to: "/grocery/$listId", params: { listId: list.id } })}
       >
-        <div className="flex flex-col gap-0.5">
-          {isEditing ? (
-            <input
-              autoFocus
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleRename();
-                if (e.key === "Escape") {
-                  setIsEditing(false);
-                  setEditName(list.name);
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="h-7 rounded border border-input bg-background px-2 py-0.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{list.name}</span>
-              {list.pinned_at && <span className="text-xs text-muted-foreground">📌</span>}
-            </div>
-          )}
+        <div className="mb-3 flex items-center justify-between">
+          <Tag>
+            {list.status === "active" ? "List" : (STATUS_LABEL[list.status] ?? list.status)}
+          </Tag>
           <span className="text-xs text-muted-foreground">
             {new Date(list.created_at).toLocaleDateString()}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor[list.status] ?? ""}`}
-          >
-            {list.status}
+        {isEditing ? (
+          <input
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleRename();
+              if (e.key === "Escape") {
+                setIsEditing(false);
+                setEditName(list.name);
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="h-7 rounded border border-input bg-background px-2 py-0.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        ) : (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="font-serif text-[17px] font-medium">{list.name}</span>
+            {list.pinned_at && <span className="text-xs text-muted-foreground">📌</span>}
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-muted-foreground">
+            {STATUS_LABEL[list.status] ?? list.status}
           </span>
           <button
             type="button"
@@ -150,7 +153,7 @@ function ListCard({ list, inventoryId }: ListCardProps) {
               e.stopPropagation();
               void handleDelete();
             }}
-            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-muted"
+            className="block w-full px-4 py-2 text-left text-sm text-destructive hover:bg-muted"
           >
             Delete
           </button>
@@ -214,28 +217,31 @@ export function GroceryPage() {
     });
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Grocery Lists</h1>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            data-testid="auto-generate-button"
-            onClick={() => void handleAutoGenerate()}
-            disabled={autoGenerate.isPending || !inventoryId}
-            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
-            {autoGenerate.isPending ? "Generating…" : "Auto-generate"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCreate((v) => !v)}
-            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            New list
-          </button>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1060px] px-8 pb-20 pt-8">
+      <PageHeader
+        title="Grocery Lists"
+        subtitle="Auto-generated and manual shopping lists"
+        action={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="auto-generate-button"
+              onClick={() => void handleAutoGenerate()}
+              disabled={autoGenerate.isPending || !inventoryId}
+              className="inline-flex h-[38px] items-center rounded-lg border-[1.5px] border-border bg-card px-4 text-[13px] font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {autoGenerate.isPending ? "Generating…" : "Auto-generate"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreate((v) => !v)}
+              className="inline-flex h-[38px] items-center rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              + New list
+            </button>
+          </div>
+        }
+      />
 
       {showCreate && (
         <div className="mb-4 flex gap-2">
@@ -247,13 +253,13 @@ export function GroceryPage() {
               if (e.key === "Enter") void handleCreate();
             }}
             placeholder="List name…"
-            className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 flex-1 rounded-lg border-[1.5px] border-border bg-card px-3 py-1.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
           />
           <button
             type="button"
             onClick={() => void handleCreate()}
             disabled={!newListName.trim() || createList.isPending}
-            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {createList.isPending ? "Creating…" : "Create"}
           </button>
@@ -265,7 +271,7 @@ export function GroceryPage() {
           No lists yet. Create one to get started.
         </p>
       ) : (
-        <div className="rounded-lg border">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
           {sorted.map((list) => (
             <ListCard key={list.id} list={list} inventoryId={inventoryId} />
           ))}

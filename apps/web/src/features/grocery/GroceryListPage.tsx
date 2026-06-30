@@ -11,6 +11,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { CheckCircle } from "../../components/CheckCircle.js";
 import { useActiveInventory } from "../../hooks/useActiveInventory.js";
 
 type ItemStatus = "pending" | "bought" | "skipped";
@@ -201,19 +202,24 @@ export function GroceryListPage() {
     { pending: [], bought: [], skipped: [] },
   );
 
+  const allItems = items ?? [];
+  const totalCount = allItems.length;
+  const doneCount = allItems.filter((i) => i.status === "bought").length;
+  const progressPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
+
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-[680px] px-8 pb-20 pt-8">
       <button
         type="button"
         onClick={() => void navigate({ to: "/grocery" })}
-        className="mb-4 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-5 flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"
       >
         ← Back to lists
       </button>
 
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">{list.name}</h1>
+          <h1 className="font-serif text-2xl font-semibold tracking-tight">{list.name}</h1>
           <button
             type="button"
             aria-label="Rename list"
@@ -235,12 +241,12 @@ export function GroceryListPage() {
                 onClick={() => void handleDeleteSelected()}
                 disabled={isDeleting}
                 aria-busy={isDeleting}
-                className="inline-flex h-9 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                className="inline-flex h-9 items-center rounded-lg bg-destructive px-4 text-[13px] font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               >
                 {isDeleting ? "Deleting…" : `Delete selected (${checkedIds.length})`}
               </button>
               {deleteError && (
-                <p role="alert" className="mt-1 text-sm text-red-600">
+                <p role="alert" className="mt-1 text-sm text-destructive">
                   {deleteError}
                 </p>
               )}
@@ -251,7 +257,7 @@ export function GroceryListPage() {
             onClick={() => setShowAdd((v) => !v)}
             aria-expanded={showAdd}
             aria-controls="add-item-panel"
-            className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+            className="inline-flex h-9 items-center rounded-lg border-[1.5px] border-border bg-card px-4 text-[13px] font-medium hover:bg-muted"
           >
             Add item
           </button>
@@ -261,12 +267,12 @@ export function GroceryListPage() {
                 type="button"
                 onClick={() => void handleComplete()}
                 disabled={completeList.isPending}
-                className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {completeList.isPending ? "Completing…" : "Complete list"}
               </button>
               {completeList.isError && (
-                <p role="alert" className="mt-1 text-sm text-red-500">
+                <p role="alert" className="mt-1 text-sm text-destructive">
                   Failed to complete list. Please try again.
                 </p>
               )}
@@ -278,12 +284,12 @@ export function GroceryListPage() {
       {showAdd && (
         <div
           id="add-item-panel"
-          className="mb-6 rounded-lg border p-4"
+          className="mb-6 rounded-2xl border-[1.5px] border-border bg-card p-4 shadow-soft"
           onKeyDown={(e) => {
             if (e.key === "Escape") setShowAdd(false);
           }}
         >
-          <h3 className="mb-3 font-medium">Add item</h3>
+          <h3 className="mb-3 font-serif text-base font-medium">Add item</h3>
           <div className="flex flex-wrap gap-2">
             <input
               autoFocus
@@ -294,34 +300,34 @@ export function GroceryListPage() {
                 if (e.key === "Enter") void handleAddItem();
               }}
               placeholder="Item name"
-              className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-9 flex-1 rounded-lg border-[1.5px] border-border bg-card px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <input
               aria-label="Quantity"
               type="number"
               value={newQty}
               onChange={(e) => setNewQty(e.target.value)}
-              className="flex h-9 w-20 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-9 w-20 rounded-lg border-[1.5px] border-border bg-card px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <input
               aria-label="Unit"
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
               placeholder="Unit"
-              className="flex h-9 w-20 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-9 w-20 rounded-lg border-[1.5px] border-border bg-card px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <button
               type="button"
               data-testid="add-item-submit"
               onClick={() => void handleAddItem()}
               disabled={!newName.trim() || addItem.isPending}
-              className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {addItem.isPending ? "Adding…" : "Add"}
             </button>
           </div>
           {addItem.isError && (
-            <p role="alert" className="mt-1 text-sm text-red-500">
+            <p role="alert" className="mt-1 text-sm text-destructive">
               Failed to add item. Please try again.
             </p>
           )}
@@ -329,26 +335,47 @@ export function GroceryListPage() {
       )}
 
       {toggleError && (
-        <p role="alert" className="mb-4 text-sm text-red-600">
+        <p role="alert" className="mb-4 text-sm text-destructive">
           {toggleError}
         </p>
+      )}
+
+      {totalCount > 0 && (
+        <div className="mb-6">
+          <div className="mb-1.5 flex justify-between text-xs">
+            <span className="text-muted-foreground">
+              {doneCount} of {totalCount} collected
+            </span>
+            <span className="font-semibold text-primary">
+              {doneCount}/{totalCount}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded bg-secondary">
+            <div
+              className="h-full rounded bg-primary transition-[width] duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
       )}
 
       {STATUS_ORDER.map((status) => {
         const group = grouped[status] ?? [];
         if (group.length === 0) return null;
         return (
-          <div key={status} className="mb-6">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <div key={status} className="mb-5">
+            <h2 className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
               {STATUS_LABEL[status]} ({group.length})
             </h2>
-            <div className="rounded-lg border">
-              {group.map((item, idx) => (
+            <div className="overflow-hidden rounded-xl border-[1.5px] border-border bg-card shadow-soft">
+              {group.map((item) => (
                 <div
                   key={item.id}
                   role="group"
                   aria-label={item.name}
-                  className={`flex items-center gap-3 px-4 py-3 ${idx !== 0 ? "border-t" : ""}`}
+                  className={`flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 ${
+                    item.status === "bought" ? "opacity-50" : "hover:bg-primary/10"
+                  }`}
                 >
                   <label
                     className="flex cursor-pointer items-center gap-1"
@@ -360,32 +387,33 @@ export function GroceryListPage() {
                       data-testid={`select-${item.id}`}
                       checked={checkedIds.includes(item.id)}
                       onChange={() => toggleChecked(item.id)}
+                      onClick={(e) => e.stopPropagation()}
                       className="h-4 w-4 rounded border-input"
                     />
-                    <span aria-hidden="true" className="text-xs text-gray-400">
+                    <span aria-hidden="true" className="text-xs text-muted-foreground">
                       ✕
                     </span>
                   </label>
-                  <input
-                    type="checkbox"
-                    title="Mark as bought"
-                    aria-label={`Mark ${item.name} as bought`}
-                    checked={item.status === "bought"}
-                    onChange={() => handleToggle(item.id, item.status as ItemStatus)}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  <div className="flex flex-1 items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(item.id, item.status as ItemStatus)}
+                    aria-label={
+                      item.status === "bought" ? `Uncheck ${item.name}` : `Check ${item.name}`
+                    }
+                    className="flex flex-1 items-center gap-3 text-left"
+                  >
+                    <CheckCircle checked={item.status === "bought"} />
                     <span
-                      className={
+                      className={`flex-1 text-sm font-medium ${
                         item.status === "bought" ? "text-muted-foreground line-through" : ""
-                      }
+                      }`}
                     >
                       {item.name}
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-[13px] tabular-nums text-muted-foreground">
                       {item.quantity} {item.unit}
                     </span>
-                  </div>
+                  </button>
                 </div>
               ))}
             </div>
@@ -405,9 +433,9 @@ export function GroceryListPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="rename-dialog-title"
-              className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
+              className="w-full max-w-sm rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft"
             >
-              <h2 id="rename-dialog-title" className="mb-4 text-lg font-semibold">
+              <h2 id="rename-dialog-title" className="mb-4 font-serif text-lg font-semibold">
                 Rename list
               </h2>
               <input
@@ -421,10 +449,10 @@ export function GroceryListPage() {
                   }
                 }}
                 placeholder="List name"
-                className="mb-4 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="mb-4 flex h-9 w-full rounded-lg border-[1.5px] border-border bg-card px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
               {renameList.isError && (
-                <p role="alert" className="mb-4 text-sm text-red-500">
+                <p role="alert" className="mb-4 text-sm text-destructive">
                   Failed to rename. Please try again.
                 </p>
               )}
@@ -432,7 +460,7 @@ export function GroceryListPage() {
                 <button
                   type="button"
                   onClick={handleRenameCancel}
-                  className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-medium hover:bg-muted"
+                  className="inline-flex h-9 items-center rounded-lg border-[1.5px] border-border bg-card px-4 text-[13px] font-medium hover:bg-muted"
                 >
                   Cancel
                 </button>
@@ -440,7 +468,7 @@ export function GroceryListPage() {
                   type="button"
                   onClick={() => void handleRenameConfirm()}
                   disabled={!renameText.trim() || renameList.isPending}
-                  className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {renameList.isPending ? "Saving…" : "Confirm"}
                 </button>
