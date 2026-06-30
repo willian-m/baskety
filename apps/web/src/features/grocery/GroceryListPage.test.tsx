@@ -49,8 +49,8 @@ describe("GroceryListPage", () => {
       ),
     );
     renderWithProviders(<GroceryListPage />);
-    const checkbox = await screen.findByRole("checkbox");
-    await user.click(checkbox);
+    const toggle = await screen.findByRole("button", { name: /^Check / });
+    await user.click(toggle);
     await waitFor(() => expect((capturedBody as { status: string }).status).toBe("bought"));
   });
 
