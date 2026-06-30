@@ -161,3 +161,13 @@ However, a development for an app like this require significant effort. So I alw
 Thus, was born this project with the premise: execute it as fast as possible using AI only. My role was to decide the features I wanted, outline the basic architecture, coordinate the agents execution and verify the final delivery of each "sprint" (sprint here is more of a block of features that the AI delivers in a single chat session) is working as intended.
 
 Because of this, all code and documentation is AI written. Only piece that is not AI written is, in fact, the current section. Everything else is AI generated with minor manual tweaks here and there if I believe it was needed.
+
+## Fonts
+
+Baskety bundles the following fonts, both licensed under the SIL Open Font
+License 1.1:
+
+- **Lora** © Cyreal — https://github.com/cyrealtype/Lora-Cyrillic
+- **DM Sans** © Colophon Foundry, Jonny Pinhorn — https://github.com/googlefonts/dm-fonts
+
+The full license text ships with each font in `node_modules/@fontsource/*/LICENSE`.

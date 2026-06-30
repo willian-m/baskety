@@ -15,6 +15,8 @@
   "dependencies": {
     "@baskety/core": "workspace:*",
     "@baskety/ui": "workspace:*",
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/lora": "^5.2.8",
     "@hookform/resolvers": "^5.4.0",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.15",
