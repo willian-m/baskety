@@ -2,13 +2,16 @@ import { useScans, useStartScan } from "@baskety/core";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
+import { PageHeader } from "../../components/PageHeader.js";
+import { ReceiptIcon } from "../../components/icons.js";
+
 const STATUS_BADGE: Record<string, string> = {
-  uploading: "bg-yellow-100 text-yellow-800",
-  ocr_processing: "bg-blue-100 text-blue-800",
-  llm_processing: "bg-blue-100 text-blue-800",
-  pending_review: "bg-yellow-100 text-yellow-800",
-  committed: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  uploading: "bg-warn/15 text-warn",
+  ocr_processing: "bg-primary/10 text-primary",
+  llm_processing: "bg-primary/10 text-primary",
+  pending_review: "bg-warn/15 text-warn",
+  committed: "bg-ok/15 text-ok",
+  failed: "bg-destructive/15 text-destructive",
 };
 
 export function ReceiptPage() {
@@ -26,13 +29,11 @@ export function ReceiptPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Receipts</h1>
-      </div>
+    <div className="mx-auto max-w-[1060px] px-8 pb-20 pt-8">
+      <PageHeader title="Receipts" subtitle="Scan receipts and review completed trips" />
 
-      <div className="mb-6 rounded-lg border p-4">
-        <h2 className="mb-3 font-medium">Scan a receipt</h2>
+      <div className="mb-6 rounded-2xl border-[1.5px] border-border bg-card p-5 shadow-soft">
+        <h2 className="mb-3 font-serif text-base font-medium">Scan a receipt</h2>
         <div className="flex flex-wrap items-center gap-3">
           <input
             ref={fileRef}
@@ -51,13 +52,11 @@ export function ReceiptPage() {
           </button>
         </div>
         {startScan.isError && (
-          <p className="mt-2 text-sm text-red-600">
+          <p className="mt-2 text-sm text-destructive">
             {startScan.error instanceof Error ? startScan.error.message : "Upload failed"}
           </p>
         )}
-        {startScan.isSuccess && (
-          <p className="mt-2 text-sm text-green-600">Scan started successfully.</p>
-        )}
+        {startScan.isSuccess && <p className="mt-2 text-sm text-ok">Scan started successfully.</p>}
       </div>
 
       {isLoading ? (
@@ -67,22 +66,25 @@ export function ReceiptPage() {
       ) : !scans || scans.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">No scans yet.</p>
       ) : (
-        <div className="rounded-lg border">
-          {scans.map((scan, idx) => (
+        <div className="flex flex-col gap-2.5">
+          {scans.map((scan) => (
             <Link
               key={scan.id}
               to="/receipt/$scanId/review"
               params={{ scanId: scan.id }}
-              className={`flex items-center justify-between px-4 py-3 hover:bg-muted/50 ${idx !== 0 ? "border-t" : ""}`}
+              className="flex items-center gap-4 rounded-xl border-[1.5px] border-border bg-card px-5 py-4 shadow-soft hover:shadow-md"
             >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium text-sm font-mono">{scan.id.slice(0, 8)}…</span>
-                <span className="text-xs text-muted-foreground">
+              <div className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary/10">
+                <ReceiptIcon />
+              </div>
+              <div className="flex-1">
+                <div className="font-mono text-sm font-medium">{scan.id.slice(0, 8)}…</div>
+                <div className="text-xs text-muted-foreground">
                   {new Date(scan.created_at).toLocaleString()}
-                </span>
+                </div>
               </div>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[scan.status] ?? "bg-gray-100 text-gray-800"}`}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[scan.status] ?? "bg-muted text-muted-foreground"}`}
               >
                 {scan.status}
               </span>
