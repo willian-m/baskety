@@ -17,6 +17,16 @@ import "@fontsource/lora/600.css";
 import "@fontsource/lora/400-italic.css";
 import "./styles/globals.css";
 
+// Apply persisted theme before first paint to avoid a flash of the wrong theme.
+// Reads the same localStorage key the uiStore persists under ("baskety-ui").
+try {
+  const raw = localStorage.getItem("baskety-ui");
+  const theme = raw ? (JSON.parse(raw)?.state?.theme as string | undefined) : undefined;
+  document.documentElement.classList.toggle("dark", theme === "dark");
+} catch {
+  // Malformed/absent storage -> stay on light (no class).
+}
+
 const queryClient = new QueryClient();
 
 const root = document.getElementById("root");
