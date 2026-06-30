@@ -1,0 +1,31 @@
+# Local-build + watch override for the baskety service.
+#
+# Layered on top of docker-compose.yml via `-f docker-compose.yml -f compose.build.yml`
+# (see the Makefile `build-up*` / `watch*` targets). The base file is left pull-only so
+# self-hosters still pull ghcr.io/willian-m/baskety:latest unchanged.
+#
+# `image:` is inherited from docker-compose.yml, so the locally built image is tagged
+# identically to the published name.
+services:
+  baskety:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        # The web frontend is compiled into the embedded Go binary, so there is no
+        # syncable runtime path — every source change requires a full image rebuild.
+        - path: ./baskety
+          action: rebuild
+        - path: ./apps/web
+          action: rebuild
+          ignore:
+            - dist/
+        - path: ./packages
+          action: rebuild
+        - path: ./pnpm-lock.yaml
+          action: rebuild
+        - path: ./pnpm-workspace.yaml
+          action: rebuild
+        - path: ./Dockerfile
+          action: rebuild

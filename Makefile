@@ -5,6 +5,8 @@ PNPM = pnpm
         go-build go-test go-vet go-generate go-migrate \
         web-dev web-build \
         up down logs \
+        build-up build-up-easyocr build-up-paddleocr \
+        watch watch-easyocr watch-paddleocr \
         db-up db-down \
         hooks
 
@@ -53,6 +55,31 @@ down:
 
 logs:
 	docker compose logs -f
+
+## Docker — local build/watch (run from repo root)
+# Layers compose.build.yml on top of the base stack so the baskety image is built
+# locally (tagged as the published name) instead of pulled.
+COMPOSE_BUILD = docker compose -f docker-compose.yml -f compose.build.yml
+
+# Build the image and bring the stack up. *-easyocr / *-paddleocr add the OCR service.
+build-up:
+	$(COMPOSE_BUILD) up -d --build
+
+build-up-easyocr:
+	$(COMPOSE_BUILD) --profile easyocr up -d --build
+
+build-up-paddleocr:
+	$(COMPOSE_BUILD) --profile paddleocr up -d --build
+
+# Auto-rebuild + redeploy baskety on source changes (foreground; Ctrl-C to stop).
+watch:
+	$(COMPOSE_BUILD) watch
+
+watch-easyocr:
+	$(COMPOSE_BUILD) --profile easyocr watch
+
+watch-paddleocr:
+	$(COMPOSE_BUILD) --profile paddleocr watch
 
 db-up:
 	docker compose -f compose.dev.yml up -d
