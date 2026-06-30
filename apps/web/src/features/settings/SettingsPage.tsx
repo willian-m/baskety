@@ -787,11 +787,14 @@ function AppearanceSection() {
     }`;
   return (
     <section className="mb-4 rounded-2xl border-[1.5px] border-border bg-card p-6 shadow-soft">
-      <div className="mb-4 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-        Appearance
-      </div>
+      <h2 className="mb-4 font-serif text-base font-semibold">Appearance</h2>
       <div className="flex gap-3">
-        <button type="button" onClick={() => setTheme("light")} className={card(theme === "light")}>
+        <button
+          type="button"
+          aria-pressed={theme === "light"}
+          onClick={() => setTheme("light")}
+          className={card(theme === "light")}
+        >
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium">Light</div>
@@ -800,7 +803,12 @@ function AppearanceSection() {
             {theme === "light" && <span className="text-base font-bold text-primary">✓</span>}
           </div>
         </button>
-        <button type="button" onClick={() => setTheme("dark")} className={card(theme === "dark")}>
+        <button
+          type="button"
+          aria-pressed={theme === "dark"}
+          onClick={() => setTheme("dark")}
+          className={card(theme === "dark")}
+        >
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium">Dark</div>

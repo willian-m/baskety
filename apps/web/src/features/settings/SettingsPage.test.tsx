@@ -9,8 +9,9 @@ import { SettingsPage } from "./SettingsPage.js";
 // @baskety/core uses Zustand 5 which resolves React 19 internally — a hook mismatch
 // with the React 18 renderer used in tests. Mock the whole package to avoid it.
 // vi.hoisted makes the fn available inside the vi.mock factory (which is hoisted).
-const { createLLMMutateAsync } = vi.hoisted(() => ({
+const { createLLMMutateAsync, setTheme } = vi.hoisted(() => ({
   createLLMMutateAsync: vi.fn().mockResolvedValue({}),
+  setTheme: vi.fn(),
 }));
 
 vi.mock("@baskety/core", () => ({
@@ -84,7 +85,7 @@ vi.mock("@baskety/core", () => ({
       theme: "light" | "dark";
       setTheme: (theme: "light" | "dark") => void;
     }) => unknown,
-  ) => selector({ activeHouseholdId: null, theme: "light", setTheme: vi.fn() }),
+  ) => selector({ activeHouseholdId: null, theme: "light", setTheme }),
   useInventories: () => ({ data: [], isLoading: false }),
   useCreateShareLink: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ token: "share-abc123" }),
@@ -146,5 +147,22 @@ describe("SettingsPage", () => {
         expect.objectContaining({ provider: "openai", model: "gpt-4o" }),
       );
     });
+  });
+
+  it("marks the Light theme card as selected (mock default theme)", async () => {
+    renderWithProviders(() => <SettingsPage />);
+    const appearance = (await screen.findByText("Appearance")).closest("section")!;
+    const lightButton = within(appearance).getByRole("button", { pressed: true });
+    expect(within(lightButton).getByText("Light")).toBeInTheDocument();
+    expect(within(lightButton).getByText("✓")).toBeInTheDocument();
+  });
+
+  it("calls setTheme('dark') when the Dark card is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(() => <SettingsPage />);
+    const appearance = (await screen.findByText("Appearance")).closest("section")!;
+    const darkButton = within(appearance).getByText("Dark").closest("button")!;
+    await user.click(darkButton);
+    expect(setTheme).toHaveBeenCalledWith("dark");
   });
 });
