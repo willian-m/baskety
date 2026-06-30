@@ -77,7 +77,7 @@ export function ReportsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Price History Reports</h1>
+        <h1 className="font-serif text-2xl font-bold tracking-tight">Price History Reports</h1>
       </div>
 
       <div className="mb-6">
@@ -113,7 +113,7 @@ export function ReportsPage() {
           ) : (
             <>
               <div className="mb-8 rounded-lg border p-4">
-                <h2 className="mb-4 text-base font-semibold">Price over time</h2>
+                <h2 className="mb-4 font-serif text-base font-semibold">Price over time</h2>
                 <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={chartData} margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
