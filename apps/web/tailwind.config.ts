@@ -1,5 +1,5 @@
-import tailwindcssAnimate from "tailwindcss-animate";
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: ["class"],
@@ -10,6 +10,13 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      fontFamily: {
+        sans: ['"DM Sans"', "system-ui", "sans-serif"],
+        serif: ['"Lora"', "Georgia", "serif"],
+      },
+      boxShadow: {
+        soft: "var(--shadow)",
       },
       colors: {
         background: "hsl(var(--background))",
@@ -45,6 +52,8 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        ok: "hsl(var(--ok))",
+        warn: "hsl(var(--warn))",
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",
