@@ -14,6 +14,15 @@ const STATUS_BADGE: Record<string, string> = {
   failed: "bg-destructive/15 text-destructive",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  uploading: "Uploading",
+  ocr_processing: "Reading",
+  llm_processing: "Extracting",
+  pending_review: "Needs review",
+  committed: "Committed",
+  failed: "Failed",
+};
+
 export function ReceiptPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -35,7 +44,11 @@ export function ReceiptPage() {
       <div className="mb-6 rounded-2xl border-[1.5px] border-border bg-card p-5 shadow-soft">
         <h2 className="mb-3 font-serif text-base font-medium">Scan a receipt</h2>
         <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="receipt-file" className="sr-only">
+            Receipt image
+          </label>
           <input
+            id="receipt-file"
             ref={fileRef}
             type="file"
             accept="image/*"
@@ -86,7 +99,7 @@ export function ReceiptPage() {
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[scan.status] ?? "bg-muted text-muted-foreground"}`}
               >
-                {scan.status}
+                {STATUS_LABEL[scan.status] ?? scan.status}
               </span>
             </Link>
           ))}
