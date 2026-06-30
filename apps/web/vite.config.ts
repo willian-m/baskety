@@ -18,8 +18,12 @@ export default defineConfig({
         __dirname,
         "../../node_modules/.pnpm/@tanstack+react-query@5.101.0_react@18.3.1/node_modules/@tanstack/react-query",
       ),
+      // @baskety/core's zustand otherwise resolves to a copy whose peer `react`
+      // is a second React (19). Pin the web app's own zustand (bound to
+      // react@18.3.1) so a single React instance is used in app + tests.
+      zustand: path.resolve(__dirname, "./node_modules/zustand"),
     },
-    dedupe: ["react", "react-dom", "@tanstack/react-query"],
+    dedupe: ["react", "react-dom", "@tanstack/react-query", "zustand"],
   },
   server: {
     port: 5173,
