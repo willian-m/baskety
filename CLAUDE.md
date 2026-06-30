@@ -51,6 +51,13 @@ GroceryStoreList/
 │   │   └── queries/          # sqlc .sql query files (input to codegen)
 │   └── gen/sqlc/             # sqlc-generated Go code — committed, never hand-edited
 ├── apps/
+│   ├── web/                  # React + Vite + TanStack Router web app (Sprints 9–12)
+│   │   └── src/
+│   │       ├── routes/                  # file-based routes (_app nav shell, _auth, share)
+│   │       ├── features/                # inventory, grocery, receipt, settings, auth, share, reports
+│   │       ├── components/              # design-system pieces (StockBar, CheckCircle, Tag, PageHeader, ThemeToggle, icons)
+│   │       ├── lib/                     # helpers (stock-ratio color)
+│   │       └── styles/globals.css       # warm cream/espresso design tokens (light + dark)
 │   └── mobile/               # Expo (React Native) app — Sprint 13–16
 │       ├── app/
 │       │   ├── _layout.tsx               # root: PersistQueryClientProvider + hydration gate
@@ -161,13 +168,14 @@ Response envelope: `{"data": ...}` for success, `{"error": "..."}` for errors.
 | 6 | Receipt scanning domain | Done |
 | 7 | Catalog, settings, pg_cron, wire-up | Done |
 | 8 | Integration tests + OpenAPI | Done |
-| 9–12 | Web frontend | Not started |
+| 9–12 | Web frontend (React + Vite + TanStack Router) | Done |
 | 13 | Mobile: Foundation + Auth + Navigation | Done |
 | 14 | Mobile: Inventory + Grocery Screens | Done |
 | 15–16 | Mobile: Receipt scanning + Settings | Not started |
 | 17–18 | Docker/CI/CD + hardening | Not started |
 | 19 | Inventory UX Redesign (web table + mobile swipeable cards) | Done |
 | 20 | UX Polish: category autocomplete, grocery mgmt, household switcher | Not started |
+| 21 | Web warm design system (Baskety.dc.html re-skin: tokens, fonts, light/dark, all screens) | Done |
 
 Sprint plans: `docs/superpowers/sprints/sprint-NN.md`
 
